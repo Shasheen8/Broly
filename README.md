@@ -27,10 +27,14 @@ cd Broly && make build
 ```bash
 broly scan                          # scan current directory
 broly scan /path/to/project         # scan specific path
+
 broly scan --secrets                # secrets only
+
 broly scan --sca                    # SCA only
+
 broly scan -f json                  # JSON output
 broly scan -f sarif -o results.sarif
+
 broly scan --min-severity high
 broly scan --sca --offline          # skip OSV API
 ```
