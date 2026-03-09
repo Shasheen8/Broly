@@ -1,0 +1,52 @@
+version: 2
+project_name: broly
+
+builds:
+  - id: broly
+    main: ./cmd/broly
+    binary: broly
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.ShortCommit}}
+    flags:
+      - -trimpath
+
+archives:
+  - id: default
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"
+
+brews:
+  - repository:
+      owner: Shasheen8
+      name: homebrew-tap
+    name: broly
+    homepage: "https://github.com/Shasheen8/Broly"
+    description: "Berserker Product Security Tool - SAST, SCA, and Secrets scanning"
+    license: "MIT"
