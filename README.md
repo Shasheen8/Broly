@@ -10,7 +10,7 @@
   <a href="https://github.com/Shasheen8/Broly/releases"><img src="https://img.shields.io/badge/Release-v0.1.0-blue?style=flat" alt="Release"></a>
 </p>
 
-Berserker product security scanner. Secrets, SCA, and SAST in a single binary. Built on [Poltergeist](https://github.com/ghostsecurity/poltergeist), [osv-scalibr](https://github.com/google/osv-scalibr), and the [OSV.dev](https://osv.dev) vulnerability database.
+Berserker product security scanner. Secrets, SCA, and SAST in a single binary.
 
 ## Quick Start
 
@@ -40,17 +40,14 @@ broly scan --sca --offline          # skip OSV API
 **Secrets** — 100 rules, entropy filtering, Hyperscan engine
 
 ```
-  AWS, GitHub, OpenAI, Anthropic, GCP, Azure, Cloudflare,
-  Slack, Stripe, Twilio, SendGrid, Docker, npm,
-  SSH/PGP/RSA/EC keys, database connection strings,
-  JWTs, generic tokens and passwords
+  AWS, GitHub, OpenAI, Anthropic, GCP, Azure, Cloudflare, Slack, Stripe, Twilio, SendGrid, Docker, npm,
+  SSH/PGP/RSA/EC keys, database connection strings, JWTs, generic tokens and passwords
 ```
 
 **SCA** — 19 ecosystems, 50+ lockfile formats, OSV.dev database
 
 ```
-  Go, Python, JavaScript, Ruby, Rust, Java, PHP, .NET,
-  Dart, C/C++, Haskell, Elixir, Erlang, R, Swift,
+  Go, Python, JavaScript, Ruby, Rust, Java, PHP, .NET, Dart, C/C++, Haskell, Elixir, Erlang, R, Swift,
   Lua, Nim, OCaml, Julia — including Go stdlib vulnerabilities
 ```
 
@@ -58,14 +55,14 @@ broly scan --sca --offline          # skip OSV API
 
 ## Output Formats
 
-`table` (default), `json`, `sarif` (SARIF 2.1.0)
+- `table` (default)
+- `json`, `sarif` (SARIF 2.1.0)
 
 ## Acknowledgments
 
 - [Poltergeist](https://github.com/ghostsecurity/poltergeist) — secret scanning engine
 - [osv-scalibr](https://github.com/google/osv-scalibr) — lockfile extraction
 - [osv.dev](https://osv.dev) — vulnerability database
-- [Bearer](https://github.com/bearer/bearer) — SAST architecture reference
 - [Opengrep](https://github.com/opengrep/opengrep) — rule DSL inspiration
 
 ## License
