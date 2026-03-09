@@ -4,6 +4,11 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (e.g. v0.1.19)"
+        required: true
 
 permissions:
   contents: write
@@ -16,6 +21,7 @@ jobs:
           - os: ubuntu-latest
             goos: linux
             goarch: amd64
+            cc: gcc
           - os: ubuntu-latest
             goos: linux
             goarch: arm64
@@ -26,6 +32,7 @@ jobs:
       CGO_ENABLED: "1"
       GOOS: ${{ matrix.goos }}
       GOARCH: ${{ matrix.goarch }}
+      CC: ${{ matrix.cc }}
     steps:
       - uses: actions/checkout@v4
 
@@ -38,10 +45,8 @@ jobs:
           cache: true
 
       - name: Build
-        env:
-          CC: ${{ matrix.cc }}
         run: |
-          VERSION=${GITHUB_REF_NAME}
+          VERSION=${{ github.event.inputs.tag || github.ref_name }}
           COMMIT=$(git rev-parse --short HEAD)
           NAME="broly_${VERSION}_${{ matrix.goos }}_${{ matrix.goarch }}"
           mkdir -p "dist/${NAME}"
@@ -70,6 +75,8 @@ jobs:
 
       - uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           files: |
             dist/*.tar.gz
             dist/checksums.txt
