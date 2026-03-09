@@ -14,10 +14,13 @@ Berserker product security scanner. Secrets, SCA, and SAST in a single binary.
 
 ## Install
 
-Download a pre-built binary from [Releases](https://github.com/Shasheen8/Broly/releases), or build from source:
+Download a pre-built binary from [Releases](https://github.com/Shasheen8/Broly/releases).
+
+Or build from source (requires [Vectorscan](https://github.com/VectorCamp/vectorscan) for the Hyperscan secrets engine):
 
 ```bash
-brew install vectorscan   # build dependency
+brew install vectorscan
+
 git clone https://github.com/Shasheen8/Broly.git
 cd Broly && make build
 ```
@@ -25,25 +28,30 @@ cd Broly && make build
 ## Usage
 
 ```bash
-broly scan                          # scan current directory
-broly scan /path/to/project         # scan specific path
-broly scan --secrets                # secrets only
-broly scan --sca                    # SCA only
-broly scan -f json                  # JSON output
+broly scan                           # scan current directory
+broly scan /path/to/project          # scan specific path
+
+broly scan --secrets                 # secrets only
+broly scan --sca                     # SCA only
+
+broly scan -f json                   # JSON output
 broly scan -f sarif -o results.sarif
+
 broly scan --min-severity high
-broly scan --sca --offline          # skip OSV API
+broly scan --sca --offline           # skip OSV API
 ```
 
 ## What It Finds
 
 **Secrets** — 100 rules, entropy filtering, Hyperscan engine
+
 ```
 AWS, GitHub, OpenAI, Anthropic, GCP, Azure, Cloudflare, Slack, Stripe, Twilio,
 SendGrid, Docker, npm, SSH/PGP/RSA/EC keys, database URIs, JWTs, generic tokens
 ```
 
 **SCA** — 19 ecosystems, 50+ lockfile formats, OSV.dev
+
 ```
 Go, Python, JavaScript, Ruby, Rust, Java, PHP, .NET, Dart, C/C++, Haskell,
 Elixir, Erlang, R, Swift, Lua, Nim, OCaml, Julia — including Go stdlib vulns
