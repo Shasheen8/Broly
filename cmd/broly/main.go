@@ -62,7 +62,7 @@ func scanCmd() *cobra.Command {
 		Use:   "scan [paths...]",
 		Short: "Scan targets for security findings",
 		Long: `Run SAST, SCA, and Secrets scanning against the specified paths.
-By default, all scanners are enabled. Use flags to selectively enable.`,
+By default all scanners are enabled and the current directory is scanned.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
 				args = []string{"."}

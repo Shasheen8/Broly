@@ -10,57 +10,57 @@
   <a href="https://github.com/Shasheen8/Broly/releases"><img src="https://img.shields.io/badge/Release-v0.1.0-blue?style=flat" alt="Release"></a>
 </p>
 
-Berserker product security scanner. Secrets, SCA, and SAST in a single binary. Built on [Poltergeist](https://github.com/ghostsecurity/poltergeist) (100 secret detection rules, Hyperscan engine), [osv-scalibr](https://github.com/google/osv-scalibr) (50+ lockfile formats across 19 ecosystems), and the [OSV.dev](https://osv.dev) vulnerability database (no API key needed, fully open).
+Berserker product security scanner. Secrets, SCA, and SAST in a single binary. Built on [Poltergeist](https://github.com/ghostsecurity/poltergeist), [osv-scalibr](https://github.com/google/osv-scalibr), and the [OSV.dev](https://osv.dev) vulnerability database.
 
 ## Quick Start
 
+Download a pre-built binary from [Releases](https://github.com/Shasheen8/Broly/releases), or build from source:
+
 ```bash
+brew install vectorscan   # build dependency
 git clone https://github.com/Shasheen8/Broly.git
 cd Broly && make build
-
-# Optional: enables Hyperscan engine for faster secret scanning
-brew install vectorscan
 ```
 
 ## Usage
 
 ```bash
-# Scan current directory (secrets + SCA)
-broly scan
-
-# Scan a specific path
-broly scan /path/to/project
-
-# Individual scanners
-broly scan --secrets
-broly scan --sca
-
-# Output formats
-broly scan -f json
+broly scan                          # scan current directory
+broly scan /path/to/project         # scan specific path
+broly scan --secrets                # secrets only
+broly scan --sca                    # SCA only
+broly scan -f json                  # JSON output
 broly scan -f sarif -o results.sarif
-
-# Filter
 broly scan --min-severity high
-
-# Offline (skip OSV API)
-broly scan --sca --offline
+broly scan --sca --offline          # skip OSV API
 ```
 
 ## What It Finds
 
-**Secrets** — AWS, GitHub, OpenAI, Anthropic, GCP, Azure, Cloudflare, Slack, Stripe, Twilio, SendGrid, Docker, npm, SSH/PGP/RSA keys, database connection strings, JWTs, generic tokens and passwords. 100 rules with entropy filtering.
+**Secrets** — 100 rules, entropy filtering, Hyperscan engine
 
-**SCA** — Vulnerable dependencies across Go, Python, JavaScript, Ruby, Rust, Java, PHP, .NET, Dart, C/C++, Haskell, Elixir, Erlang, R, Swift, and more. Queries the open OSV.dev database. Detects Go stdlib vulnerabilities.
+```
+  AWS, GitHub, OpenAI, Anthropic, GCP, Azure, Cloudflare,
+  Slack, Stripe, Twilio, SendGrid, Docker, npm,
+  SSH/PGP/RSA/EC keys, database connection strings,
+  JWTs, generic tokens and passwords
+```
 
-**SAST** — Tree-sitter based AST analysis. Coming in v0.2.
+**SCA** — 19 ecosystems, 50+ lockfile formats, OSV.dev database
+
+```
+  Go, Python, JavaScript, Ruby, Rust, Java, PHP, .NET,
+  Dart, C/C++, Haskell, Elixir, Erlang, R, Swift,
+  Lua, Nim, OCaml, Julia — including Go stdlib vulnerabilities
+```
+
+**SAST** — tree-sitter AST analysis, coming in v0.2
 
 ## Output Formats
 
-`table` (default), `json`, `sarif` (SARIF 2.1.0 for GitHub Security tab and IDEs).
+`table` (default), `json`, `sarif` (SARIF 2.1.0)
 
 ## Acknowledgments
-
-Built on the shoulders of:
 
 - [Poltergeist](https://github.com/ghostsecurity/poltergeist) — secret scanning engine
 - [osv-scalibr](https://github.com/google/osv-scalibr) — lockfile extraction
