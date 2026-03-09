@@ -38,7 +38,7 @@ Secrets scanning into a single fast binary. Built in Go for speed.`,
 	root.AddCommand(validateCmd())
 
 	if err := root.Execute(); err != nil {
-		os.Exit(1)
+		os.Exit(2)
 	}
 }
 
@@ -172,7 +172,7 @@ func runScan(cfg *core.Config) error {
 	}
 
 	if len(result.Findings) > 0 {
-		return fmt.Errorf("scan detected %d findings", len(result.Findings))
+		os.Exit(1)
 	}
 	return nil
 }

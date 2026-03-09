@@ -60,7 +60,12 @@ func (o *Orchestrator) Run(ctx context.Context) (*core.ScanResult, error) {
 			go func() {
 				defer fwdWg.Done()
 				for f := range ch {
-					aggregated <- f
+					select {
+					case aggregated <- f:
+					case <-ctx.Done():
+						for range ch {} // drain so scanner can exit
+						return
+					}
 				}
 			}()
 

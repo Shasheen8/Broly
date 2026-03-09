@@ -55,7 +55,7 @@ func (f *Finding) ComputeFingerprint() {
 		f.Type, f.RuleID, f.FilePath, f.Snippet, f.StartLine,
 	)
 	hash := sha256.Sum256([]byte(data))
-	f.Fingerprint = fmt.Sprintf("%x", hash[:16])
+	f.Fingerprint = fmt.Sprintf("%x", hash[:])
 }
 
 type ScanResult struct {
