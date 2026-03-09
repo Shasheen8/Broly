@@ -1,72 +1,69 @@
-// Package secrets adapts Poltergeist's engine to Broly's core.Scanner interface.
+// Package secrets adapts Titus's engine to Broly's core.Scanner interface.
 package secrets
 
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
-	poltergeist "github.com/ghostsecurity/poltergeist/v2/pkg"
+	titus "github.com/praetorian-inc/titus"
 
 	"github.com/Shasheen8/Broly/pkg/core"
 )
 
 type SecretsScanner struct {
-	scanner          *poltergeist.Scanner
+	scanner          *titus.Scanner
 	disableRedaction bool
+	maxFileSize      int64
+	excludePaths     map[string]bool
 }
 
 func NewSecretsScanner() *SecretsScanner {
 	return &SecretsScanner{}
 }
 
-func (s *SecretsScanner) Name() string       { return "secrets" }
+func (s *SecretsScanner) Name() string        { return "secrets" }
 func (s *SecretsScanner) Type() core.ScanType { return core.ScanTypeSecrets }
 
 func (s *SecretsScanner) Init(cfg *core.Config) error {
-	var rules []poltergeist.Rule
-	var err error
-
-	if cfg.SecretsRulesDir != "" {
-		rules, err = poltergeist.LoadRulesFromDirectory(cfg.SecretsRulesDir)
-	} else {
-		rules, err = poltergeist.LoadDefaultRules()
-	}
-	if err != nil {
-		return fmt.Errorf("load secrets rules: %w", err)
+	s.disableRedaction = cfg.DisableRedaction
+	s.maxFileSize = cfg.MaxFileSize
+	if s.maxFileSize == 0 {
+		s.maxFileSize = 100 * 1024 * 1024 // 100MB default
 	}
 
-	if cfg.SecretsRulesDir != "" {
-		defaultRules, defErr := poltergeist.LoadDefaultRules()
-		if defErr == nil {
-			rules = append(defaultRules, rules...)
+	s.excludePaths = make(map[string]bool, len(cfg.ExcludePaths))
+	for _, p := range cfg.ExcludePaths {
+		s.excludePaths[p] = true
+	}
+
+	opts := []titus.Option{
+		titus.WithContextLines(0),
+	}
+
+	if cfg.ValidateSecrets {
+		opts = append(opts, titus.WithValidation())
+		if cfg.Workers > 0 {
+			opts = append(opts, titus.WithValidationWorkers(cfg.Workers))
 		}
 	}
 
-	s.disableRedaction = cfg.DisableRedaction
-
-	engineName := poltergeist.SelectEngine(rules, "auto")
-	var engine poltergeist.PatternEngine
-	if engineName == "hyperscan" {
-		engine = poltergeist.NewHyperscanEngine()
-	} else {
-		engine = poltergeist.NewGoRegexEngine()
+	if cfg.SecretsRulesDir != "" {
+		rules, err := titus.LoadRulesFromFile(cfg.SecretsRulesDir)
+		if err != nil {
+			return fmt.Errorf("load secrets rules: %w", err)
+		}
+		opts = append(opts, titus.WithRules(rules))
 	}
 
-	if err := engine.CompileRules(rules); err != nil {
-		engine.Close()
-		return fmt.Errorf("compile secrets rules: %w", err)
+	scanner, err := titus.NewScanner(opts...)
+	if err != nil {
+		return fmt.Errorf("init secrets scanner: %w", err)
 	}
-
-	scanner := poltergeist.NewScanner(engine)
-	if cfg.Workers > 0 {
-		scanner.WorkerCount = cfg.Workers
-	}
-	if cfg.MaxFileSize > 0 {
-		scanner.MaxFileSize = cfg.MaxFileSize
-	}
-	scanner.DisableRedaction = cfg.DisableRedaction
 
 	s.scanner = scanner
 	return nil
@@ -79,98 +76,105 @@ func (s *SecretsScanner) Scan(ctx context.Context, paths []string, findings chan
 		if ctx.Err() != nil {
 			return nil
 		}
-
-		results, err := s.scanner.ScanDirectory(target)
-		if err != nil {
+		if err := s.scanPath(ctx, target, findings); err != nil {
 			fmt.Fprintf(os.Stderr, "warning: secrets scan of %s: %v\n", target, err)
-			continue
+		}
+	}
+
+	return nil
+}
+
+func (s *SecretsScanner) scanPath(ctx context.Context, root string, findings chan<- core.Finding) error {
+	return filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if ctx.Err() != nil {
+			return filepath.SkipAll
 		}
 
-		for _, r := range results {
-			if !r.RuleEntropyThresholdMet {
-				continue
+		name := d.Name()
+		if s.excludePaths[name] || s.excludePaths[path] {
+			if d.IsDir() {
+				return filepath.SkipDir
 			}
+			return nil
+		}
 
-			redacted := r.Redacted
+		if d.IsDir() {
+			return nil
+		}
+
+		info, err := d.Info()
+		if err != nil || info.Size() == 0 || info.Size() > s.maxFileSize {
+			return nil
+		}
+
+		matches, err := s.scanner.ScanFile(path)
+		if err != nil {
+			return nil
+		}
+
+		for _, m := range matches {
+			redacted := redact(m.Snippet.Matching)
 			snippet := redacted
-			if s.disableRedaction && r.Match != "" {
-				snippet = r.Match
+			if s.disableRedaction {
+				snippet = string(m.Snippet.Matching)
 			}
 
 			finding := core.Finding{
 				Type:        core.ScanTypeSecrets,
-				RuleID:      r.RuleID,
-				RuleName:    r.RuleName,
+				RuleID:      m.RuleID,
+				RuleName:    m.RuleName,
 				Severity:    core.SeverityHigh,
-				Title:       "Secret detected: " + r.RuleName,
-				Description: fmt.Sprintf("Potential secret found matching rule %q", r.RuleName),
-				FilePath:    r.FilePath,
-				StartLine:   r.LineNumber,
-				EndLine:     r.LineNumber,
+				Title:       "Secret detected: " + m.RuleName,
+				Description: fmt.Sprintf("Potential secret matching rule %q", m.RuleName),
+				FilePath:    path,
+				StartLine:   int(m.Location.Source.Start.Line),
+				EndLine:     int(m.Location.Source.End.Line),
 				Snippet:     snippet,
 				Redacted:    redacted,
-				Entropy:     r.Entropy,
 				Tags:        []string{"secrets"},
 				Timestamp:   time.Now(),
 			}
+
+			if m.ValidationResult != nil {
+				finding.Tags = append(finding.Tags, string(m.ValidationResult.Status))
+			}
+
 			finding.ComputeFingerprint()
 
 			select {
 			case findings <- finding:
 			case <-ctx.Done():
-				return nil
+				return filepath.SkipAll
 			}
 		}
-	}
 
-	return nil
+		return nil
+	})
 }
 
 func (s *SecretsScanner) Close() error {
 	if s.scanner != nil {
-		s.scanner.Engine.Close()
+		return s.scanner.Close()
 	}
 	return nil
 }
 
-func LoadDefaultRules() ([]poltergeist.Rule, error) {
-	return poltergeist.LoadDefaultRules()
+func redact(b []byte) string {
+	s := string(b)
+	if len(s) <= 8 {
+		return strings.Repeat("*", len(s))
+	}
+	return s[:4] + strings.Repeat("*", min(5, len(s)-8)) + s[len(s)-4:]
 }
 
-func ValidateRules(rules []poltergeist.Rule) []error {
-	var errs []error
-	engine := poltergeist.NewGoRegexEngine()
-	defer engine.Close()
-
-	if err := engine.CompileRules(rules); err != nil {
-		return []error{fmt.Errorf("compile rules: %w", err)}
+// ValidateRules verifies that builtin secrets rules load successfully.
+func ValidateRules() (int, error) {
+	rules, err := titus.LoadBuiltinRules()
+	if err != nil {
+		return 0, err
 	}
-
-	for _, rule := range rules {
-		for _, assert := range rule.Tests.Assert {
-			matches := engine.FindAllInLine(assert)
-			found := false
-			for _, m := range matches {
-				if m.RuleID == rule.ID && m.RuleEntropyThresholdMet {
-					found = true
-					break
-				}
-			}
-			if !found {
-				errs = append(errs, fmt.Errorf("rule %s: assert failed - pattern should match %q", rule.ID, assert))
-			}
-		}
-
-		for _, assertNot := range rule.Tests.AssertNot {
-			matches := engine.FindAllInLine(assertNot)
-			for _, m := range matches {
-				if m.RuleID == rule.ID && m.RuleEntropyThresholdMet {
-					errs = append(errs, fmt.Errorf("rule %s: assert_not failed - pattern should NOT match %q", rule.ID, assertNot))
-					break
-				}
-			}
-		}
-	}
-
-	return errs
+	return len(rules), nil
 }

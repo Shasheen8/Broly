@@ -44,18 +44,19 @@ Secrets scanning into a single fast binary. Built in Go for speed.`,
 
 func scanCmd() *cobra.Command {
 	var (
-		outputFormat   string
-		outputFile     string
-		enableSAST     bool
-		enableSCA      bool
-		enableSecrets  bool
-		workers        int
-		minSeverity    string
-		excludePaths   []string
-		secretsRules   string
-		disableRedact  bool
-		offline        bool
-		quiet          bool
+		outputFormat    string
+		outputFile      string
+		enableSAST      bool
+		enableSCA       bool
+		enableSecrets   bool
+		workers         int
+		minSeverity     string
+		excludePaths    []string
+		secretsRules    string
+		disableRedact   bool
+		validateSecrets bool
+		offline         bool
+		quiet           bool
 	)
 
 	cmd := &cobra.Command{
@@ -87,6 +88,7 @@ By default all scanners are enabled and the current directory is scanned.`,
 				ExcludePaths:     excludePaths,
 				SecretsRulesDir:  secretsRules,
 				DisableRedaction: disableRedact,
+				ValidateSecrets:  validateSecrets,
 				Offline:          offline,
 				Quiet:            quiet,
 			}
@@ -106,6 +108,7 @@ By default all scanners are enabled and the current directory is scanned.`,
 	flags.StringSliceVar(&excludePaths, "exclude", nil, "Paths to exclude from scanning")
 	flags.StringVar(&secretsRules, "secrets-rules", "", "Custom secrets rules directory")
 	flags.BoolVar(&disableRedact, "no-redact", false, "Disable secret redaction in output")
+	flags.BoolVar(&validateSecrets, "validate", false, "Validate detected secrets against source APIs")
 	flags.BoolVar(&offline, "offline", false, "Run SCA in offline mode (skip OSV API)")
 	flags.BoolVarP(&quiet, "quiet", "q", false, "Suppress progress output")
 
@@ -190,22 +193,13 @@ func versionCmd() *cobra.Command {
 func validateCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "validate-rules",
-		Short: "Validate secrets rules (compile patterns, run tests)",
+		Short: "Validate that builtin secrets rules load successfully",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			rules, err := secrets.LoadDefaultRules()
+			count, err := secrets.ValidateRules()
 			if err != nil {
 				return err
 			}
-
-			errs := secrets.ValidateRules(rules)
-			if len(errs) > 0 {
-				for _, e := range errs {
-					fmt.Fprintf(os.Stderr, "  FAIL: %s\n", e)
-				}
-				return fmt.Errorf("%d rule validation errors", len(errs))
-			}
-
-			fmt.Printf("  All %d rules validated successfully.\n", len(rules))
+			fmt.Printf("  %d builtin rules loaded successfully.\n", count)
 			return nil
 		},
 	}
