@@ -7,12 +7,12 @@
 <p align="center">
   <a href="https://github.com/Shasheen8/Broly"><img src="https://img.shields.io/badge/Go-1.26-00ADD8?style=flat&logo=go" alt="Go"></a>
   <a href="https://github.com/Shasheen8/Broly/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=flat" alt="License"></a>
-  <a href="https://github.com/Shasheen8/Broly/releases"><img src="https://img.shields.io/badge/Release-v0.1.0-blue?style=flat" alt="Release"></a>
+  <a href="https://github.com/Shasheen8/Broly/releases"><img src="https://img.shields.io/github/v/release/Shasheen8/Broly?style=flat&label=Release" alt="Release"></a>
 </p>
 
 Berserker product security scanner. Secrets, SCA, and SAST in a single binary.
 
-## Quick Start
+## Install
 
 Download a pre-built binary from [Releases](https://github.com/Shasheen8/Broly/releases), or build from source:
 
@@ -27,47 +27,51 @@ cd Broly && make build
 ```bash
 broly scan                          # scan current directory
 broly scan /path/to/project         # scan specific path
-
 broly scan --secrets                # secrets only
-
 broly scan --sca                    # SCA only
-
 broly scan -f json                  # JSON output
 broly scan -f sarif -o results.sarif
-
 broly scan --min-severity high
 broly scan --sca --offline          # skip OSV API
 ```
 
 ## What It Finds
 
-**Secrets:** 100 rules, entropy filtering, Hyperscan engine
-
+**Secrets** — 100 rules, entropy filtering, Hyperscan engine
 ```
-  AWS, GitHub, OpenAI, Anthropic, GCP, Azure, Cloudflare, Slack, Stripe, Twilio, SendGrid, Docker, npm,
-  SSH/PGP/RSA/EC keys, database connection strings, JWTs, generic tokens and passwords
-```
-
-**SCA:** 19 ecosystems, 50+ lockfile formats, OSV.dev database
-
-```
-  Go, Python, JavaScript, Ruby, Rust, Java, PHP, .NET, Dart, C/C++, Haskell, Elixir, Erlang, R, Swift,
-  Lua, Nim, OCaml, Julia — including Go stdlib vulnerabilities
+AWS, GitHub, OpenAI, Anthropic, GCP, Azure, Cloudflare, Slack, Stripe, Twilio,
+SendGrid, Docker, npm, SSH/PGP/RSA/EC keys, database URIs, JWTs, generic tokens
 ```
 
-**SAST:** tree-sitter AST analysis, coming in v0.2
+**SCA** — 19 ecosystems, 50+ lockfile formats, OSV.dev
+```
+Go, Python, JavaScript, Ruby, Rust, Java, PHP, .NET, Dart, C/C++, Haskell,
+Elixir, Erlang, R, Swift, Lua, Nim, OCaml, Julia — including Go stdlib vulns
+```
+
+**SAST** — tree-sitter AST analysis, coming in v0.2
 
 ## Output Formats
 
-- `table` (default)
-- `json`, `sarif` (SARIF 2.1.0)
+| Format | Flag |
+|--------|------|
+| Table (default) | `-f table` |
+| JSON | `-f json` |
+| SARIF 2.1.0 | `-f sarif` |
+
+## Exit Codes
+
+| Code | Meaning |
+|------|---------|
+| 0 | No findings |
+| 1 | Findings detected |
+| 2 | Error |
 
 ## Acknowledgments
 
-- [Poltergeist](https://github.com/ghostsecurity/poltergeist) — secret scanning engine
+- [Poltergeist](https://github.com/ghostsecurity/poltergeist) — secrets engine
 - [osv-scalibr](https://github.com/google/osv-scalibr) — lockfile extraction
 - [osv.dev](https://osv.dev) — vulnerability database
-- [Opengrep](https://github.com/opengrep/opengrep) — rule DSL inspiration
 
 ## License
 
