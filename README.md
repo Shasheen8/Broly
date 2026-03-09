@@ -2,15 +2,15 @@
   <img src="assets/broly-logo.png" alt="Broly" width="350"/>
 </p>
 
-<h1 align="center">Broly</h1>
+<h1 align="center">Broly — Berserker product security scanner.</h1>
+
+<p align="center">Secrets, SCA, and SAST in a single binary.</p>
 
 <p align="center">
   <a href="https://github.com/Shasheen8/Broly"><img src="https://img.shields.io/badge/Go-1.26-00ADD8?style=flat&logo=go" alt="Go"></a>
   <a href="https://github.com/Shasheen8/Broly/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=flat" alt="License"></a>
   <a href="https://github.com/Shasheen8/Broly/releases"><img src="https://img.shields.io/github/v/release/Shasheen8/Broly?style=flat&label=Release" alt="Release"></a>
 </p>
-
-Berserker product security scanner. Secrets, SCA, and SAST in a single binary.
 
 ## Install
 
