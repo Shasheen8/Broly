@@ -9,24 +9,8 @@ builds:
       - CGO_ENABLED=1
     goos:
       - linux
-      - darwin
     goarch:
       - amd64
-      - arm64
-    overrides:
-      - goos: darwin
-        goarch: amd64
-        env:
-          - CGO_ENABLED=0
-      - goos: darwin
-        goarch: arm64
-        env:
-          - CGO_ENABLED=0
-      - goos: linux
-        goarch: arm64
-        env:
-          - CGO_ENABLED=1
-          - CC=aarch64-linux-gnu-gcc
     ldflags:
       - -s -w
       - -X main.version={{.Version}}
