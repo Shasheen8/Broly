@@ -14,13 +14,12 @@ Berserker product security scanner. Secrets, SCA, and SAST in a single binary.
 
 ## Install
 
-Download a pre-built binary from [Releases](https://github.com/Shasheen8/Broly/releases).
+**Linux** - download a pre-built binary from [Releases](https://github.com/Shasheen8/Broly/releases).
 
-Or build from source (requires [Vectorscan](https://github.com/VectorCamp/vectorscan) for the Hyperscan secrets engine):
+**macOS** - build from source (requires [Vectorscan](https://github.com/VectorCamp/vectorscan)):
 
 ```bash
 brew install vectorscan
-
 git clone https://github.com/Shasheen8/Broly.git
 cd Broly && make build
 ```
@@ -43,7 +42,7 @@ broly scan --sca --offline           # skip OSV API
 
 ## What It Finds
 
-**Secrets** - 100 rules, entropy filtering, Hyperscan engine
+**Secrets** - 487 rules, entropy filtering, Hyperscan engine
 
 ```
 AWS, GitHub, OpenAI, Anthropic, GCP, Azure, Cloudflare, Slack, Stripe, Twilio,
