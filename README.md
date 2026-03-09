@@ -59,14 +59,6 @@ Elixir, Erlang, R, Swift, Lua, Nim, OCaml, Julia — including Go stdlib vulns
 | JSON | `-f json` |
 | SARIF 2.1.0 | `-f sarif` |
 
-## Exit Codes
-
-| Code | Meaning |
-|------|---------|
-| 0 | No findings |
-| 1 | Findings detected |
-| 2 | Error |
-
 ## Acknowledgments
 
 - [Poltergeist](https://github.com/ghostsecurity/poltergeist) — secrets engine
