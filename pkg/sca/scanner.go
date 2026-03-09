@@ -39,7 +39,7 @@ func NewSCAScanner() *SCAScanner {
 	return &SCAScanner{}
 }
 
-func (s *SCAScanner) Name() string       { return "sca" }
+func (s *SCAScanner) Name() string        { return "sca" }
 func (s *SCAScanner) Type() core.ScanType { return core.ScanTypeSCA }
 
 func (s *SCAScanner) Init(cfg *core.Config) error {
@@ -51,6 +51,7 @@ func (s *SCAScanner) Init(cfg *core.Config) error {
 	for _, eco := range ecosystems {
 		exts, err := list.ExtractorsFromName(eco, &cpb.PluginConfig{})
 		if err != nil {
+			fmt.Fprintf(os.Stderr, "warning: sca extractor unavailable for %s: %v\n", eco, err)
 			continue
 		}
 		extractors = append(extractors, exts...)

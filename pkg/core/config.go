@@ -18,8 +18,8 @@ type Config struct {
 	ExcludeRuleIDs []string `yaml:"exclude_rule_ids" json:"exclude_rule_ids"`
 
 	SecretsRulesDir  string `yaml:"secrets_rules_dir" json:"secrets_rules_dir"`
-	DisableRedaction  bool `yaml:"disable_redaction" json:"disable_redaction"`
-	ValidateSecrets   bool `yaml:"validate_secrets" json:"validate_secrets"`
+	DisableRedaction bool   `yaml:"disable_redaction" json:"disable_redaction"`
+	ValidateSecrets  bool   `yaml:"validate_secrets" json:"validate_secrets"`
 
 	Offline      bool     `yaml:"offline" json:"offline"`
 	SASTRulesDir string   `yaml:"sast_rules_dir" json:"sast_rules_dir"`

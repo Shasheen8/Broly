@@ -39,11 +39,11 @@ type sarifDriver struct {
 }
 
 type sarifRule struct {
-	ID               string           `json:"id"`
-	Name             string           `json:"name"`
-	ShortDescription sarifMessage     `json:"shortDescription"`
-	HelpURI          string           `json:"helpUri,omitempty"`
-	Properties       sarifProperties  `json:"properties,omitempty"`
+	ID               string          `json:"id"`
+	Name             string          `json:"name"`
+	ShortDescription sarifMessage    `json:"shortDescription"`
+	HelpURI          string          `json:"helpUri,omitempty"`
+	Properties       sarifProperties `json:"properties,omitempty"`
 }
 
 type sarifProperties struct {
@@ -51,10 +51,10 @@ type sarifProperties struct {
 }
 
 type sarifResult struct {
-	RuleID    string            `json:"ruleId"`
-	Level     string            `json:"level"`
-	Message   sarifMessage      `json:"message"`
-	Locations []sarifLocation   `json:"locations,omitempty"`
+	RuleID       string            `json:"ruleId"`
+	Level        string            `json:"level"`
+	Message      sarifMessage      `json:"message"`
+	Locations    []sarifLocation   `json:"locations,omitempty"`
 	Fingerprints map[string]string `json:"fingerprints,omitempty"`
 }
 

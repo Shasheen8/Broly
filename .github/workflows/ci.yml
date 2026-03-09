@@ -47,6 +47,7 @@ jobs:
 
       - name: Bump patch version and push tag
         run: |
+          set -e
           latest=$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
           if [ -z "$latest" ]; then
             next="v0.1.0"
@@ -56,5 +57,7 @@ jobs:
             patch=$(echo "$latest" | cut -d. -f3)
             next="v${major}.${minor}.$((patch + 1))"
           fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
           git tag "$next"
           git push origin "$next"

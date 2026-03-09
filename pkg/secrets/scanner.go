@@ -167,7 +167,7 @@ func redact(b []byte) string {
 	if len(s) <= 8 {
 		return strings.Repeat("*", len(s))
 	}
-	return s[:4] + strings.Repeat("*", min(5, len(s)-8)) + s[len(s)-4:]
+	return s[:4] + "****" + s[len(s)-4:]
 }
 
 // ValidateRules verifies that builtin secrets rules load successfully.

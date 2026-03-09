@@ -16,7 +16,7 @@ func NewSASTScanner() *SASTScanner {
 	return &SASTScanner{}
 }
 
-func (s *SASTScanner) Name() string       { return "sast" }
+func (s *SASTScanner) Name() string        { return "sast" }
 func (s *SASTScanner) Type() core.ScanType { return core.ScanTypeSAST }
 
 func (s *SASTScanner) Init(cfg *core.Config) error {

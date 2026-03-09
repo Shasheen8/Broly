@@ -69,7 +69,7 @@ Elixir, Erlang, R, Swift, Lua, Nim, OCaml, Julia, including Go stdlib vulns
 
 ## Acknowledgments
 
-- [Poltergeist](https://github.com/ghostsecurity/poltergeist) — secrets engine
+- [Titus](https://github.com/praetorian-inc/titus) — secrets engine
 - [osv-scalibr](https://github.com/google/osv-scalibr) — lockfile extraction
 - [osv.dev](https://osv.dev) — vulnerability database
 

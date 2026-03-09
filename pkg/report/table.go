@@ -141,7 +141,7 @@ func trunc(s string, maxLen int) string {
 
 func truncPath(path string, maxLen int) string {
 	runes := []rune(path)
-	if len(runes) <= maxLen {
+	if len(runes) <= maxLen || maxLen <= 3 {
 		return path
 	}
 	return "..." + string(runes[len(runes)-maxLen+3:])
