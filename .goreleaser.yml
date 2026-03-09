@@ -14,13 +14,16 @@ builds:
       - amd64
       - arm64
     overrides:
-      - targets:
-          - darwin_amd64
-          - darwin_arm64
+      - goos: darwin
+        goarch: amd64
         env:
           - CGO_ENABLED=0
-      - targets:
-          - linux_arm64
+      - goos: darwin
+        goarch: arm64
+        env:
+          - CGO_ENABLED=0
+      - goos: linux
+        goarch: arm64
         env:
           - CGO_ENABLED=1
           - CC=aarch64-linux-gnu-gcc
