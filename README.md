@@ -43,21 +43,21 @@ broly scan --sca --offline           # skip OSV API
 
 ## What It Finds
 
-**Secrets** — 100 rules, entropy filtering, Hyperscan engine
+**Secrets** - 100 rules, entropy filtering, Hyperscan engine
 
 ```
 AWS, GitHub, OpenAI, Anthropic, GCP, Azure, Cloudflare, Slack, Stripe, Twilio,
 SendGrid, Docker, npm, SSH/PGP/RSA/EC keys, database URIs, JWTs, generic tokens
 ```
 
-**SCA** — 19 ecosystems, 50+ lockfile formats, OSV.dev
+**SCA** - 19 ecosystems, 50+ lockfile formats
 
 ```
 Go, Python, JavaScript, Ruby, Rust, Java, PHP, .NET, Dart, C/C++, Haskell,
-Elixir, Erlang, R, Swift, Lua, Nim, OCaml, Julia — including Go stdlib vulns
+Elixir, Erlang, R, Swift, Lua, Nim, OCaml, Julia, including Go stdlib vulns
 ```
 
-**SAST** — tree-sitter AST analysis, coming in v0.2
+**SAST** - AST-based analysis, coming in v0.2
 
 ## Output Formats
 
