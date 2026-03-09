@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/broly-logo.png" alt="Broly" width="200"/>
+  <img src="assets/broly-logo.png" alt="Broly" width="350"/>
 </p>
 
 <h1 align="center">Broly</h1>
