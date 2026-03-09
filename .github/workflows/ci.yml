@@ -44,6 +44,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ secrets.GH_PAT }}
 
       - name: Bump patch version and push tag
         run: |
@@ -61,3 +62,5 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git tag "$next"
           git push origin "$next"
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
