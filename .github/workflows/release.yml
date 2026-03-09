@@ -17,7 +17,7 @@ jobs:
           fetch-depth: 0
 
       - name: Install build dependencies
-        run: sudo apt-get update && sudo apt-get install -y libhyperscan-dev
+        run: sudo apt-get update && sudo apt-get install -y libhyperscan-dev gcc-aarch64-linux-gnu
 
       - uses: actions/setup-go@v5
         with:
