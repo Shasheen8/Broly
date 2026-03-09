@@ -1,0 +1,108 @@
+rules:
+  - id: broly.sast.js.eval
+    name: Use of eval()
+    language: javascript
+    severity: high
+    cwe: [CWE-95]
+    message: eval() executes arbitrary JavaScript. Never pass user-controlled input to eval().
+    description: Arbitrary code execution risk via JavaScript eval().
+    find_capture: call
+    query: |
+      (call_expression
+        function: (identifier) @func
+        arguments: (arguments)) @call
+    filter:
+      - capture: func
+        regex: "^eval$"
+    fix: Avoid eval(). Use JSON.parse() for data or refactor to explicit logic.
+    references:
+      - https://cwe.mitre.org/data/definitions/95.html
+
+  - id: broly.sast.js.document_write
+    name: document.write() Usage
+    language: javascript
+    severity: medium
+    cwe: [CWE-79]
+    message: document.write() can introduce XSS if called with user-controlled data.
+    description: document.write() writes raw HTML, bypassing DOM-based XSS protections.
+    find_capture: call
+    query: |
+      (call_expression
+        function: (member_expression
+          object: (identifier) @obj
+          property: (property_identifier) @method)
+        arguments: (arguments)) @call
+    filter:
+      - capture: obj
+        regex: "^document$"
+      - capture: method
+        regex: "^(write|writeln)$"
+    fix: Use textContent or createElement() instead of document.write().
+    references:
+      - https://owasp.org/www-community/attacks/xss/
+      - https://cwe.mitre.org/data/definitions/79.html
+
+  - id: broly.sast.js.innerhtml
+    name: innerHTML/outerHTML Assignment
+    language: javascript
+    severity: high
+    cwe: [CWE-79]
+    message: Assigning to innerHTML or outerHTML with user-controlled data causes XSS.
+    description: Direct HTML injection via innerHTML/outerHTML assignment.
+    find_capture: assign
+    query: |
+      (assignment_expression
+        left: (member_expression
+          property: (property_identifier) @prop)
+        right: _) @assign
+    filter:
+      - capture: prop
+        regex: "^(innerHTML|outerHTML)$"
+    fix: Use textContent for text or a sanitizer library for HTML content.
+    references:
+      - https://owasp.org/www-community/attacks/xss/
+      - https://cwe.mitre.org/data/definitions/79.html
+
+  - id: broly.sast.js.process_spawn
+    name: OS Command Execution
+    language: javascript
+    severity: high
+    cwe: [CWE-78]
+    message: OS command execution detected. Ensure arguments are not user-controlled to prevent injection.
+    description: Direct OS command execution via Node.js child_process methods.
+    find_capture: call
+    query: |
+      (call_expression
+        function: (member_expression
+          property: (property_identifier) @method)
+        arguments: (arguments)) @call
+    filter:
+      - capture: method
+        regex: "^(exec|execSync|spawn|spawnSync|execFile|execFileSync)$"
+    fix: Use execFile() with an explicit argument array rather than a shell string.
+    references:
+      - https://owasp.org/www-community/attacks/Command_Injection
+      - https://cwe.mitre.org/data/definitions/78.html
+
+  - id: broly.sast.js.math_random
+    name: Use of Math.random() for Security
+    language: javascript
+    severity: medium
+    cwe: [CWE-338]
+    message: Math.random() is not cryptographically secure. Use crypto.getRandomValues() for security purposes.
+    description: Math.random() produces predictable output unsuitable for tokens, IDs, or keys.
+    find_capture: call
+    query: |
+      (call_expression
+        function: (member_expression
+          object: (identifier) @obj
+          property: (property_identifier) @method)
+        arguments: (arguments)) @call
+    filter:
+      - capture: obj
+        regex: "^Math$"
+      - capture: method
+        regex: "^random$"
+    fix: Use crypto.randomUUID() or crypto.getRandomValues() for security-sensitive values.
+    references:
+      - https://cwe.mitre.org/data/definitions/338.html

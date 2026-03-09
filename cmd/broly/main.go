@@ -57,6 +57,8 @@ func scanCmd() *cobra.Command {
 		validateSecrets bool
 		offline         bool
 		quiet           bool
+		sastRules       string
+		languages       []string
 	)
 
 	cmd := &cobra.Command{
@@ -91,6 +93,8 @@ By default all scanners are enabled and the current directory is scanned.`,
 				ValidateSecrets:  validateSecrets,
 				Offline:          offline,
 				Quiet:            quiet,
+				SASTRulesDir:     sastRules,
+				Languages:        languages,
 			}
 
 			return runScan(cfg)
@@ -110,6 +114,8 @@ By default all scanners are enabled and the current directory is scanned.`,
 	flags.BoolVar(&disableRedact, "no-redact", false, "Disable secret redaction in output")
 	flags.BoolVar(&validateSecrets, "validate", false, "Validate detected secrets against source APIs")
 	flags.BoolVar(&offline, "offline", false, "Run SCA in offline mode (skip OSV API)")
+	flags.StringVar(&sastRules, "sast-rules", "", "Custom SAST rules directory")
+	flags.StringSliceVar(&languages, "languages", nil, "Limit SAST to specific languages (go,python,javascript)")
 	flags.BoolVarP(&quiet, "quiet", "q", false, "Suppress progress output")
 
 	return cmd

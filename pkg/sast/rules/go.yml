@@ -1,0 +1,134 @@
+rules:
+  - id: broly.sast.go.crypto.weak_hash
+    name: Use of Weak Cryptographic Hash (MD5/SHA1)
+    language: go
+    severity: medium
+    cwe: [CWE-327]
+    message: MD5 and SHA1 are cryptographically broken. Use SHA-256 or SHA-3 for security purposes.
+    description: Weak hash function detected. MD5 and SHA1 are vulnerable to collision attacks.
+    find_capture: call
+    query: |
+      (call_expression
+        function: (selector_expression
+          operand: (identifier) @pkg
+          field: (field_identifier) @func)
+        arguments: (argument_list)) @call
+    filter:
+      - capture: pkg
+        regex: "^(md5|sha1)$"
+      - capture: func
+        regex: "^New$"
+    fix: Replace with crypto/sha256 or crypto/sha512.
+    references:
+      - https://cwe.mitre.org/data/definitions/327.html
+
+  - id: broly.sast.go.sqli.string_concat
+    name: SQL Injection via String Concatenation
+    language: go
+    severity: high
+    cwe: [CWE-89]
+    message: Database query built via string concatenation may allow SQL injection. Use parameterized queries.
+    description: User-controlled input concatenated directly into a SQL query string.
+    find_capture: call
+    query: |
+      (call_expression
+        function: (selector_expression
+          field: (field_identifier) @method)
+        arguments: (argument_list
+          (binary_expression) @concat)) @call
+    filter:
+      - capture: method
+        regex: "^(Query|Exec|QueryRow|QueryContext|ExecContext|QueryRowContext|RawQuery|Prepare)$"
+    fix: Use db.Query(query, args...) with ? placeholders instead of string concatenation.
+    references:
+      - https://owasp.org/www-community/attacks/SQL_Injection
+      - https://cwe.mitre.org/data/definitions/89.html
+
+  - id: broly.sast.go.tls.insecure_skip_verify
+    name: TLS Certificate Verification Disabled
+    language: go
+    severity: high
+    cwe: [CWE-295]
+    message: InsecureSkipVerify disables TLS certificate validation, enabling man-in-the-middle attacks.
+    description: TLS InsecureSkipVerify set to true disables certificate chain validation.
+    find_capture: key
+    query: |
+      (identifier) @key
+    filter:
+      - capture: key
+        regex: "^InsecureSkipVerify$"
+    fix: Remove InsecureSkipVerify or use a custom certificate pool instead.
+    references:
+      - https://cwe.mitre.org/data/definitions/295.html
+
+  - id: broly.sast.go.cmdi.exec_command
+    name: OS Command Execution
+    language: go
+    severity: high
+    cwe: [CWE-78]
+    message: exec.Command executes OS commands. Verify inputs are sanitized to prevent command injection.
+    description: Direct OS command execution detected. Ensure arguments are not user-controlled.
+    find_capture: call
+    query: |
+      (call_expression
+        function: (selector_expression
+          operand: (identifier) @pkg
+          field: (field_identifier) @func)
+        arguments: (argument_list)) @call
+    filter:
+      - capture: pkg
+        regex: "^exec$"
+      - capture: func
+        regex: "^(Command|CommandContext)$"
+    fix: Validate and sanitize all arguments before passing to exec.Command.
+    references:
+      - https://owasp.org/www-community/attacks/Command_Injection
+      - https://cwe.mitre.org/data/definitions/78.html
+
+  - id: broly.sast.go.rand.math_rand
+    name: Use of Cryptographically Weak PRNG
+    language: go
+    severity: medium
+    cwe: [CWE-338]
+    message: math/rand is not cryptographically secure. Use crypto/rand for security-sensitive operations.
+    description: math/rand functions produce predictable output unsuitable for security purposes.
+    find_capture: call
+    query: |
+      (call_expression
+        function: (selector_expression
+          operand: (identifier) @pkg
+          field: (field_identifier) @func)
+        arguments: (argument_list)) @call
+    filter:
+      - capture: pkg
+        regex: "^rand$"
+      - capture: func
+        regex: "^(Intn|Seed|Float64|Float32|Perm|Shuffle|ExpFloat64|NormFloat64|Int63|Int31|Int|New)$"
+    fix: Use crypto/rand.Read() for security-sensitive random values.
+    references:
+      - https://cwe.mitre.org/data/definitions/338.html
+
+  - id: broly.sast.go.path.traversal
+    name: Potential Path Traversal via String Concatenation
+    language: go
+    severity: high
+    cwe: [CWE-22]
+    message: File path built via string concatenation may allow path traversal. Validate and sanitize paths.
+    description: User-controlled input concatenated into a filesystem path.
+    find_capture: call
+    query: |
+      (call_expression
+        function: (selector_expression
+          operand: (identifier) @pkg
+          field: (field_identifier) @func)
+        arguments: (argument_list
+          (binary_expression) @path)) @call
+    filter:
+      - capture: pkg
+        regex: "^(os|ioutil)$"
+      - capture: func
+        regex: "^(Open|ReadFile|Create|Mkdir|MkdirAll|Remove|RemoveAll|Stat|Lstat)$"
+    fix: Use filepath.Clean() and validate the resolved path is within the expected directory.
+    references:
+      - https://owasp.org/www-community/attacks/Path_Traversal
+      - https://cwe.mitre.org/data/definitions/22.html
