@@ -2,7 +2,8 @@
   <img src="assets/broly-logo.png" alt="Broly" width="350"/>
 </p>
 
-<h1 align="center">Broly — Berserker product security scanner.</h1>
+<h1 align="center">Broly</h1>
+<h3 align="center">A berserker vulnerability scanner.</h3>
 
 <p align="center">Secrets, SCA, and SAST in a single binary.</p>
 
