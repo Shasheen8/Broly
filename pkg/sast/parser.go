@@ -1,6 +1,7 @@
 package sast
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/Shasheen8/Broly/pkg/core"
@@ -93,8 +94,8 @@ func (p *parsedFinding) toFinding(filePath string) core.Finding {
 	sev := parseLLMSeverity(p.level)
 	ruleID := "broly.sast.ai." + strings.ToLower(strings.ReplaceAll(p.level, " ", "_"))
 
-	// Extract line number from location if present (e.g., "src/main.go:42")
-	startLine := 0
+	// Extract line number from location if present (e.g., "src/main.go:42" or "line 42")
+	startLine := extractLineNumber(p.location)
 	loc := p.location
 	if loc == "N/A" || loc == "" {
 		loc = filePath
@@ -142,6 +143,33 @@ func parseLLMSeverity(level string) core.Severity {
 	default:
 		return core.SeverityInfo
 	}
+}
+
+// extractLineNumber parses a line number from location strings like
+// "file.py:12", "file.py:12-15", or "line 12".
+func extractLineNumber(loc string) int {
+	if loc == "" || loc == "N/A" {
+		return 0
+	}
+	// Try "file:linenum" or "file:linenum-linenum"
+	if idx := strings.LastIndex(loc, ":"); idx >= 0 {
+		part := loc[idx+1:]
+		if dash := strings.Index(part, "-"); dash >= 0 {
+			part = part[:dash]
+		}
+		if n, err := strconv.Atoi(strings.TrimSpace(part)); err == nil && n > 0 {
+			return n
+		}
+	}
+	// Try "line N"
+	lower := strings.ToLower(loc)
+	if idx := strings.Index(lower, "line "); idx >= 0 {
+		part := strings.TrimSpace(loc[idx+5:])
+		if n, err := strconv.Atoi(part); err == nil && n > 0 {
+			return n
+		}
+	}
+	return 0
 }
 
 // extractCWE looks for CWE references in text (e.g., "CWE-89", "CWE-79").
