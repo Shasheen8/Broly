@@ -17,6 +17,7 @@ import (
 
 type SecretsScanner struct {
 	scanner          *titus.Scanner
+	validator        *AIValidator
 	disableRedaction bool
 	maxFileSize      int64
 	excludePaths     map[string]bool
@@ -64,8 +65,15 @@ func (s *SecretsScanner) Init(cfg *core.Config) error {
 	if err != nil {
 		return fmt.Errorf("init secrets scanner: %w", err)
 	}
-
 	s.scanner = scanner
+
+	if cfg.AIFilterSecrets {
+		s.validator = newAIValidator(cfg.AIModel)
+		if s.validator == nil {
+			fmt.Fprintln(os.Stderr, "warning: TOGETHER_API_KEY not set — AI secrets filtering disabled")
+		}
+	}
+
 	return nil
 }
 
@@ -115,6 +123,7 @@ func (s *SecretsScanner) scanPath(ctx context.Context, root string, findings cha
 			return nil
 		}
 
+		var batch []core.Finding
 		for _, m := range matches {
 			redacted := redact(m.Snippet.Matching)
 			snippet := redacted
@@ -122,7 +131,7 @@ func (s *SecretsScanner) scanPath(ctx context.Context, root string, findings cha
 				snippet = string(m.Snippet.Matching)
 			}
 
-			finding := core.Finding{
+			f := core.Finding{
 				Type:        core.ScanTypeSecrets,
 				RuleID:      m.RuleID,
 				RuleName:    m.RuleName,
@@ -137,15 +146,21 @@ func (s *SecretsScanner) scanPath(ctx context.Context, root string, findings cha
 				Tags:        []string{"secrets"},
 				Timestamp:   time.Now(),
 			}
-
 			if m.ValidationResult != nil {
-				finding.Tags = append(finding.Tags, string(m.ValidationResult.Status))
+				f.Tags = append(f.Tags, string(m.ValidationResult.Status))
 			}
+			f.ComputeFingerprint()
+			batch = append(batch, f)
+		}
 
-			finding.ComputeFingerprint()
+		// AI false-positive filter: validate findings concurrently.
+		if s.validator != nil && len(batch) > 0 {
+			batch = s.validator.filterBatch(ctx, batch)
+		}
 
+		for _, f := range batch {
 			select {
-			case findings <- finding:
+			case findings <- f:
 			case <-ctx.Done():
 				return filepath.SkipAll
 			}

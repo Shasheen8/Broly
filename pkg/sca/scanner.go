@@ -30,9 +30,11 @@ var ecosystems = []string{
 }
 
 type SCAScanner struct {
-	osvClient  *osvdev.OSVClient
-	extractors []filesystem.Extractor
-	offline    bool
+	osvClient    *osvdev.OSVClient
+	extractors   []filesystem.Extractor
+	offline      bool
+	reachability *AIReachability
+	scanPaths    []string
 }
 
 func NewSCAScanner() *SCAScanner {
@@ -57,11 +59,20 @@ func (s *SCAScanner) Init(cfg *core.Config) error {
 		extractors = append(extractors, exts...)
 	}
 	s.extractors = extractors
+
+	if cfg.AISCAReachability {
+		s.reachability = newAIReachability(cfg.AIModel)
+		if s.reachability == nil {
+			fmt.Fprintln(os.Stderr, "warning: TOGETHER_API_KEY not set — AI SCA reachability disabled")
+		}
+	}
+
 	return nil
 }
 
 func (s *SCAScanner) Scan(ctx context.Context, paths []string, findings chan<- core.Finding) error {
 	defer close(findings)
+	s.scanPaths = paths
 
 	for _, target := range paths {
 		if ctx.Err() != nil {
@@ -105,7 +116,7 @@ func (s *SCAScanner) Scan(ctx context.Context, paths []string, findings chan<- c
 			return fmt.Errorf("osv query: %w", err)
 		}
 
-		s.emitFindings(ctx, pkgs, resp, findings)
+		s.emitFindings(ctx, pkgs, resp, target, findings)
 	}
 
 	return nil
@@ -115,6 +126,7 @@ func (s *SCAScanner) emitFindings(
 	ctx context.Context,
 	pkgs []*extractor.Package,
 	resp *api.BatchVulnerabilityList,
+	scanRoot string,
 	findings chan<- core.Finding,
 ) {
 	for i, vulnList := range resp.GetResults() {
@@ -165,6 +177,12 @@ func (s *SCAScanner) emitFindings(
 				Timestamp:      time.Now(),
 			}
 			finding.ComputeFingerprint()
+
+			// AI reachability analysis.
+			if s.reachability != nil {
+				res := s.reachability.analyze(ctx, finding, []string{scanRoot})
+				annotate(&finding, res)
+			}
 
 			select {
 			case findings <- finding:

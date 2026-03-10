@@ -57,8 +57,10 @@ func scanCmd() *cobra.Command {
 		validateSecrets bool
 		offline         bool
 		quiet           bool
-		aiModel         string
-		languages       []string
+		aiModel              string
+		languages            []string
+		aiFilterSecrets      bool
+		aiSCAReachability    bool
 	)
 
 	cmd := &cobra.Command{
@@ -93,8 +95,10 @@ By default all scanners are enabled and the current directory is scanned.`,
 				ValidateSecrets:  validateSecrets,
 				Offline:          offline,
 				Quiet:            quiet,
-				AIModel:          aiModel,
-				Languages:        languages,
+				AIModel:           aiModel,
+				Languages:         languages,
+				AIFilterSecrets:   aiFilterSecrets,
+				AISCAReachability: aiSCAReachability,
 			}
 
 			return runScan(cfg)
@@ -114,8 +118,10 @@ By default all scanners are enabled and the current directory is scanned.`,
 	flags.BoolVar(&disableRedact, "no-redact", false, "Disable secret redaction in output")
 	flags.BoolVar(&validateSecrets, "validate", false, "Validate detected secrets against source APIs")
 	flags.BoolVar(&offline, "offline", false, "Run SCA in offline mode (skip OSV API)")
-	flags.StringVar(&aiModel, "ai-model", "", "Together.ai model for SAST (default: Qwen/Qwen3-Coder-Next-FP8)")
+	flags.StringVar(&aiModel, "ai-model", "", "Together.ai model for AI features (default: Qwen/Qwen3-Coder-Next-FP8)")
 	flags.StringSliceVar(&languages, "languages", nil, "Limit SAST to specific languages (go,python,javascript)")
+	flags.BoolVar(&aiFilterSecrets, "ai-filter-secrets", false, "Use AI to filter false positive secrets findings (requires TOGETHER_API_KEY)")
+	flags.BoolVar(&aiSCAReachability, "ai-sca-reachability", false, "Use AI to analyze reachability of vulnerable dependencies (requires TOGETHER_API_KEY)")
 	flags.BoolVarP(&quiet, "quiet", "q", false, "Suppress progress output")
 
 	return cmd
