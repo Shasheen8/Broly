@@ -47,6 +47,7 @@ git clone https://github.com/Shasheen8/Broly.git
 cd Broly && make build
 ```
 
+> [!TIP]
 > `go install` uses pure Go regex for secrets. The source build enables Hyperscan via `-tags vectorscan` for significantly faster pattern matching on large codebases.
 
 **SAST / AI features** require a Together AI key:
@@ -88,7 +89,8 @@ broly scan --quiet                                # suppress progress output
 
 ### Config file
 
-A `.broly.yaml` at the repo root is loaded automatically. CLI flags override it. See [`.broly.yaml`](.broly.yaml) for a working example.
+> [!TIP]
+> `.broly.yaml` is loaded automatically from the repo root. CLI flags always override it. See [`.broly.yaml`](.broly.yaml) for a working example.
 
 ```yaml
 min_severity: low
@@ -100,7 +102,8 @@ workers: 8
 
 ### Baseline
 
-`.broly-baseline.yaml` is a two-sided contract: `suppress` silences known false positives, `require` asserts specific findings must be detected every scan (missing entries cause a non-zero exit). See [`.broly-baseline.yaml`](.broly-baseline.yaml) for a working example.
+> [!NOTE]
+> `suppress` silences known false positives. `require` asserts specific findings must be detected every scan — missing entries cause a non-zero exit. See [`.broly-baseline.yaml`](.broly-baseline.yaml) for a working example.
 
 ```yaml
 suppress:
