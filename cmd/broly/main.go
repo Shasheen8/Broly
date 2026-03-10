@@ -114,7 +114,7 @@ By default all scanners are enabled and the current directory is scanned.`,
 	flags.BoolVar(&disableRedact, "no-redact", false, "Disable secret redaction in output")
 	flags.BoolVar(&validateSecrets, "validate", false, "Validate detected secrets against source APIs")
 	flags.BoolVar(&offline, "offline", false, "Run SCA in offline mode (skip OSV API)")
-	flags.StringVar(&aiModel, "ai-model", "", "Together.ai model for SAST (default: meta-llama/Llama-3.3-70B-Instruct-Turbo)")
+	flags.StringVar(&aiModel, "ai-model", "", "Together.ai model for SAST (default: Qwen/Qwen3-Coder-Next-FP8)")
 	flags.StringSliceVar(&languages, "languages", nil, "Limit SAST to specific languages (go,python,javascript)")
 	flags.BoolVarP(&quiet, "quiet", "q", false, "Suppress progress output")
 

@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	defaultModel       = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
+	defaultModel       = "Qwen/Qwen3-Coder-Next-FP8"
 	defaultMaxFileSize = 10 * 1024 * 1024 // 10 MB
 	defaultWorkers     = 4
 )
