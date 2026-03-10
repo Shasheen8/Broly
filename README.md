@@ -5,7 +5,7 @@
 <h1 align="center">Broly</h1>
 <h3 align="center">A berserker vulnerability scanner.</h3>
 
-<p align="center">Secrets · SCA · SAST — powered by AI, shipped as a single binary.</p>
+<p align="center">Secrets · SCA · SAST — powered by AI, shipped as a single binary. No rule files. No rule engine.</p>
 
 <p align="center">
   <a href="https://github.com/Shasheen8/Broly"><img src="https://img.shields.io/badge/Go-1.26-00ADD8?style=flat&logo=go" alt="Go"></a>
@@ -24,7 +24,7 @@ Broly runs three security scanners in parallel on your codebase and delivers res
 |---------|--------|----------|
 | **Secrets** | [Titus](https://github.com/praetorian-inc/titus) · 487 rules · Hyperscan | `--ai-filter-secrets` — eliminates false positives |
 | **SCA** | [osv-scalibr](https://github.com/google/osv-scalibr) + [osv.dev](https://osv.dev) · 19 ecosystems | `--ai-sca-reachability` — checks if the vuln is actually called |
-| **SAST** | [Together AI](https://together.ai) · `Qwen/Qwen3-Coder-Next-FP8` | Always-on · data flow analysis · CVSS scoring |
+| **SAST** | [Together AI](https://together.ai) · `Qwen/Qwen3-Coder-Next-FP8` · **no rule files, no rule engine** | Always-on · data flow analysis · CVSS scoring |
 
 ---
 
@@ -106,7 +106,7 @@ scanners: sast | workers: 8
   ╚══════════════════════════════════════════════════════╝
 ```
 
-The SAST engine sends each file to `Qwen/Qwen3-Coder-Next-FP8` with a structured security prompt that traces data flow from source to sink, infers CVSS scores, and pinpoints exact line numbers — no rule files required.
+The SAST engine sends each file directly to `Qwen/Qwen3-Coder-Next-FP8` with a structured security prompt. No rule files. No rule engine. No YAML. The model traces data flow from source to sink, infers CVSS scores, and pinpoints exact line numbers — and finds what static rules miss.
 
 ---
 
@@ -210,10 +210,10 @@ Go, Python, JavaScript, Ruby, Rust, Java, PHP, .NET, Dart, C/C++, Haskell,
 Elixir, Erlang, R, Swift, Lua, Nim, OCaml, Julia
 ```
 
-**SAST** — AI analysis across 18 languages:
+**SAST** — AI analysis across 18 languages. No rule files. No rule engine. No maintenance:
 ```
 Go, Python, JavaScript, TypeScript, Java, Ruby, PHP, C#, Rust, C, C++,
-Kotlin, Swift, Bash, and more — no rule files required
+Kotlin, Swift, Bash, and more
 ```
 
 ---
