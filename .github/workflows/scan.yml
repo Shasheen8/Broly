@@ -76,11 +76,14 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "stable"
-          cache: false
+          go-version-file: go.mod
+          cache: true
 
-      - name: Install Broly
-        run: CGO_ENABLED=0 go install github.com/Shasheen8/Broly/cmd/broly@latest
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y libhyperscan-dev
+
+      - name: Build Broly
+        run: go build -trimpath -o "$HOME/go/bin/broly" ./cmd/broly
 
       # ── PR: identify changed code files ────────────────────────────────────
       - name: Get changed files
