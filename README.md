@@ -84,7 +84,7 @@ scanners: sast | workers: 8
 
   ╔══════════════════════════════════════════════════════╗
   ║                                                      ║
-  ║    ⚡  BROLY  --  Berserker Vulnerability Scanner    ║
+  ║      ⚡  BROLY  Berserker Vulnerability Scanner      ║
   ║    Secrets · SCA · SAST · Powered by Together AI     ║
   ║                                                      ║
   ╚══════════════════════════════════════════════════════╝

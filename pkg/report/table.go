@@ -190,7 +190,7 @@ func printBanner(w io.Writer, clr color) {
 	fmt.Fprintf(w, "  %s\n", clr.s(cyan, "╔══════════════════════════════════════════════════════╗"))
 	bannerCentered(w, clr, "")
 	bannerCentered(w, clr,
-		"⚡  "+clr.s(bold+brightRed, "BROLY")+"  "+clr.s(bold+white, "--  Berserker Vulnerability Scanner"),
+		"⚡  "+clr.s(bold+brightRed, "BROLY")+"  "+clr.s(bold+white, "Berserker Vulnerability Scanner"),
 	)
 	bannerCentered(w, clr,
 		clr.s(dim+cyan, "Secrets · SCA · SAST · Powered by Together AI"),
