@@ -253,7 +253,7 @@ func runScan(cfg *core.Config) error {
 
 	var w *os.File
 	if cfg.OutputFile != "" {
-		w, err = os.Create(cfg.OutputFile)
+		w, err = os.OpenFile(cfg.OutputFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
 		if err != nil {
 			return fmt.Errorf("create output file: %w", err)
 		}

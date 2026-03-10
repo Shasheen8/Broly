@@ -3,7 +3,7 @@
 </p>
 
 <h1 align="center">Broly</h1>
-<h3 align="center">A berserker vulnerability scanner.</h3>
+<h3 align="center">A berserker code security scanner.</h3>
 
 <p align="center">Secrets · SCA · SAST in a single binary.</p>
 <p align="center">AI-powered. No rule files. No rule engine.</p>
@@ -11,7 +11,7 @@
 <p align="center">
   <a href="https://github.com/Shasheen8/Broly"><img src="https://img.shields.io/badge/Go-1.26-00ADD8?style=flat&logo=go" alt="Go"></a>
   <a href="https://github.com/Shasheen8/Broly/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=flat" alt="License"></a>
-  <a href="https://github.com/Shasheen8/Broly/releases"><img src="https://img.shields.io/github/v/release/Shasheen8/Broly?style=flat&label=Release" alt="Release"></a>
+  <a href="https://github.com/Shasheen8/Broly/releases"><img src="https://img.shields.io/badge/Release-latest-blue?style=flat" alt="Release"></a>
   <a href="https://together.ai"><img src="https://img.shields.io/badge/Powered%20by-Together%20AI-blueviolet?style=flat" alt="Together AI"></a>
 </p>
 

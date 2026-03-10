@@ -8,8 +8,6 @@ import (
 )
 
 // parseLLMResponse parses the LLM's structured markdown output into findings.
-// Each finding block starts with "- **Vulnerability Level**:".
-// Multiple findings are separated by blank lines or "---".
 func parseLLMResponse(filePath, response string) []parsedFinding {
 	resp := strings.TrimSpace(response)
 	if resp == "" || strings.Contains(resp, "NO_FINDINGS") {
@@ -23,13 +21,12 @@ func parseLLMResponse(filePath, response string) []parsedFinding {
 	for _, raw := range lines {
 		line := strings.TrimSpace(raw)
 
-		if field, val, ok := extractField(line, "Vulnerability Level"); ok {
+		if _, val, ok := extractField(line, "Vulnerability Level"); ok {
 			if current != nil {
 				findings = append(findings, *current)
 			}
 			current = &parsedFinding{}
 			current.level = strings.Trim(val, "[]")
-			_ = field
 			continue
 		}
 
@@ -71,9 +68,7 @@ type parsedFinding struct {
 	fix        string
 }
 
-// extractField parses a line like "- **Field Name**: value" and returns (field, value, true).
 func extractField(line, field string) (string, string, bool) {
-	// Match: "- **Field**:" or "**Field**:"
 	prefix1 := "- **" + field + "**:"
 	prefix2 := "**" + field + "**:"
 
@@ -89,18 +84,12 @@ func extractField(line, field string) (string, string, bool) {
 	return field, strings.TrimSpace(rest), true
 }
 
-// toFinding converts a parsedFinding to a core.Finding.
 func (p *parsedFinding) toFinding(filePath string) core.Finding {
 	sev := parseLLMSeverity(p.level)
 	ruleID := "broly.sast.ai." + strings.ToLower(strings.ReplaceAll(p.level, " ", "_"))
 
 	// Extract line number from location if present (e.g., "src/main.go:42" or "line 42")
 	startLine := extractLineNumber(p.location)
-	loc := p.location
-	if loc == "N/A" || loc == "" {
-		loc = filePath
-	}
-
 	description := p.risk
 	if description == "" {
 		description = p.issue
@@ -124,12 +113,10 @@ func (p *parsedFinding) toFinding(filePath string) core.Finding {
 		Advisory:    fix,
 	}
 
-	_ = loc
 	f.ComputeFingerprint()
 	return f
 }
 
-// parseLLMSeverity maps LLM severity strings to core.Severity.
 func parseLLMSeverity(level string) core.Severity {
 	switch strings.ToUpper(strings.TrimSpace(level)) {
 	case "CRITICAL":
@@ -145,8 +132,6 @@ func parseLLMSeverity(level string) core.Severity {
 	}
 }
 
-// extractLineNumber parses a line number from location strings like
-// "file.py:12", "file.py:12-15", or "line 12".
 func extractLineNumber(loc string) int {
 	if loc == "" || loc == "N/A" {
 		return 0
@@ -172,7 +157,6 @@ func extractLineNumber(loc string) int {
 	return 0
 }
 
-// extractCWE looks for CWE references in text (e.g., "CWE-89", "CWE-79").
 func extractCWE(text string) []string {
 	var cwes []string
 	seen := make(map[string]bool)

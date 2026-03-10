@@ -34,14 +34,12 @@ REACHABILITY: REACHABLE or UNREACHABLE or UNKNOWN
 CONFIDENCE: HIGH or MEDIUM or LOW
 REASON: One sentence explaining which function or pattern is (or is not) called.`
 
-// reachabilityResult holds the AI analysis result for a single CVE.
 type reachabilityResult struct {
 	status     string // REACHABLE, UNREACHABLE, UNKNOWN
 	confidence string
 	reason     string
 }
 
-// AIReachability uses Together.ai to determine if a vulnerable dep is actually called.
 type AIReachability struct {
 	client *ai.Client
 }
@@ -54,7 +52,6 @@ func newAIReachability(model string) *AIReachability {
 	return &AIReachability{client: c}
 }
 
-// analyze checks whether the vulnerability in pkg is reachable from the scanned paths.
 func (r *AIReachability) analyze(ctx context.Context, f core.Finding, scanPaths []string) reachabilityResult {
 	files := findImportingFiles(f.PackageName, f.Ecosystem, scanPaths)
 	if len(files) == 0 {
@@ -77,7 +74,6 @@ func (r *AIReachability) analyze(ctx context.Context, f core.Finding, scanPaths 
 	return parseReachability(resp)
 }
 
-// parseReachability extracts REACHABILITY / CONFIDENCE / REASON from the LLM response.
 func parseReachability(resp string) reachabilityResult {
 	res := reachabilityResult{status: "UNKNOWN", confidence: "LOW"}
 	for _, line := range strings.Split(resp, "\n") {
@@ -94,8 +90,6 @@ func parseReachability(resp string) reachabilityResult {
 	return res
 }
 
-// annotate applies the reachability result to a finding.
-// UNREACHABLE findings are downgraded one severity level and tagged accordingly.
 func annotate(f *core.Finding, res reachabilityResult) {
 	switch res.status {
 	case "REACHABLE":
@@ -117,8 +111,6 @@ func annotate(f *core.Finding, res reachabilityResult) {
 	}
 }
 
-// findImportingFiles searches scanPaths for source files that import the given package.
-// Returns at most 5 files to keep the prompt focused.
 func findImportingFiles(pkgName string, ecosystem string, scanPaths []string) []string {
 	patterns := importPatterns(pkgName, ecosystem)
 	if len(patterns) == 0 {
@@ -130,7 +122,13 @@ func findImportingFiles(pkgName string, ecosystem string, scanPaths []string) []
 
 	for _, root := range scanPaths {
 		filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
-			if err != nil || d.IsDir() || len(found) >= 5 {
+			if err != nil {
+				return nil
+			}
+			if len(found) >= 5 {
+				return filepath.SkipAll
+			}
+			if d.IsDir() {
 				return nil
 			}
 			if seen[path] {
@@ -153,12 +151,10 @@ func findImportingFiles(pkgName string, ecosystem string, scanPaths []string) []
 
 var importSkipDirs = []string{"vendor", "node_modules", ".git", "dist", "build", "__pycache__"}
 
-// importPatterns returns grep-style strings to find imports of a package by ecosystem.
 func importPatterns(pkgName, ecosystem string) []string {
 	eco := strings.ToLower(ecosystem)
 	name := pkgName
 
-	// Use just the base name for pattern matching (e.g. "github.com/foo/bar" → "bar")
 	if idx := strings.LastIndex(name, "/"); idx >= 0 {
 		name = name[idx+1:]
 	}
@@ -181,7 +177,6 @@ func importPatterns(pkgName, ecosystem string) []string {
 	}
 }
 
-// fileContainsAny reports whether the file contains any of the given strings.
 func fileContainsAny(path string, patterns []string) bool {
 	f, err := os.Open(path)
 	if err != nil {
@@ -201,7 +196,6 @@ func fileContainsAny(path string, patterns []string) bool {
 	return false
 }
 
-// buildFilesContent reads each file and returns a formatted block (truncated to maxLines).
 func buildFilesContent(files []string, maxLines int) string {
 	var sb strings.Builder
 	for _, path := range files {

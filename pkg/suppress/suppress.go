@@ -1,10 +1,3 @@
-// Package suppress implements inline finding suppression via source comments.
-//
-// A finding is suppressed when its line (or the line immediately above) contains:
-//
-//	// broly:ignore              — suppress any finding on this line
-//	// broly:ignore <rule-id>   — suppress a specific rule only
-//	# broly:ignore               — works for Python, Ruby, shell, etc.
 package suppress
 
 import (
@@ -17,7 +10,6 @@ import (
 
 const marker = "broly:ignore"
 
-// Filter removes findings whose source line carries a broly:ignore comment.
 func Filter(findings []core.Finding) (filtered []core.Finding, count int) {
 	lineCache := make(map[string][]string)
 
@@ -46,14 +38,10 @@ func isIgnored(lines []string, f core.Finding) bool {
 		if idx < 0 {
 			continue
 		}
-		// Everything after "broly:ignore" on the same line.
 		rest := strings.TrimSpace(lower[idx+len(marker):])
 		if rest == "" {
-			// bare broly:ignore — suppress everything on this line
 			return true
 		}
-		// rule-specific: broly:ignore <rule-id>
-		// strip any trailing comment characters
 		ruleID := strings.Fields(rest)[0]
 		if strings.EqualFold(ruleID, f.RuleID) {
 			return true

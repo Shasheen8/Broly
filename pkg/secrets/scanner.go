@@ -153,7 +153,6 @@ func (s *SecretsScanner) scanPath(ctx context.Context, root string, findings cha
 			batch = append(batch, f)
 		}
 
-		// AI false-positive filter: validate findings concurrently.
 		if s.validator != nil && len(batch) > 0 {
 			batch = s.validator.filterBatch(ctx, batch)
 		}
