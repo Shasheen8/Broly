@@ -22,8 +22,8 @@ type Config struct {
 	ValidateSecrets  bool   `yaml:"validate_secrets" json:"validate_secrets"`
 
 	Offline      bool     `yaml:"offline" json:"offline"`
-	SASTRulesDir string   `yaml:"sast_rules_dir" json:"sast_rules_dir"`
 	Languages    []string `yaml:"languages" json:"languages"`
+	AIModel      string   `yaml:"ai_model" json:"ai_model"`
 	BaselineFile string   `yaml:"baseline_file" json:"baseline_file"`
 	Quiet        bool     `yaml:"quiet" json:"quiet"`
 }
