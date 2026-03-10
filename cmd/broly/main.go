@@ -132,7 +132,7 @@ func runScan(cfg *core.Config) error {
 	defer cancel()
 
 	if !cfg.Quiet {
-		fmt.Fprintf(os.Stderr, "broly v%s — scanning %s\n", version, strings.Join(cfg.Targets, ", "))
+		fmt.Fprintf(os.Stderr, "broly v%s - scanning %s\n", version, strings.Join(cfg.Targets, ", "))
 		scanners := make([]string, 0, 3)
 		if cfg.EnableSecrets {
 			scanners = append(scanners, "secrets")

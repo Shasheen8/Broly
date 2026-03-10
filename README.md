@@ -81,6 +81,7 @@ broly scan --sca --offline              # skip OSV API lookup
 broly vdev - scanning api/handlers.py
 scanners: sast | workers: 8
 
+
   ╔══════════════════════════════════════════════════════╗
   ║                                                      ║
   ║    ⚡  BROLY  --  Berserker Vulnerability Scanner    ║
@@ -140,6 +141,7 @@ The AI recognized the file contained documented placeholder values (`EXAMPLE` in
 broly vdev - scanning /path/to/project
 scanners: sca | workers: 8
 
+
   ▸ SCA (13 findings)
 
   SEVERITY     VULN ID                PACKAGE            VERSION        FIXED            ECOSYSTEM
@@ -161,38 +163,6 @@ scanners: sca | workers: 8
 ```
 
 Add `--ai-sca-reachability` to check whether the vulnerable functions are actually called in your code. Unreachable findings are automatically downgraded one severity level and tagged `[Unreachable]`.
-
----
-
-## AI Architecture
-
-```
-                        ┌─────────────────────────┐
-                        │      broly scan          │
-                        └────────────┬────────────┘
-               ┌─────────────────────┼──────────────────────┐
-               ▼                     ▼                       ▼
-        ┌─────────────┐      ┌──────────────┐       ┌──────────────┐
-        │   Secrets   │      │     SCA      │       │     SAST     │
-        │   (Titus)   │      │ (osv-scalibr │       │  (Together   │
-        │  487 rules  │      │  + osv.dev)  │       │     AI)      │
-        └──────┬──────┘      └──────┬───────┘       └──────┬───────┘
-               │                   │                       │
-      --ai-filter-secrets  --ai-sca-reachability    Always-on AI
-               │                   │                       │
-               ▼                   ▼                       ▼
-        AI reads context    AI finds importing      AI traces data flow
-        filters FP hits     files, checks if        source to sink
-        (placeholder vs     vuln code path          CVSS scoring
-         real credential)   is actually called      exact line numbers
-               │                   │                       │
-               └───────────────────┴───────────────────────┘
-                                   │
-                            ┌──────▼──────┐
-                            │  Together AI │
-                            │ Qwen3-Coder  │
-                            └─────────────┘
-```
 
 ---
 
