@@ -78,6 +78,54 @@ broly scan -f json                                # JSON output
 broly scan -f sarif -o results.sarif              # SARIF for GitHub Code Scanning
 broly scan --min-severity high                    # only high and critical
 broly scan --sca --offline                        # skip OSV API lookup
+
+# developer experience
+broly scan --config .broly.yaml                   # load project config file
+broly scan --baseline .broly-baseline.yaml        # suppress known FPs / require specific findings
+broly scan --incremental                          # skip SAST on unchanged files (uses .broly-cache.json)
+broly scan --quiet                                # suppress progress output
+```
+
+### Config file
+
+Create `.broly.yaml` in your project root to set defaults without repeating flags:
+
+```yaml
+min_severity: medium
+exclude_paths:
+  - vendor
+  - node_modules
+  - .git
+languages:
+  - go
+  - python
+workers: 8
+```
+
+### Baseline
+
+Create `.broly-baseline.yaml` to suppress known false positives or assert that specific findings must always be detected:
+
+```yaml
+suppress:
+  - fingerprint: "abc123..."    # silence accepted risk / known FP
+    reason: "test fixture"
+
+require:
+  - rule_id: "SQL-INJECTION"
+    file: "api/handlers.py"
+    description: "SQL injection in user lookup — must be detected"
+```
+
+Missing `require` entries cause a non-zero exit, making the baseline a two-sided contract.
+
+### Inline suppression
+
+Add a comment on the finding line or the line above:
+
+```python
+query = "SELECT * FROM users WHERE id = " + user_id  # broly:ignore
+query = f"SELECT * FROM users WHERE id = {user_id}"  # broly:ignore SQL-INJECTION
 ```
 
 ---
