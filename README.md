@@ -5,7 +5,8 @@
 <h1 align="center">Broly</h1>
 <h3 align="center">A berserker vulnerability scanner.</h3>
 
-<p align="center">Secrets · SCA · SAST, powered by AI, shipped as a single binary. No rule files. No rule engine.</p>
+<p align="center">Secrets · SCA · SAST in a single binary.</p>
+<p align="center">AI-powered. No rule files. No rule engine.</p>
 
 <p align="center">
   <a href="https://github.com/Shasheen8/Broly"><img src="https://img.shields.io/badge/Go-1.26-00ADD8?style=flat&logo=go" alt="Go"></a>
