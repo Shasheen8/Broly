@@ -16,14 +16,6 @@ def get_user(user_id):
     return cursor.fetchone()
 
 
-def search_products(keyword):
-    conn = sqlite3.connect("shop.db")
-    cursor = conn.cursor()
-    # SQL injection: keyword unsanitized
-    cursor.execute("SELECT * FROM products WHERE name LIKE '%" + keyword + "%'")
-    return cursor.fetchall()
-
-
 def read_file(filename):
     # Path traversal: no sanitization on filename
     base_dir = "/var/app/files/"

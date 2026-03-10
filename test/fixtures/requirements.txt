@@ -1,3 +1,2 @@
-# Pinned to old versions with known CVEs - for SCA testing only
+# Pinned to old version with known CVEs - for SCA testing only
 requests==2.18.0
-django==2.0.0

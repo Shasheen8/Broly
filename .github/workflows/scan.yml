@@ -192,7 +192,7 @@ jobs:
 
               const rows = findings.slice(0, 20).map(f => {
                 const name  = sevName[f.severity] || 'UNKNOWN';
-                const sev   = `${icon[name] || ''} ${name}`;
+                const sev   = `${icon[name] || ''}&nbsp;${name}`;
                 const type  = (f.type || '').toUpperCase();
                 const issue = (f.rule_name || f.title || f.rule_id || '-').substring(0, 55);
                 const loc   = f.file_path
