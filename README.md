@@ -5,7 +5,7 @@
 <h1 align="center">Broly</h1>
 <h3 align="center">A berserker vulnerability scanner.</h3>
 
-<p align="center">Secrets · SCA · SAST — powered by AI, shipped as a single binary. No rule files. No rule engine.</p>
+<p align="center">Secrets · SCA · SAST, powered by AI, shipped as a single binary. No rule files. No rule engine.</p>
 
 <p align="center">
   <a href="https://github.com/Shasheen8/Broly"><img src="https://img.shields.io/badge/Go-1.26-00ADD8?style=flat&logo=go" alt="Go"></a>
@@ -22,17 +22,17 @@ Broly runs three security scanners in parallel on your codebase and delivers res
 
 | Scanner | Engine | AI Layer |
 |---------|--------|----------|
-| **Secrets** | [Titus](https://github.com/praetorian-inc/titus) · 487 rules · Hyperscan | `--ai-filter-secrets` — eliminates false positives |
-| **SCA** | [osv-scalibr](https://github.com/google/osv-scalibr) + [osv.dev](https://osv.dev) · 19 ecosystems | `--ai-sca-reachability` — checks if the vuln is actually called |
+| **Secrets** | [Titus](https://github.com/praetorian-inc/titus) · 487 rules · Hyperscan | `--ai-filter-secrets` eliminates false positives |
+| **SCA** | [osv-scalibr](https://github.com/google/osv-scalibr) + [osv.dev](https://osv.dev) · 19 ecosystems | `--ai-sca-reachability` checks if the vuln is actually called |
 | **SAST** | [Together AI](https://together.ai) · `Qwen/Qwen3-Coder-Next-FP8` · **no rule files, no rule engine** | Always-on · data flow analysis · CVSS scoring |
 
 ---
 
 ## Install
 
-**Linux** — download a pre-built binary from [Releases](https://github.com/Shasheen8/Broly/releases).
+**Linux** - download a pre-built binary from [Releases](https://github.com/Shasheen8/Broly/releases).
 
-**macOS** — build from source:
+**macOS** - build from source:
 
 ```bash
 brew install vectorscan
@@ -75,10 +75,10 @@ broly scan --sca --offline              # skip OSV API lookup
 
 ## Snapshots
 
-### SAST — AI-powered code analysis
+### SAST - AI-powered code analysis
 
 ```
-broly vdev — scanning api/handlers.py
+broly vdev - scanning api/handlers.py
 scanners: sast | workers: 8
 
   ╔══════════════════════════════════════════════════════╗
@@ -106,11 +106,11 @@ scanners: sast | workers: 8
   ╚══════════════════════════════════════════════════════╝
 ```
 
-The SAST engine sends each file directly to `Qwen/Qwen3-Coder-Next-FP8` with a structured security prompt. No rule files. No rule engine. No YAML. The model traces data flow from source to sink, infers CVSS scores, and pinpoints exact line numbers — and finds what static rules miss.
+The SAST engine sends each file directly to `Qwen/Qwen3-Coder-Next-FP8` with a structured security prompt. No rule files. No rule engine. No YAML. The model traces data flow from source to sink, infers CVSS scores, and pinpoints exact line numbers, finding what static rules miss.
 
 ---
 
-### Secrets — with AI false positive filtering
+### Secrets - with AI false positive filtering
 
 Without `--ai-filter-secrets` (raw regex hits):
 
@@ -130,14 +130,14 @@ With `--ai-filter-secrets` (AI reads surrounding context):
   ✔  No findings detected. Clean scan!
 ```
 
-The AI recognized the file contained documented placeholder values (`EXAMPLE` in variable names, "Test / dummy values" comment) and filtered them all as false positives — reducing noise to zero.
+The AI recognized the file contained documented placeholder values (`EXAMPLE` in variable names, "Test / dummy values" comment) and filtered them all as false positives, reducing noise to zero.
 
 ---
 
-### SCA — dependency vulnerability scan
+### SCA - dependency vulnerability scan
 
 ```
-broly vdev — scanning /path/to/project
+broly vdev - scanning /path/to/project
 scanners: sca | workers: 8
 
   ▸ SCA (13 findings)
@@ -182,7 +182,7 @@ Add `--ai-sca-reachability` to check whether the vulnerable functions are actual
                │                   │                       │
                ▼                   ▼                       ▼
         AI reads context    AI finds importing      AI traces data flow
-        filters FP hits     files, checks if        source → sink
+        filters FP hits     files, checks if        source to sink
         (placeholder vs     vuln code path          CVSS scoring
          real credential)   is actually called      exact line numbers
                │                   │                       │
@@ -198,19 +198,19 @@ Add `--ai-sca-reachability` to check whether the vulnerable functions are actual
 
 ## What Gets Scanned
 
-**Secrets** — 487 rules across:
+**Secrets** - 487 rules across:
 ```
 AWS, GitHub, OpenAI, Anthropic, GCP, Azure, Cloudflare, Slack, Stripe, Twilio,
 SendGrid, Docker, npm, SSH/PGP/RSA/EC keys, database URIs, JWTs, generic tokens
 ```
 
-**SCA** — 19 ecosystems, 50+ lockfile formats:
+**SCA** - 19 ecosystems, 50+ lockfile formats:
 ```
 Go, Python, JavaScript, Ruby, Rust, Java, PHP, .NET, Dart, C/C++, Haskell,
 Elixir, Erlang, R, Swift, Lua, Nim, OCaml, Julia
 ```
 
-**SAST** — AI analysis across 18 languages. No rule files. No rule engine. No maintenance:
+**SAST** - AI analysis across 18 languages. No rule files. No rule engine. No maintenance:
 ```
 Go, Python, JavaScript, TypeScript, Java, Ruby, PHP, C#, Rust, C, C++,
 Kotlin, Swift, Bash, and more
@@ -230,10 +230,10 @@ Kotlin, Swift, Bash, and more
 
 ## Acknowledgments
 
-- [Titus](https://github.com/praetorian-inc/titus) — secrets engine
-- [osv-scalibr](https://github.com/google/osv-scalibr) — lockfile extraction
-- [osv.dev](https://osv.dev) — vulnerability database
-- [Together AI](https://together.ai) — AI inference
+- [Titus](https://github.com/praetorian-inc/titus) - secrets engine
+- [osv-scalibr](https://github.com/google/osv-scalibr) - lockfile extraction
+- [osv.dev](https://osv.dev) - vulnerability database
+- [Together AI](https://together.ai) - AI inference
 
 ## License
 
