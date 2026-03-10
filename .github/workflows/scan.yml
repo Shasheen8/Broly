@@ -107,8 +107,8 @@ jobs:
           mkdir -p sarif
 
           # Secrets + SCA: scan full repo (fast, lockfile-based, no API cost)
-          broly scan . --secrets --sca -f sarif -o sarif/fast.sarif -q || true
-          broly scan . --secrets --sca -f json  -o fast-results.json  -q || true
+          broly scan . --secrets --sca --exclude .git -f sarif -o sarif/fast.sarif -q || true
+          broly scan . --secrets --sca --exclude .git -f json  -o fast-results.json  -q || true
 
           # SAST: scan changed files only to control AI API usage
           if [ -n "${TOGETHER_API_KEY}" ] && [ -n "${CHANGED_FILES}" ]; then
@@ -164,10 +164,11 @@ jobs:
               } catch (_) {}
             }
 
-            const order = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3, INFO: 4 };
-            findings.sort((a, b) => (order[a.severity] ?? 9) - (order[b.severity] ?? 9));
+            // Severity is serialized as int: 0=INFO,1=LOW,2=MEDIUM,3=HIGH,4=CRITICAL
+            const sevName = { 4: 'CRITICAL', 3: 'HIGH', 2: 'MEDIUM', 1: 'LOW', 0: 'INFO' };
+            const icon    = { CRITICAL: '🔴', HIGH: '🟠', MEDIUM: '🟡', LOW: '🔵', INFO: '⚪' };
 
-            const icon = { CRITICAL: '🔴', HIGH: '🟠', MEDIUM: '🟡', LOW: '🔵', INFO: '⚪' };
+            findings.sort((a, b) => b.severity - a.severity);
 
             let body;
             if (findings.length === 0) {
@@ -180,14 +181,18 @@ jobs:
               ].join('\n');
             } else {
               const counts = {};
-              for (const f of findings) counts[f.severity] = (counts[f.severity] || 0) + 1;
+              for (const f of findings) {
+                const name = sevName[f.severity] || 'UNKNOWN';
+                counts[name] = (counts[name] || 0) + 1;
+              }
               const summary = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']
                 .filter(s => counts[s])
                 .map(s => `${icon[s]} **${counts[s]} ${s}**`)
                 .join('  ');
 
-              const rows = findings.slice(0, 30).map(f => {
-                const sev   = `${icon[f.severity] || ''} ${f.severity}`;
+              const rows = findings.slice(0, 20).map(f => {
+                const name  = sevName[f.severity] || 'UNKNOWN';
+                const sev   = `${icon[name] || ''} ${name}`;
                 const type  = (f.type || '').toUpperCase();
                 const issue = (f.rule_name || f.title || f.rule_id || '-').substring(0, 55);
                 const loc   = f.file_path
@@ -196,8 +201,8 @@ jobs:
                 return `| ${sev} | ${type} | ${issue} | ${loc} |`;
               }).join('\n');
 
-              const note = findings.length > 30
-                ? `\n> Showing top 30 of ${findings.length} findings. See [Security tab](../../security/code-scanning) for full results.`
+              const note = findings.length > 20
+                ? `\n> Showing top 20 of ${findings.length} findings. See [Security tab](../../security/code-scanning) for full results.`
                 : '';
 
               body = [
