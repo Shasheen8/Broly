@@ -31,15 +31,23 @@ Broly runs three security scanners in parallel on your codebase and delivers res
 
 ## Install
 
-**Linux** - download a pre-built binary from [Releases](https://github.com/Shasheen8/Broly/releases).
+**Go install** (any platform):
 
-**macOS** - build from source:
+```bash
+go install github.com/Shasheen8/Broly/cmd/broly@latest
+```
+
+**Linux** - pre-built binary from [Releases](https://github.com/Shasheen8/Broly/releases).
+
+**macOS** - build from source with Hyperscan (faster secrets scanning):
 
 ```bash
 brew install vectorscan
 git clone https://github.com/Shasheen8/Broly.git
 cd Broly && make build
 ```
+
+> `go install` uses pure Go regex for secrets. The source build enables Hyperscan via `-tags vectorscan` for significantly faster pattern matching on large codebases.
 
 **SAST / AI features** require a Together AI key:
 
