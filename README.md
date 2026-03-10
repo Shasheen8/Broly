@@ -52,29 +52,29 @@ export TOGETHER_API_KEY=your_key_here
 ## Usage
 
 ```bash
-broly scan                              # run all scanners on current directory
-broly scan /path/to/project             # specific path
+broly scan                                        # run all scanners on current directory
+broly scan /path/to/project                       # specific path
 
 # individual scanners
-broly scan --secrets                    # secrets only
-broly scan --sca                        # SCA only
-broly scan --sast                       # SAST only (requires TOGETHER_API_KEY)
+broly scan --secrets                              # secrets only
+broly scan --sca                                  # SCA only
+broly scan --sast                                 # SAST only (requires TOGETHER_API_KEY)
 
 # AI enhancements
-broly scan --ai-filter-secrets          # filter secrets false positives with AI
-broly scan --ai-sca-reachability        # check if vulnerable deps are actually called
+broly scan --ai-filter-secrets                    # filter secrets false positives with AI
+broly scan --ai-sca-reachability                  # check if vulnerable deps are actually called
 broly scan --ai-model Qwen/Qwen3-Coder-Next-FP8   # override model (default)
 
 # output
-broly scan -f json                      # JSON output
-broly scan -f sarif -o results.sarif    # SARIF for GitHub Code Scanning
-broly scan --min-severity high          # only high and critical
-broly scan --sca --offline              # skip OSV API lookup
+broly scan -f json                                # JSON output
+broly scan -f sarif -o results.sarif              # SARIF for GitHub Code Scanning
+broly scan --min-severity high                    # only high and critical
+broly scan --sca --offline                        # skip OSV API lookup
 ```
 
 ---
 
-## Snapshots
+## Output Results
 
 ### SAST - AI-powered code analysis
 
