@@ -58,8 +58,7 @@ func (s *SASTScanner) Init(cfg *core.Config) error {
 		s.langFilter[strings.ToLower(l)] = true
 	}
 
-	apiKey := os.Getenv("TOGETHER_API_KEY")
-	if apiKey == "" {
+	if os.Getenv("TOGETHER_API_KEY") == "" {
 		fmt.Fprintln(os.Stderr, "warning: TOGETHER_API_KEY not set — SAST scanning will be skipped")
 		s.apiKeySet = false
 		return nil
@@ -70,7 +69,7 @@ func (s *SASTScanner) Init(cfg *core.Config) error {
 	if model == "" {
 		model = defaultModel
 	}
-	s.client = newTogetherClient(apiKey, model)
+	s.client = newTogetherClient(model)
 
 	return nil
 }

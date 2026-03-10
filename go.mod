@@ -7,6 +7,7 @@ require (
 	github.com/ossf/osv-schema/bindings/go v0.0.0-20260129002236-09a17f85b44a
 	github.com/praetorian-inc/titus v1.1.4
 	github.com/spf13/cobra v1.10.2
+	github.com/togethercomputer/together-go v0.6.0
 	osv.dev/bindings/go v0.0.0-20260119002423-9eebd248ed28
 )
 
@@ -121,6 +122,7 @@ require (
 	github.com/tidwall/jsonc v0.3.2 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
+	github.com/tidwall/sjson v1.2.5 // indirect
 	github.com/tink-crypto/tink-go/v2 v2.4.0 // indirect
 	github.com/tonistiigi/go-csvvalue v0.0.0-20240814133006-030d3b2625d0 // indirect
 	github.com/ulikunitz/xz v0.5.15 // indirect
