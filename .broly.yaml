@@ -1,0 +1,7 @@
+min_severity: low
+exclude_paths:
+  - vendor
+  - .git
+  - node_modules
+  - testdata
+workers: 8

@@ -88,23 +88,19 @@ broly scan --quiet                                # suppress progress output
 
 ### Config file
 
-Create `.broly.yaml` in your project root to set defaults without repeating flags:
+A `.broly.yaml` at the repo root is loaded automatically. CLI flags override it. See [`.broly.yaml`](.broly.yaml) for a working example.
 
 ```yaml
-min_severity: medium
+min_severity: low
 exclude_paths:
   - vendor
-  - node_modules
   - .git
-languages:
-  - go
-  - python
 workers: 8
 ```
 
 ### Baseline
 
-Create `.broly-baseline.yaml` to suppress known false positives or assert that specific findings must always be detected:
+`.broly-baseline.yaml` is a two-sided contract — `suppress` silences known false positives, `require` asserts specific findings must be detected every scan (missing entries cause a non-zero exit). See [`.broly-baseline.yaml`](.broly-baseline.yaml) for a working example.
 
 ```yaml
 suppress:
@@ -116,8 +112,6 @@ require:
     file: "api/handlers.py"
     description: "SQL injection in user lookup — must be detected"
 ```
-
-Missing `require` entries cause a non-zero exit, making the baseline a two-sided contract.
 
 ### Inline suppression
 
