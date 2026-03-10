@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Shasheen8/Broly/pkg/cache"
 	"github.com/Shasheen8/Broly/pkg/core"
 )
 
@@ -28,6 +29,8 @@ type SASTScanner struct {
 	maxFileSize  int64
 	workers      int
 	apiKeySet    bool
+	fileCache    *cache.Cache
+	incremental  bool
 }
 
 func NewSASTScanner() *SASTScanner {
@@ -56,6 +59,20 @@ func (s *SASTScanner) Init(cfg *core.Config) error {
 	s.langFilter = make(map[string]bool)
 	for _, l := range cfg.Languages {
 		s.langFilter[strings.ToLower(l)] = true
+	}
+
+	s.incremental = cfg.Incremental
+	if s.incremental {
+		cachePath := cfg.CachePath
+		if cachePath == "" {
+			cachePath = cache.DefaultPath
+		}
+		c, err := cache.Load(cachePath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "warning: could not load sast cache: %v\n", err)
+		} else {
+			s.fileCache = c
+		}
 	}
 
 	if os.Getenv("TOGETHER_API_KEY") == "" {
@@ -140,6 +157,11 @@ func (s *SASTScanner) Scan(ctx context.Context, paths []string, findings chan<- 
 				return nil
 			}
 
+			// Incremental: skip files unchanged since last scan.
+			if s.fileCache != nil && !s.fileCache.Changed(path) {
+				return nil
+			}
+
 			jobs <- fileJob{path: path, lang: lang}
 			return nil
 		})
@@ -147,6 +169,22 @@ func (s *SASTScanner) Scan(ctx context.Context, paths []string, findings chan<- 
 
 	close(jobs)
 	wg.Wait()
+
+	// Persist updated cache.
+	if s.fileCache != nil {
+		for _, target := range paths {
+			filepath.WalkDir(target, func(path string, d fs.DirEntry, err error) error {
+				if err == nil && !d.IsDir() {
+					if _, ok := extToLang[strings.ToLower(filepath.Ext(d.Name()))]; ok {
+						s.fileCache.Update(path)
+					}
+				}
+				return nil
+			})
+		}
+		_ = s.fileCache.Save()
+	}
+
 	return nil
 }
 

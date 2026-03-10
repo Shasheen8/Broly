@@ -313,6 +313,17 @@ func printSummary(w io.Writer, clr color, result *core.ScanResult) {
 	summaryLine(w, clr, fmt.Sprintf("  %s",
 		clr.s(gray, fmt.Sprintf("duration: %s", result.Duration.Round(time.Millisecond))),
 	))
+	if result.SuppressedCount > 0 {
+		summaryLine(w, clr, fmt.Sprintf("  %s",
+			clr.s(gray, fmt.Sprintf("%d suppressed", result.SuppressedCount)),
+		))
+	}
+	for _, desc := range result.MissingRequired {
+		summaryLine(w, clr, fmt.Sprintf("  %s %s",
+			clr.s(bold+yellow, "!"),
+			clr.s(yellow, fmt.Sprintf("missing required: %s", trunc(desc, 44))),
+		))
+	}
 	summaryLine(w, clr, "")
 	fmt.Fprintf(w, "  %s\n\n", clr.s(cyan, "╚══════════════════════════════════════════════════════╝"))
 }

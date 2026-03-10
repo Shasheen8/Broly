@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 
 	"github.com/Shasheen8/Broly/pkg/core"
 	"github.com/Shasheen8/Broly/pkg/orchestrator"
@@ -44,6 +45,7 @@ Secrets scanning into a single fast binary. Built in Go for speed.`,
 
 func scanCmd() *cobra.Command {
 	var (
+		configFile      string
 		outputFormat    string
 		outputFile      string
 		enableSAST      bool
@@ -57,10 +59,13 @@ func scanCmd() *cobra.Command {
 		validateSecrets bool
 		offline         bool
 		quiet           bool
-		aiModel              string
-		languages            []string
-		aiFilterSecrets      bool
-		aiSCAReachability    bool
+		aiModel             string
+		languages           []string
+		aiFilterSecrets     bool
+		aiSCAReachability   bool
+		baselineFile        string
+		incremental         bool
+		cachePath           string
 	)
 
 	cmd := &cobra.Command{
@@ -73,32 +78,89 @@ By default all scanners are enabled and the current directory is scanned.`,
 				args = []string{"."}
 			}
 
-			allDisabled := !enableSAST && !enableSCA && !enableSecrets
-			if allDisabled {
-				enableSAST = true
-				enableSCA = true
-				enableSecrets = true
+			// Start with defaults from config file (if present).
+			cfg := loadConfigFile(configFile)
+			cfg.Targets = args
+
+			// CLI flags override config file values where explicitly set.
+			f := cmd.Flags()
+			if f.Changed("format") {
+				cfg.OutputFormat = outputFormat
+			} else if cfg.OutputFormat == "" {
+				cfg.OutputFormat = outputFormat
+			}
+			if f.Changed("output") {
+				cfg.OutputFile = outputFile
+			}
+			if f.Changed("workers") {
+				cfg.Workers = workers
+			} else if cfg.Workers == 0 {
+				cfg.Workers = workers
+			}
+			if f.Changed("min-severity") {
+				cfg.MinSeverity = core.ParseSeverity(minSeverity)
+			} else if cfg.MinSeverity == 0 {
+				cfg.MinSeverity = core.ParseSeverity(minSeverity)
+			}
+			if f.Changed("exclude") {
+				cfg.ExcludePaths = excludePaths
+			}
+			if f.Changed("secrets-rules") {
+				cfg.SecretsRulesDir = secretsRules
+			}
+			if f.Changed("no-redact") {
+				cfg.DisableRedaction = disableRedact
+			}
+			if f.Changed("validate") {
+				cfg.ValidateSecrets = validateSecrets
+			}
+			if f.Changed("offline") {
+				cfg.Offline = offline
+			}
+			if f.Changed("quiet") || f.Changed("q") {
+				cfg.Quiet = quiet
+			}
+			if f.Changed("ai-model") {
+				cfg.AIModel = aiModel
+			}
+			if f.Changed("languages") {
+				cfg.Languages = languages
+			}
+			if f.Changed("ai-filter-secrets") {
+				cfg.AIFilterSecrets = aiFilterSecrets
+			}
+			if f.Changed("ai-sca-reachability") {
+				cfg.AISCAReachability = aiSCAReachability
+			}
+			if f.Changed("baseline") {
+				cfg.BaselineFile = baselineFile
+			}
+			if f.Changed("incremental") {
+				cfg.Incremental = incremental
+			}
+			if f.Changed("cache-path") {
+				cfg.CachePath = cachePath
 			}
 
-			cfg := &core.Config{
-				Targets:          args,
-				EnableSAST:       enableSAST,
-				EnableSCA:        enableSCA,
-				EnableSecrets:    enableSecrets,
-				Workers:          workers,
-				OutputFormat:     outputFormat,
-				OutputFile:       outputFile,
-				MinSeverity:      core.ParseSeverity(minSeverity),
-				ExcludePaths:     excludePaths,
-				SecretsRulesDir:  secretsRules,
-				DisableRedaction: disableRedact,
-				ValidateSecrets:  validateSecrets,
-				Offline:          offline,
-				Quiet:            quiet,
-				AIModel:           aiModel,
-				Languages:         languages,
-				AIFilterSecrets:   aiFilterSecrets,
-				AISCAReachability: aiSCAReachability,
+			// Scanner enable flags: CLI always wins; if none set and config has none, enable all.
+			cliSAST    := f.Changed("sast")
+			cliSCA     := f.Changed("sca")
+			cliSecrets := f.Changed("secrets")
+
+			if cliSAST {
+				cfg.EnableSAST = enableSAST
+			}
+			if cliSCA {
+				cfg.EnableSCA = enableSCA
+			}
+			if cliSecrets {
+				cfg.EnableSecrets = enableSecrets
+			}
+
+			if !cfg.EnableSAST && !cfg.EnableSCA && !cfg.EnableSecrets {
+				cfg.EnableSAST = true
+				cfg.EnableSCA = true
+				cfg.EnableSecrets = true
 			}
 
 			return runScan(cfg)
@@ -106,6 +168,7 @@ By default all scanners are enabled and the current directory is scanned.`,
 	}
 
 	flags := cmd.Flags()
+	flags.StringVarP(&configFile, "config", "c", ".broly.yaml", "Config file path")
 	flags.StringVarP(&outputFormat, "format", "f", "table", "Output format: table, json, sarif")
 	flags.StringVarP(&outputFile, "output", "o", "", "Write output to file (default: stdout)")
 	flags.BoolVar(&enableSAST, "sast", false, "Enable SAST scanning")
@@ -123,8 +186,25 @@ By default all scanners are enabled and the current directory is scanned.`,
 	flags.BoolVar(&aiFilterSecrets, "ai-filter-secrets", false, "Use AI to filter false positive secrets findings (requires TOGETHER_API_KEY)")
 	flags.BoolVar(&aiSCAReachability, "ai-sca-reachability", false, "Use AI to analyze reachability of vulnerable dependencies (requires TOGETHER_API_KEY)")
 	flags.BoolVarP(&quiet, "quiet", "q", false, "Suppress progress output")
+	flags.StringVar(&baselineFile, "baseline", "", "Baseline file for suppress/require rules (default: .broly-baseline.yaml)")
+	flags.BoolVar(&incremental, "incremental", false, "Only re-scan SAST files changed since last run")
+	flags.StringVar(&cachePath, "cache-path", "", "Path to incremental scan cache (default: .broly-cache.json)")
 
 	return cmd
+}
+
+// loadConfigFile reads .broly.yaml (or the specified path) and returns a Config with those values.
+// Missing file is silently ignored. Parse errors print a warning.
+func loadConfigFile(path string) *core.Config {
+	cfg := &core.Config{}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return cfg
+	}
+	if err := yaml.Unmarshal(data, cfg); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: could not parse config file %s: %v\n", path, err)
+	}
+	return cfg
 }
 
 func runScan(cfg *core.Config) error {
@@ -186,7 +266,7 @@ func runScan(cfg *core.Config) error {
 		return fmt.Errorf("format output: %w", err)
 	}
 
-	if len(result.Findings) > 0 {
+	if len(result.Findings) > 0 || len(result.MissingRequired) > 0 {
 		os.Exit(1)
 	}
 	return nil

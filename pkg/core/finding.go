@@ -59,10 +59,12 @@ func (f *Finding) ComputeFingerprint() {
 }
 
 type ScanResult struct {
-	Findings  []Finding     `json:"findings"`
-	Metrics   ScanMetrics   `json:"metrics"`
-	Duration  time.Duration `json:"duration_ms"`
-	ScanTypes []ScanType    `json:"scan_types"`
+	Findings        []Finding     `json:"findings"`
+	Metrics         ScanMetrics   `json:"metrics"`
+	Duration        time.Duration `json:"duration_ms"`
+	ScanTypes       []ScanType    `json:"scan_types"`
+	SuppressedCount int           `json:"suppressed_count,omitempty"`
+	MissingRequired []string      `json:"missing_required,omitempty"`
 }
 
 type ScanMetrics struct {

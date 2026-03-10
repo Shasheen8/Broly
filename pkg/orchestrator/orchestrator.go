@@ -4,9 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"sync"
 
+	"github.com/Shasheen8/Broly/pkg/baseline"
 	"github.com/Shasheen8/Broly/pkg/core"
+	"github.com/Shasheen8/Broly/pkg/suppress"
 )
 
 type Orchestrator struct {
@@ -90,8 +93,27 @@ func (o *Orchestrator) Run(ctx context.Context) (*core.ScanResult, error) {
 		return nil, fmt.Errorf("scan errors: %w", errors.Join(errs...))
 	}
 
+	// Post-processing pipeline.
+	findings = deduplicateFindings(findings)
 	findings = filterBySeverity(findings, o.config.MinSeverity)
 	findings = filterByRuleIDs(findings, o.config.IncludeRuleIDs, o.config.ExcludeRuleIDs)
+
+	// Inline suppression: broly:ignore comments in source.
+	findings, inlineSuppressed := suppress.Filter(findings)
+
+	// Baseline: suppress known FPs, assert required findings exist.
+	var (
+		baselineSuppressed int
+		missingRequired    []string
+	)
+	if o.config.BaselineFile != "" {
+		bl, err := baseline.Load(o.config.BaselineFile)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "warning: could not load baseline %s: %v\n", o.config.BaselineFile, err)
+		} else {
+			findings, missingRequired, baselineSuppressed = bl.Apply(findings)
+		}
+	}
 
 	scanTypes := make([]core.ScanType, 0, len(o.scanners))
 	typeSet := make(map[core.ScanType]bool)
@@ -103,10 +125,24 @@ func (o *Orchestrator) Run(ctx context.Context) (*core.ScanResult, error) {
 	}
 
 	return &core.ScanResult{
-		Findings:  findings,
-		ScanTypes: scanTypes,
-		Metrics:   core.ScanMetrics{FindingsCount: len(findings)},
+		Findings:        findings,
+		ScanTypes:       scanTypes,
+		Metrics:         core.ScanMetrics{FindingsCount: len(findings)},
+		SuppressedCount: inlineSuppressed + baselineSuppressed,
+		MissingRequired: missingRequired,
 	}, nil
+}
+
+func deduplicateFindings(findings []core.Finding) []core.Finding {
+	seen := make(map[string]bool, len(findings))
+	out := make([]core.Finding, 0, len(findings))
+	for _, f := range findings {
+		if f.Fingerprint == "" || !seen[f.Fingerprint] {
+			seen[f.Fingerprint] = true
+			out = append(out, f)
+		}
+	}
+	return out
 }
 
 func filterBySeverity(findings []core.Finding, min core.Severity) []core.Finding {
@@ -126,10 +162,8 @@ func filterByRuleIDs(findings []core.Finding, include, exclude []string) []core.
 	if len(include) == 0 && len(exclude) == 0 {
 		return findings
 	}
-
 	includeSet := toSet(include)
 	excludeSet := toSet(exclude)
-
 	filtered := make([]core.Finding, 0, len(findings))
 	for _, f := range findings {
 		if len(includeSet) > 0 && !includeSet[f.RuleID] {
