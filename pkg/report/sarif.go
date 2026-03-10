@@ -98,6 +98,15 @@ func (f *SARIFFormatter) Format(w io.Writer, result *core.ScanResult) error {
 			})
 		}
 
+		startLine := finding.StartLine
+		if startLine < 1 {
+			startLine = 1
+		}
+		endLine := finding.EndLine
+		if endLine < startLine {
+			endLine = 0 // omitempty drops it
+		}
+
 		results = append(results, sarifResult{
 			RuleID:  finding.RuleID,
 			Level:   severityToSARIFLevel(finding.Severity),
@@ -106,8 +115,8 @@ func (f *SARIFFormatter) Format(w io.Writer, result *core.ScanResult) error {
 				PhysicalLocation: sarifPhysicalLocation{
 					ArtifactLocation: sarifArtifactLocation{URI: finding.FilePath},
 					Region: sarifRegion{
-						StartLine:   finding.StartLine,
-						EndLine:     finding.EndLine,
+						StartLine:   startLine,
+						EndLine:     endLine,
 						StartColumn: finding.StartColumn,
 						EndColumn:   finding.EndColumn,
 					},
