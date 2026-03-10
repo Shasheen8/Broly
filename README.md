@@ -100,7 +100,7 @@ workers: 8
 
 ### Baseline
 
-`.broly-baseline.yaml` is a two-sided contract — `suppress` silences known false positives, `require` asserts specific findings must be detected every scan (missing entries cause a non-zero exit). See [`.broly-baseline.yaml`](.broly-baseline.yaml) for a working example.
+`.broly-baseline.yaml` is a two-sided contract: `suppress` silences known false positives, `require` asserts specific findings must be detected every scan (missing entries cause a non-zero exit). See [`.broly-baseline.yaml`](.broly-baseline.yaml) for a working example.
 
 ```yaml
 suppress:
@@ -110,7 +110,7 @@ suppress:
 require:
   - rule_id: "SQL-INJECTION"
     file: "api/handlers.py"
-    description: "SQL injection in user lookup — must be detected"
+    description: "SQL injection in user lookup - must be detected"
 ```
 
 ### Inline suppression
