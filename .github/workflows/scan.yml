@@ -1,0 +1,251 @@
+name: Broly Security Scan
+
+# Scans this repository with Broly on every PR and push to main.
+#
+# PR scan:   SAST on changed files only (AI API cost control) + secrets + SCA on full repo.
+#            Posts findings as a PR comment (updates in-place on re-runs).
+# Full scan: All scanners on the entire repo. Triggered on push to main or workflow_dispatch.
+#            Uploads SARIF to GitHub Security tab.
+#
+# Required secrets (optional — SAST is skipped if absent):
+#   TOGETHER_API_KEY  — Together.ai key for SAST and AI enhancements
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "**.go"
+      - "**.py"
+      - "**.js"
+      - "**.ts"
+      - "**.jsx"
+      - "**.tsx"
+      - "**.java"
+      - "**.rb"
+      - "**.php"
+      - "**.cs"
+      - "**.rs"
+      - "**.c"
+      - "**.cpp"
+      - "**.h"
+      - "**.hpp"
+      - "**.kt"
+      - "**.swift"
+      - "**.sh"
+      - "**.bash"
+      - "**/go.sum"
+      - "**/go.mod"
+      - "**/requirements*.txt"
+      - "**/package-lock.json"
+      - "**/yarn.lock"
+      - "**/Cargo.lock"
+      - "**/Gemfile.lock"
+      - "**/poetry.lock"
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      scanners:
+        description: "Scanners to run (default: all)"
+        required: false
+        default: "all"
+        type: choice
+        options:
+          - all
+          - sast
+          - sca
+          - secrets
+
+permissions:
+  contents: read
+  pull-requests: write
+  security-events: write
+
+jobs:
+  scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    continue-on-error: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "stable"
+          cache: false
+
+      - name: Install Broly
+        run: CGO_ENABLED=0 go install github.com/Shasheen8/Broly/cmd/broly@latest
+
+      # ── PR: identify changed code files ────────────────────────────────────
+      - name: Get changed files
+        if: github.event_name == 'pull_request'
+        id: diff
+        run: |
+          CHANGED=$(git diff --name-only "origin/${BASE_REF}...${SHA}" \
+            | grep -E '\.(go|py|js|ts|jsx|tsx|java|rb|php|cs|rs|c|cpp|h|hpp|kt|swift|sh|bash)$' \
+            | head -50 \
+            | tr '\n' ' ')
+          echo "files=${CHANGED}" >> "$GITHUB_OUTPUT"
+          echo "has_code=$([ -n "${CHANGED}" ] && echo 'true' || echo 'false')" >> "$GITHUB_OUTPUT"
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          SHA: ${{ github.sha }}
+
+      # ── PR scan ─────────────────────────────────────────────────────────────
+      - name: Scan PR diff
+        if: github.event_name == 'pull_request' && steps.diff.outputs.has_code == 'true'
+        run: |
+          mkdir -p sarif
+
+          # Secrets + SCA: scan full repo (fast, lockfile-based, no API cost)
+          broly scan . --secrets --sca -f sarif -o sarif/fast.sarif -q || true
+          broly scan . --secrets --sca -f json  -o fast-results.json  -q || true
+
+          # SAST: scan changed files only to control AI API usage
+          if [ -n "${TOGETHER_API_KEY}" ] && [ -n "${CHANGED_FILES}" ]; then
+            # shellcheck disable=SC2086 — word splitting is intentional for file list
+            broly scan ${CHANGED_FILES} --sast -f sarif -o sarif/sast.sarif -q || true
+            broly scan ${CHANGED_FILES} --sast -f json  -o sast-results.json  -q || true
+          fi
+        env:
+          TOGETHER_API_KEY: ${{ secrets.TOGETHER_API_KEY }}
+          CHANGED_FILES: ${{ steps.diff.outputs.files }}
+
+      # ── Full scan (push to main / workflow_dispatch) ─────────────────────
+      - name: Full scan
+        if: github.event_name != 'pull_request'
+        run: |
+          mkdir -p sarif
+          SCANNERS=""
+          case "${INPUT_SCANNERS}" in
+            sast)    SCANNERS="--sast"    ;;
+            sca)     SCANNERS="--sca"     ;;
+            secrets) SCANNERS="--secrets" ;;
+          esac
+          # shellcheck disable=SC2086 — SCANNERS is intentionally unquoted (may be empty)
+          broly scan . ${SCANNERS} -f sarif -o sarif/results.sarif -q || true
+          broly scan . ${SCANNERS} -f json  -o results.json         -q || true
+        env:
+          TOGETHER_API_KEY: ${{ secrets.TOGETHER_API_KEY }}
+          INPUT_SCANNERS: ${{ github.event.inputs.scanners }}
+
+      # ── GitHub Security tab ──────────────────────────────────────────────
+      - name: Upload SARIF to GitHub Security tab
+        if: always() && hashFiles('sarif/*.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: sarif/
+        continue-on-error: true
+
+      # ── PR comment ───────────────────────────────────────────────────────
+      - name: Post PR comment
+        if: always() && github.event_name == 'pull_request' && steps.diff.outputs.has_code == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+
+            let findings = [];
+            for (const f of ['fast-results.json', 'sast-results.json', 'results.json']) {
+              if (!fs.existsSync(f)) continue;
+              try {
+                const data = JSON.parse(fs.readFileSync(f, 'utf8'));
+                if (Array.isArray(data.findings)) findings = findings.concat(data.findings);
+              } catch (_) {}
+            }
+
+            const order = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3, INFO: 4 };
+            findings.sort((a, b) => (order[a.severity] ?? 9) - (order[b.severity] ?? 9));
+
+            const icon = { CRITICAL: '🔴', HIGH: '🟠', MEDIUM: '🟡', LOW: '🔵', INFO: '⚪' };
+
+            let body;
+            if (findings.length === 0) {
+              body = [
+                '## Broly Security Scan',
+                '',
+                '✅ No findings detected.',
+                '',
+                '> [Broly](https://github.com/Shasheen8/Broly) — Secrets · SCA · SAST · Powered by Together AI',
+              ].join('\n');
+            } else {
+              const counts = {};
+              for (const f of findings) counts[f.severity] = (counts[f.severity] || 0) + 1;
+              const summary = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']
+                .filter(s => counts[s])
+                .map(s => `${icon[s]} **${counts[s]} ${s}**`)
+                .join('  ');
+
+              const rows = findings.slice(0, 30).map(f => {
+                const sev   = `${icon[f.severity] || ''} ${f.severity}`;
+                const type  = (f.type || '').toUpperCase();
+                const issue = (f.rule_name || f.title || f.rule_id || '-').substring(0, 55);
+                const loc   = f.file_path
+                  ? `\`${f.file_path}${f.start_line ? ':' + f.start_line : ''}\``
+                  : '-';
+                return `| ${sev} | ${type} | ${issue} | ${loc} |`;
+              }).join('\n');
+
+              const note = findings.length > 30
+                ? `\n> Showing top 30 of ${findings.length} findings. See [Security tab](../../security/code-scanning) for full results.`
+                : '';
+
+              body = [
+                '## Broly Security Scan',
+                '',
+                summary,
+                '',
+                '| Severity | Scanner | Issue | Location |',
+                '|----------|---------|-------|----------|',
+                rows,
+                note,
+                '',
+                '> [Broly](https://github.com/Shasheen8/Broly) — Secrets · SCA · SAST · Powered by Together AI',
+              ].join('\n');
+            }
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const existing = comments.find(c =>
+              c.user.login === 'github-actions[bot]' &&
+              c.body.includes('## Broly Security Scan')
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+      # ── Artifacts ────────────────────────────────────────────────────────
+      - name: Upload scan artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: broly-scan-results
+          path: |
+            sarif/
+            *.json
+          if-no-files-found: ignore
+          retention-days: 30
