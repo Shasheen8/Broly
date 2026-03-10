@@ -141,7 +141,7 @@ jobs:
       # ── GitHub Security tab ──────────────────────────────────────────────
       - name: Upload SARIF to GitHub Security tab
         if: always() && hashFiles('sarif/*.sarif') != ''
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: sarif/
         continue-on-error: true
