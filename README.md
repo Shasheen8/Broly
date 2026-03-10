@@ -25,7 +25,7 @@ Broly runs three security scanners in parallel on your codebase and delivers res
 |---------|--------|----------|
 | **Secrets** | [Titus](https://github.com/praetorian-inc/titus) · 487 rules · Hyperscan | `--ai-filter-secrets` eliminates false positives |
 | **SCA** | [osv-scalibr](https://github.com/google/osv-scalibr) + [osv.dev](https://osv.dev) · 19 ecosystems | `--ai-sca-reachability` checks if the vuln is actually called |
-| **SAST** | [Together AI](https://together.ai) · `Qwen/Qwen3-Coder-Next-FP8` · **no rule files, no rule engine** | Always-on · data flow analysis · CVSS scoring |
+| **SAST** | [Together AI](https://together.ai) · `Qwen/Qwen3-Coder-Next-FP8` · **no rule files,  no rule engine** | Always-on · data flow analysis · CVSS scoring |
 
 ---
 
@@ -85,7 +85,7 @@ scanners: sast | workers: 8
 
   ╔══════════════════════════════════════════════════════╗
   ║                                                      ║
-  ║      ⚡  BROLY  Berserker Vulnerability Scanner      ║
+  ║      ⚡  BROLY  Berserker Vulnerability Scanner       ║
   ║    Secrets · SCA · SAST · Powered by Together AI     ║
   ║                                                      ║
   ╚══════════════════════════════════════════════════════╝
