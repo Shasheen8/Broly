@@ -1,6 +1,9 @@
 package core
 
-import "strings"
+import (
+	"encoding/json"
+	"strings"
+)
 
 type Severity int
 
@@ -27,6 +30,19 @@ func (s Severity) String() string {
 	default:
 		return "UNKNOWN"
 	}
+}
+
+func (s Severity) MarshalJSON() ([]byte, error) {
+	return json.Marshal(s.String())
+}
+
+func (s *Severity) UnmarshalJSON(data []byte) error {
+	var str string
+	if err := json.Unmarshal(data, &str); err != nil {
+		return err
+	}
+	*s = ParseSeverity(str)
+	return nil
 }
 
 func ParseSeverity(s string) Severity {
