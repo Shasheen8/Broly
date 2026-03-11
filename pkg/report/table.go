@@ -238,6 +238,12 @@ func printSecretsTable(w io.Writer, clr color, findings []core.Finding) {
 			clr.s(dim, trunc(location, 40)),
 			clr.s(gray, trunc(f.Redacted, 30)),
 		)
+		if f.Verdict != "" {
+			fmt.Fprintf(w, "  %s %s\n",
+				verdictColor(f.Verdict, clr),
+				clr.s(gray, trunc(f.VerdictReason, 90)),
+			)
+		}
 	}
 }
 
@@ -260,6 +266,12 @@ func printSCATable(w io.Writer, clr color, findings []core.Finding) {
 			fixed,
 			clr.s(dim, f.Ecosystem),
 		)
+		if f.Verdict != "" {
+			fmt.Fprintf(w, "  %s %s\n",
+				verdictColor(f.Verdict, clr),
+				clr.s(gray, trunc(f.VerdictReason, 90)),
+			)
+		}
 	}
 }
 
@@ -293,9 +305,9 @@ func printSASTTable(w io.Writer, clr color, findings []core.Finding) {
 func verdictColor(verdict string, clr color) string {
 	switch verdict {
 	case "TRUE_POSITIVE":
-		return clr.s(bold+red, "● TRUE_POSITIVE")
+		return clr.s(bold+red, "🔺 TRUE_POSITIVE")
 	case "FALSE_POSITIVE":
-		return clr.s(bold+green, "● FALSE_POSITIVE")
+		return clr.s(bold+green, "🟢 FALSE_POSITIVE")
 	default:
 		return clr.s(gray, "● UNKNOWN")
 	}

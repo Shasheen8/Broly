@@ -168,7 +168,7 @@ jobs:
             findings.sort((a, b) => (sevOrder[a.severity] ?? 9) - (sevOrder[b.severity] ?? 9));
 
             const sevIcon     = { CRITICAL: '🔴', HIGH: '🟠', MEDIUM: '🟡', LOW: '🔵', INFO: '⚪' };
-            const verdictIcon = { TRUE_POSITIVE: '🔺', FALSE_POSITIVE: '✅', UNKNOWN: '❔' };
+            const verdictIcon = { TRUE_POSITIVE: '🔺', FALSE_POSITIVE: '🟢', UNKNOWN: '❔' };
 
             let body;
             if (findings.length === 0) {

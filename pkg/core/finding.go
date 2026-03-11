@@ -3,6 +3,8 @@ package core
 import (
 	"crypto/sha256"
 	"fmt"
+	"os"
+	"strings"
 	"time"
 )
 
@@ -51,6 +53,28 @@ type Finding struct {
 	Verdict       string `json:"verdict,omitempty"`        // TRUE_POSITIVE, FALSE_POSITIVE, UNKNOWN
 	VerdictReason string `json:"verdict_reason,omitempty"` // one-sentence explanation
 	FixSuggestion string `json:"fix_suggestion,omitempty"` // concrete code fix from LLM
+}
+
+// FileContext returns up to radius lines on each side of lineNum, with line numbers.
+func FileContext(path string, lineNum, radius int) string {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	lines := strings.Split(string(data), "\n")
+	start := lineNum - radius - 1
+	if start < 0 {
+		start = 0
+	}
+	end := lineNum + radius
+	if end > len(lines) {
+		end = len(lines)
+	}
+	var sb strings.Builder
+	for i := start; i < end; i++ {
+		fmt.Fprintf(&sb, "%4d  %s\n", i+1, lines[i])
+	}
+	return sb.String()
 }
 
 // ComputeFingerprint sets a deduplication hash. Changes when file path or line changes.

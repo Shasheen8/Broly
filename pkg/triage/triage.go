@@ -3,7 +3,6 @@ package triage
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 	"sync"
 
@@ -46,7 +45,6 @@ func New(model string) *Triager {
 	return &Triager{client: c}
 }
 
-// Run concurrently triages all findings, attaching verdict and fix suggestion to each.
 func (t *Triager) Run(ctx context.Context, findings []core.Finding) []core.Finding {
 	out := make([]core.Finding, len(findings))
 	copy(out, findings)
@@ -60,7 +58,7 @@ func (t *Triager) Run(ctx context.Context, findings []core.Finding) []core.Findi
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
-			verdict, reason, fix := triage(ctx, t.client, &out[i])
+			verdict, reason, fix := triageFinding(ctx, t.client, &out[i])
 			out[i].Verdict = verdict
 			out[i].VerdictReason = reason
 			out[i].FixSuggestion = fix
@@ -70,15 +68,14 @@ func (t *Triager) Run(ctx context.Context, findings []core.Finding) []core.Findi
 	return out
 }
 
-func triage(ctx context.Context, client *ai.Client, f *core.Finding) (verdict, reason, fix string) {
-	code := fileContext(f.FilePath, f.StartLine, 8)
+func triageFinding(ctx context.Context, client *ai.Client, f *core.Finding) (verdict, reason, fix string) {
 	prompt := fmt.Sprintf(triagePrompt,
 		f.Type,
 		f.RuleName,
 		f.Severity.String(),
 		f.Description,
 		f.FilePath, f.StartLine,
-		code,
+		core.FileContext(f.FilePath, f.StartLine, 8),
 	)
 
 	resp, err := client.Complete(ctx, prompt, 512)
@@ -115,13 +112,13 @@ func parseTriageResponse(resp string) (verdict, reason, fix string) {
 		}
 		if strings.HasPrefix(upper, "FIX:") {
 			rest := strings.TrimSpace(trimmed[4:])
-			if rest != "" && strings.ToUpper(rest) != "N/A" {
+			if rest != "" && strings.ToUpper(rest) != "N/A" && !isCodeFence(rest) {
 				fixLines = append(fixLines, rest)
 			}
 			inFix = true
 			continue
 		}
-		if inFix && trimmed != "" && strings.ToUpper(trimmed) != "N/A" {
+		if inFix && trimmed != "" && strings.ToUpper(trimmed) != "N/A" && !isCodeFence(trimmed) {
 			fixLines = append(fixLines, trimmed)
 		}
 	}
@@ -130,23 +127,6 @@ func parseTriageResponse(resp string) (verdict, reason, fix string) {
 	return verdict, reason, fix
 }
 
-func fileContext(path string, lineNum, radius int) string {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return ""
-	}
-	lines := strings.Split(string(data), "\n")
-	start := lineNum - radius - 1
-	if start < 0 {
-		start = 0
-	}
-	end := lineNum + radius
-	if end > len(lines) {
-		end = len(lines)
-	}
-	var sb strings.Builder
-	for i := start; i < end; i++ {
-		fmt.Fprintf(&sb, "%4d  %s\n", i+1, lines[i])
-	}
-	return sb.String()
+func isCodeFence(s string) bool {
+	return strings.HasPrefix(s, "```")
 }

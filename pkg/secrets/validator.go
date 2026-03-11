@@ -3,7 +3,6 @@ package secrets
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 	"sync"
 
@@ -41,7 +40,6 @@ Respond with exactly two lines:
 VERDICT: TRUE_POSITIVE or FALSE_POSITIVE
 REASON: One sentence explanation.`
 
-// AIValidator uses Together.ai to filter false positive secret findings.
 type AIValidator struct {
 	client *ai.Client
 }
@@ -54,10 +52,8 @@ func newAIValidator(model string) *AIValidator {
 	return &AIValidator{client: c}
 }
 
-// validate returns true if the finding is a true positive, false if it is a false positive.
-// On error it returns true (pass-through — never silently drop a finding on failure).
 func (v *AIValidator) validate(ctx context.Context, f core.Finding) bool {
-	context_lines := extractContext(f.FilePath, f.StartLine, 8)
+	context_lines := core.FileContext(f.FilePath, f.StartLine, 8)
 	prompt := fmt.Sprintf(fpPrompt,
 		f.RuleName,
 		f.FilePath,
@@ -74,7 +70,6 @@ func (v *AIValidator) validate(ctx context.Context, f core.Finding) bool {
 	return parseVerdict(resp)
 }
 
-// parseVerdict extracts the TRUE_POSITIVE / FALSE_POSITIVE verdict from the LLM response.
 func parseVerdict(resp string) bool {
 	for _, line := range strings.Split(resp, "\n") {
 		line = strings.TrimSpace(line)
@@ -86,7 +81,6 @@ func parseVerdict(resp string) bool {
 	return true // default: pass-through if no verdict found
 }
 
-// filterBatch concurrently validates a batch of findings, returning only true positives.
 func (v *AIValidator) filterBatch(ctx context.Context, batch []core.Finding) []core.Finding {
 	type result struct {
 		idx int
@@ -94,7 +88,7 @@ func (v *AIValidator) filterBatch(ctx context.Context, batch []core.Finding) []c
 	}
 	results := make([]result, len(batch))
 	var wg sync.WaitGroup
-	sem := make(chan struct{}, 4) // max 4 concurrent validation calls
+	sem := make(chan struct{}, 4)
 
 	for i, f := range batch {
 		wg.Add(1)
@@ -116,24 +110,3 @@ func (v *AIValidator) filterBatch(ctx context.Context, batch []core.Finding) []c
 	return out
 }
 
-// extractContext reads up to `radius` lines on each side of `lineNum` from the file.
-func extractContext(filePath string, lineNum, radius int) string {
-	data, err := os.ReadFile(filePath)
-	if err != nil {
-		return ""
-	}
-	lines := strings.Split(string(data), "\n")
-	start := lineNum - radius - 1
-	if start < 0 {
-		start = 0
-	}
-	end := lineNum + radius
-	if end > len(lines) {
-		end = len(lines)
-	}
-	var sb strings.Builder
-	for i := start; i < end; i++ {
-		fmt.Fprintf(&sb, "%4d  %s\n", i+1, lines[i])
-	}
-	return sb.String()
-}
