@@ -64,24 +64,24 @@ export TOGETHER_API_KEY=your_key_here
 broly scan                                        # run all scanners on current directory
 broly scan /path/to/project                       # specific path
 
-# individual scanners
+# Individual scanners
 broly scan --secrets                              # secrets only
 broly scan --sca                                  # SCA only
 broly scan --sast                                 # SAST only (requires TOGETHER_API_KEY)
 
-# AI enhancements
+# AI triage suggestions
 broly scan --ai-filter-secrets                    # filter secrets false positives with AI
 broly scan --ai-sca-reachability                  # check if vulnerable deps are actually called
 broly scan --ai-triage                            # verdict (TP/FP) + fix suggestion per finding
 broly scan --ai-model Qwen/Qwen3-Coder-Next-FP8   # override model (default)
 
-# output
+# Outputs
 broly scan -f json                                # JSON output
 broly scan -f sarif -o results.sarif              # SARIF for GitHub Code Scanning
 broly scan --min-severity high                    # only high and critical
 broly scan --sca --offline                        # skip OSV API lookup
 
-# developer experience
+# Scan config 
 broly scan --config .broly.yaml                   # load project config file
 broly scan --baseline .broly-baseline.yaml        # suppress known FPs / require specific findings
 broly scan --incremental                          # skip SAST on unchanged files (uses .broly-cache.json)
