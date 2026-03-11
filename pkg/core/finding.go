@@ -47,6 +47,10 @@ type Finding struct {
 	Tags        []string  `json:"tags,omitempty"`
 	Fingerprint string    `json:"fingerprint"`
 	Timestamp   time.Time `json:"timestamp"`
+
+	Verdict       string `json:"verdict,omitempty"`        // TRUE_POSITIVE, FALSE_POSITIVE, UNKNOWN
+	VerdictReason string `json:"verdict_reason,omitempty"` // one-sentence explanation
+	FixSuggestion string `json:"fix_suggestion,omitempty"` // concrete code fix from LLM
 }
 
 // ComputeFingerprint sets a deduplication hash. Changes when file path or line changes.

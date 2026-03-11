@@ -10,6 +10,7 @@ import (
 	"github.com/Shasheen8/Broly/pkg/baseline"
 	"github.com/Shasheen8/Broly/pkg/core"
 	"github.com/Shasheen8/Broly/pkg/suppress"
+	"github.com/Shasheen8/Broly/pkg/triage"
 )
 
 type Orchestrator struct {
@@ -112,6 +113,16 @@ func (o *Orchestrator) Run(ctx context.Context) (*core.ScanResult, error) {
 			fmt.Fprintf(os.Stderr, "warning: could not load baseline %s: %v\n", o.config.BaselineFile, err)
 		} else {
 			findings, missingRequired, baselineSuppressed = bl.Apply(findings)
+		}
+	}
+
+	// AI triage: verdict + fix suggestion per finding.
+	if o.config.AITriage && len(findings) > 0 {
+		t := triage.New(o.config.AIModel)
+		if t != nil {
+			findings = t.Run(ctx, findings)
+		} else {
+			fmt.Fprintln(os.Stderr, "warning: TOGETHER_API_KEY not set — AI triage disabled")
 		}
 	}
 

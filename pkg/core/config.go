@@ -26,6 +26,7 @@ type Config struct {
 	AIModel      string   `yaml:"ai_model" json:"ai_model"`
 	AIFilterSecrets   bool `yaml:"ai_filter_secrets" json:"ai_filter_secrets"`
 	AISCAReachability bool `yaml:"ai_sca_reachability" json:"ai_sca_reachability"`
+	AITriage          bool `yaml:"ai_triage" json:"ai_triage"`
 	BaselineFile string `yaml:"baseline_file" json:"baseline_file"`
 	Incremental  bool   `yaml:"incremental" json:"incremental"`
 	CachePath    string `yaml:"cache_path" json:"cache_path"`

@@ -113,8 +113,8 @@ jobs:
           # SAST: scan changed files only to control AI API usage
           if [ -n "${TOGETHER_API_KEY}" ] && [ -n "${CHANGED_FILES}" ]; then
             # shellcheck disable=SC2086 — word splitting is intentional for file list
-            broly scan ${CHANGED_FILES} --sast -f sarif -o sarif/sast.sarif -q || true
-            broly scan ${CHANGED_FILES} --sast -f json  -o sast-results.json  -q || true
+            broly scan ${CHANGED_FILES} --sast --ai-triage -f sarif -o sarif/sast.sarif -q || true
+            broly scan ${CHANGED_FILES} --sast --ai-triage -f json  -o sast-results.json  -q || true
           fi
         env:
           TOGETHER_API_KEY: ${{ secrets.TOGETHER_API_KEY }}
@@ -164,10 +164,11 @@ jobs:
               } catch (_) {}
             }
 
-            const order = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3, INFO: 4 };
-            findings.sort((a, b) => (order[a.severity] ?? 9) - (order[b.severity] ?? 9));
+            const sevOrder = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3, INFO: 4 };
+            findings.sort((a, b) => (sevOrder[a.severity] ?? 9) - (sevOrder[b.severity] ?? 9));
 
-            const icon = { CRITICAL: '🔴', HIGH: '🟠', MEDIUM: '🟡', LOW: '🔵', INFO: '⚪' };
+            const sevIcon     = { CRITICAL: '🔴', HIGH: '🟠', MEDIUM: '🟡', LOW: '🔵', INFO: '⚪' };
+            const verdictIcon = { TRUE_POSITIVE: '🔺', FALSE_POSITIVE: '✅', UNKNOWN: '❔' };
 
             let body;
             if (findings.length === 0) {
@@ -183,18 +184,49 @@ jobs:
               for (const f of findings) counts[f.severity] = (counts[f.severity] || 0) + 1;
               const summary = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']
                 .filter(s => counts[s])
-                .map(s => `${icon[s]} **${counts[s]} ${s}**`)
+                .map(s => `${sevIcon[s]} **${counts[s]} ${s}**`)
                 .join('  ');
 
+              const hasTriage = findings.some(f => f.verdict);
+
+              const header = hasTriage
+                ? '| Severity | Scanner | Issue | Location | Verdict |'
+                : '| Severity | Scanner | Issue | Location |';
+              const divider = hasTriage
+                ? '|----------|---------|-------|----------|---------|'
+                : '|----------|---------|-------|----------|';
+
               const rows = findings.slice(0, 30).map(f => {
-                const sev   = `${icon[f.severity] || ''} ${f.severity}`;
-                const type  = (f.type || '').toUpperCase();
-                const issue = (f.rule_name || f.title || f.rule_id || '-').substring(0, 55);
-                const loc   = f.file_path
+                const sev     = `${sevIcon[f.severity] || ''} ${f.severity}`;
+                const type    = (f.type || '').toUpperCase();
+                const issue   = (f.rule_name || f.title || f.rule_id || '-').substring(0, 55);
+                const loc     = f.file_path
                   ? `\`${f.file_path}${f.start_line ? ':' + f.start_line : ''}\``
                   : '-';
-                return `| ${sev} | ${type} | ${issue} | ${loc} |`;
+                if (!hasTriage) return `| ${sev} | ${type} | ${issue} | ${loc} |`;
+                const vIcon   = verdictIcon[f.verdict] || '❔';
+                const verdict = f.verdict ? `${vIcon}&nbsp;${f.verdict}` : '-';
+                return `| ${sev} | ${type} | ${issue} | ${loc} | ${verdict} |`;
               }).join('\n');
+
+              const fixes = findings
+                .filter(f => f.fix_suggestion && f.verdict === 'TRUE_POSITIVE')
+                .slice(0, 10)
+                .map(f => {
+                  const title = f.rule_name || f.title || f.rule_id || 'Finding';
+                  const loc   = f.file_path ? `${f.file_path}:${f.start_line || ''}` : '';
+                  return [
+                    `<details><summary>🔧 Fix: ${title}${loc ? ' — ' + loc : ''}</summary>`,
+                    '',
+                    '```',
+                    f.fix_suggestion,
+                    '```',
+                    '',
+                    f.verdict_reason ? `> ${f.verdict_reason}` : '',
+                    '',
+                    '</details>',
+                  ].join('\n');
+                }).join('\n');
 
               const note = findings.length > 30
                 ? `\n> Showing top 30 of ${findings.length} findings. See [Security tab](../../security/code-scanning) for full results.`
@@ -205,10 +237,11 @@ jobs:
                 '',
                 summary,
                 '',
-                '| Severity | Scanner | Issue | Location |',
-                '|----------|---------|-------|----------|',
+                header,
+                divider,
                 rows,
                 note,
+                fixes ? '\n### Fix Suggestions\n\n' + fixes : '',
                 '',
                 '> [Broly](https://github.com/Shasheen8/Broly) — Secrets · SCA · SAST · Powered by Together AI',
               ].join('\n');

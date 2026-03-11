@@ -275,6 +275,29 @@ func printSASTTable(w io.Writer, clr color, findings []core.Finding) {
 			clr.s(dim, trunc(location, 40)),
 			clr.s(gray, trunc(f.Title, 30)),
 		)
+		if f.Verdict != "" {
+			fmt.Fprintf(w, "  %s %s\n",
+				verdictColor(f.Verdict, clr),
+				clr.s(gray, trunc(f.VerdictReason, 90)),
+			)
+		}
+		if f.FixSuggestion != "" {
+			fmt.Fprintf(w, "  %s\n", clr.s(dim+cyan, "  fix:"))
+			for _, line := range strings.Split(f.FixSuggestion, "\n") {
+				fmt.Fprintf(w, "  %s\n", clr.s(dim, "    "+line))
+			}
+		}
+	}
+}
+
+func verdictColor(verdict string, clr color) string {
+	switch verdict {
+	case "TRUE_POSITIVE":
+		return clr.s(bold+red, "● TRUE_POSITIVE")
+	case "FALSE_POSITIVE":
+		return clr.s(bold+green, "● FALSE_POSITIVE")
+	default:
+		return clr.s(gray, "● UNKNOWN")
 	}
 }
 
