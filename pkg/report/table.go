@@ -58,7 +58,7 @@ func (f *TableFormatter) Name() string { return "table" }
 func (f *TableFormatter) Format(w io.Writer, result *core.ScanResult) error {
 	clr := color{enabled: isColorEnabled(w)}
 
-	if len(result.Findings) == 0 {
+	if len(result.Findings) == 0 && len(result.MissingRequired) == 0 {
 		fmt.Fprintf(w, "\n  %s\n\n", clr.s(green+bold, "✔  No findings detected. Clean scan!"))
 		return nil
 	}
@@ -166,21 +166,6 @@ func bannerCentered(w io.Writer, clr color, content string) {
 		strings.Repeat(" ", leftPad),
 		content,
 		strings.Repeat(" ", rightPad),
-		clr.s(cyan, "║"),
-	)
-}
-
-func bannerLine(w io.Writer, clr color, content string) {
-	// Inner width matches "╔══...══╗" with 54 ═ signs.
-	const width = 54
-	pad := width - visibleLen(content)
-	if pad < 0 {
-		pad = 0
-	}
-	fmt.Fprintf(w, "  %s%s%s%s\n",
-		clr.s(cyan, "║"),
-		content,
-		strings.Repeat(" ", pad),
 		clr.s(cyan, "║"),
 	)
 }

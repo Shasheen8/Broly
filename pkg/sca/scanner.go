@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -34,7 +35,6 @@ type SCAScanner struct {
 	extractors   []filesystem.Extractor
 	offline      bool
 	reachability *AIReachability
-	scanPaths    []string
 }
 
 func NewSCAScanner() *SCAScanner {
@@ -72,7 +72,6 @@ func (s *SCAScanner) Init(cfg *core.Config) error {
 
 func (s *SCAScanner) Scan(ctx context.Context, paths []string, findings chan<- core.Finding) error {
 	defer close(findings)
-	s.scanPaths = paths
 
 	for _, target := range paths {
 		if ctx.Err() != nil {
@@ -157,11 +156,13 @@ func (s *SCAScanner) emitFindings(
 				location = pkg.Locations[0]
 			}
 
+			sev, cvss := parseCVSSSeverity(vuln)
 			finding := core.Finding{
 				Type:           core.ScanTypeSCA,
 				RuleID:         id,
 				RuleName:       id,
-				Severity:       core.SeverityMedium,
+				Severity:       sev,
+				CVSSScore:      cvss,
 				Title:          fmt.Sprintf("%s: %s@%s", id, pkg.Name, pkg.Version),
 				Description:    vuln.GetSummary(),
 				FilePath:       location,
@@ -194,6 +195,37 @@ func (s *SCAScanner) emitFindings(
 }
 
 func (s *SCAScanner) Close() error { return nil }
+
+func parseCVSSSeverity(vuln *osvschema.Vulnerability) (core.Severity, float64) {
+	for _, sev := range vuln.GetSeverity() {
+		score := sev.GetScore()
+		if f, err := strconv.ParseFloat(score, 64); err == nil {
+			return core.SeverityFromCVSS(f), f
+		}
+		if s, ok := cvssVectorSeverity(score); ok {
+			return s, 0
+		}
+	}
+	return core.SeverityMedium, 0
+}
+
+func cvssVectorSeverity(vector string) (core.Severity, bool) {
+	upper := strings.ToUpper(vector)
+	if !strings.HasPrefix(upper, "CVSS:") {
+		return 0, false
+	}
+	c := strings.Contains(upper, "/C:H")
+	i := strings.Contains(upper, "/I:H")
+	a := strings.Contains(upper, "/A:H")
+	switch {
+	case c && i && a:
+		return core.SeverityCritical, true
+	case c || i || a:
+		return core.SeverityHigh, true
+	default:
+		return core.SeverityMedium, true
+	}
+}
 
 func extractFixedVersion(vuln *osvschema.Vulnerability) string {
 	for _, affected := range vuln.GetAffected() {

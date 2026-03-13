@@ -29,15 +29,13 @@ Based solely on the code above, determine:
 
 Focus on what is explicitly present in the code — do not speculate about code not shown.
 
-Respond with exactly three lines:
+Respond with exactly two lines:
 REACHABILITY: REACHABLE or UNREACHABLE or UNKNOWN
-CONFIDENCE: HIGH or MEDIUM or LOW
 REASON: One sentence explaining which function or pattern is (or is not) called.`
 
 type reachabilityResult struct {
-	status     string // REACHABLE, UNREACHABLE, UNKNOWN
-	confidence string
-	reason     string
+	status string // REACHABLE, UNREACHABLE, UNKNOWN
+	reason string
 }
 
 type AIReachability struct {
@@ -55,7 +53,7 @@ func newAIReachability(model string) *AIReachability {
 func (r *AIReachability) analyze(ctx context.Context, f core.Finding, scanPaths []string) reachabilityResult {
 	files := findImportingFiles(f.PackageName, f.Ecosystem, scanPaths)
 	if len(files) == 0 {
-		return reachabilityResult{status: "UNKNOWN", confidence: "LOW", reason: "No source files importing this package were found in scanned paths."}
+		return reachabilityResult{status: "UNKNOWN", reason: "No source files importing this package were found in scanned paths."}
 	}
 
 	filesContent := buildFilesContent(files, 300) // max 300 lines per file
@@ -68,21 +66,19 @@ func (r *AIReachability) analyze(ctx context.Context, f core.Finding, scanPaths 
 
 	resp, err := r.client.Complete(ctx, prompt, 512)
 	if err != nil {
-		return reachabilityResult{status: "UNKNOWN", confidence: "LOW", reason: "AI analysis failed: " + err.Error()}
+		return reachabilityResult{status: "UNKNOWN", reason: "AI analysis failed: " + err.Error()}
 	}
 
 	return parseReachability(resp)
 }
 
 func parseReachability(resp string) reachabilityResult {
-	res := reachabilityResult{status: "UNKNOWN", confidence: "LOW"}
+	res := reachabilityResult{status: "UNKNOWN"}
 	for _, line := range strings.Split(resp, "\n") {
 		line = strings.TrimSpace(line)
 		upper := strings.ToUpper(line)
 		if strings.HasPrefix(upper, "REACHABILITY:") {
 			res.status = strings.TrimSpace(strings.TrimPrefix(upper, "REACHABILITY:"))
-		} else if strings.HasPrefix(upper, "CONFIDENCE:") {
-			res.confidence = strings.TrimSpace(strings.TrimPrefix(upper, "CONFIDENCE:"))
 		} else if strings.HasPrefix(strings.ToUpper(line), "REASON:") {
 			res.reason = strings.TrimSpace(line[7:])
 		}

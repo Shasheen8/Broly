@@ -96,14 +96,11 @@ func (o *Orchestrator) Run(ctx context.Context) (*core.ScanResult, error) {
 
 	// Post-processing pipeline.
 	findings = deduplicateFindings(findings)
-	findings = filterBySeverity(findings, o.config.MinSeverity)
-	findings = filterByRuleIDs(findings, o.config.IncludeRuleIDs, o.config.ExcludeRuleIDs)
 
-	// Inline suppression: broly:ignore comments in source.
-	findings, inlineSuppressed := suppress.Filter(findings)
-
-	// Baseline: suppress known FPs, assert required findings exist.
+	// Baseline: check required findings against full deduplicated set (before any filtering).
+	// Suppression is applied after other filters.
 	var (
+		inlineSuppressed   int
 		baselineSuppressed int
 		missingRequired    []string
 	)
@@ -112,8 +109,16 @@ func (o *Orchestrator) Run(ctx context.Context) (*core.ScanResult, error) {
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "warning: could not load baseline %s: %v\n", o.config.BaselineFile, err)
 		} else {
-			findings, missingRequired, baselineSuppressed = bl.Apply(findings)
+			missingRequired = bl.CheckRequired(findings)
+			findings = filterBySeverity(findings, o.config.MinSeverity)
+			findings = filterByRuleIDs(findings, o.config.IncludeRuleIDs, o.config.ExcludeRuleIDs)
+			findings, inlineSuppressed = suppress.Filter(findings)
+			findings, baselineSuppressed = bl.Suppress(findings)
 		}
+	} else {
+		findings = filterBySeverity(findings, o.config.MinSeverity)
+		findings = filterByRuleIDs(findings, o.config.IncludeRuleIDs, o.config.ExcludeRuleIDs)
+		findings, inlineSuppressed = suppress.Filter(findings)
 	}
 
 	// AI triage: verdict + fix suggestion per finding.

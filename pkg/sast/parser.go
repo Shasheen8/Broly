@@ -47,8 +47,7 @@ func parseLLMResponse(filePath, response string) []parsedFinding {
 		} else if line == "---" || line == "***" {
 			// separator — do nothing, next Vulnerability Level starts new finding
 		} else if line != "" && current.fix != "" {
-			// multi-line fix continuation
-			current.fix += " " + line
+			current.fix += "\n" + line
 		}
 	}
 
@@ -86,7 +85,7 @@ func extractField(line, field string) (string, string, bool) {
 
 func (p *parsedFinding) toFinding(filePath string) core.Finding {
 	sev := parseLLMSeverity(p.level)
-	ruleID := "broly.sast.ai." + strings.ToLower(strings.ReplaceAll(p.level, " ", "_"))
+	ruleID := "broly.sast.ai." + slugify(p.issue)
 
 	// Extract line number from location if present (e.g., "src/main.go:42" or "line 42")
 	startLine := extractLineNumber(p.location)
@@ -110,7 +109,7 @@ func (p *parsedFinding) toFinding(filePath string) core.Finding {
 		StartLine:   startLine,
 		CWE:         cwe,
 		Tags:        []string{"sast", "ai"},
-		Advisory:    fix,
+		FixSuggestion: fix,
 	}
 
 	f.ComputeFingerprint()
@@ -155,6 +154,25 @@ func extractLineNumber(loc string) int {
 		}
 	}
 	return 0
+}
+
+func slugify(s string) string {
+	var b strings.Builder
+	for _, r := range strings.ToLower(s) {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+		} else if b.Len() > 0 && b.String()[b.Len()-1] != '_' {
+			b.WriteByte('_')
+		}
+	}
+	result := strings.Trim(b.String(), "_")
+	if len(result) > 50 {
+		result = result[:50]
+	}
+	if result == "" {
+		return "unknown"
+	}
+	return result
 }
 
 func extractCWE(text string) []string {

@@ -53,13 +53,13 @@ func newAIValidator(model string) *AIValidator {
 }
 
 func (v *AIValidator) validate(ctx context.Context, f core.Finding) bool {
-	context_lines := core.FileContext(f.FilePath, f.StartLine, 8)
+	ctxLines := core.FileContextSafe(f.FilePath, f.StartLine, 8)
 	prompt := fmt.Sprintf(fpPrompt,
 		f.RuleName,
 		f.FilePath,
 		f.StartLine,
 		f.Redacted,
-		context_lines,
+		ctxLines,
 	)
 
 	resp, err := v.client.Complete(ctx, prompt, 256)

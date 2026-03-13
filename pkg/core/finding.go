@@ -77,6 +77,32 @@ func FileContext(path string, lineNum, radius int) string {
 	return sb.String()
 }
 
+// FileContextSafe returns up to radius lines on each side of lineNum, redacting the exact lineNum line.
+func FileContextSafe(path string, lineNum, radius int) string {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	lines := strings.Split(string(data), "\n")
+	start := lineNum - radius - 1
+	if start < 0 {
+		start = 0
+	}
+	end := lineNum + radius
+	if end > len(lines) {
+		end = len(lines)
+	}
+	var sb strings.Builder
+	for i := start; i < end; i++ {
+		content := lines[i]
+		if i+1 == lineNum {
+			content = "<content redacted>"
+		}
+		fmt.Fprintf(&sb, "%4d  %s\n", i+1, content)
+	}
+	return sb.String()
+}
+
 // ComputeFingerprint sets a deduplication hash. Changes when file path or line changes.
 func (f *Finding) ComputeFingerprint() {
 	data := fmt.Sprintf("%s:%s:%s:%s:%d",
@@ -89,16 +115,12 @@ func (f *Finding) ComputeFingerprint() {
 type ScanResult struct {
 	Findings        []Finding     `json:"findings"`
 	Metrics         ScanMetrics   `json:"metrics"`
-	Duration        time.Duration `json:"duration_ms"`
+	Duration        time.Duration `json:"duration_ns"`
 	ScanTypes       []ScanType    `json:"scan_types"`
 	SuppressedCount int           `json:"suppressed_count,omitempty"`
 	MissingRequired []string      `json:"missing_required,omitempty"`
 }
 
 type ScanMetrics struct {
-	FilesScanned  int64 `json:"files_scanned"`
-	FilesSkipped  int64 `json:"files_skipped"`
-	TotalBytes    int64 `json:"total_bytes"`
-	FindingsCount int   `json:"findings_count"`
-	RulesLoaded   int   `json:"rules_loaded"`
+	FindingsCount int `json:"findings_count"`
 }

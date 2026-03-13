@@ -17,7 +17,7 @@ import (
 
 const (
 	defaultModel       = "Qwen/Qwen3-Coder-Next-FP8"
-	defaultMaxFileSize = 10 * 1024 * 1024 // 10 MB
+	defaultMaxFileSize = 512 * 1024 // 512 KB
 	defaultWorkers     = 4
 )
 
@@ -106,6 +106,11 @@ func (s *SASTScanner) Scan(ctx context.Context, paths []string, findings chan<- 
 	jobs := make(chan fileJob, 64)
 	var wg sync.WaitGroup
 
+	var (
+		successMu    sync.Mutex
+		successPaths []string
+	)
+
 	// Start workers.
 	for i := 0; i < s.workers; i++ {
 		wg.Add(1)
@@ -115,7 +120,11 @@ func (s *SASTScanner) Scan(ctx context.Context, paths []string, findings chan<- 
 				if ctx.Err() != nil {
 					return
 				}
-				s.scanFile(ctx, job.path, job.lang, findings)
+				if s.scanFile(ctx, job.path, job.lang, findings) && s.fileCache != nil {
+					successMu.Lock()
+					successPaths = append(successPaths, job.path)
+					successMu.Unlock()
+				}
 			}
 		}()
 	}
@@ -170,28 +179,23 @@ func (s *SASTScanner) Scan(ctx context.Context, paths []string, findings chan<- 
 	close(jobs)
 	wg.Wait()
 
-	// Persist updated cache.
+	// Persist cache only for files that were successfully scanned.
 	if s.fileCache != nil {
-		for _, target := range paths {
-			filepath.WalkDir(target, func(path string, d fs.DirEntry, err error) error {
-				if err == nil && !d.IsDir() {
-					if _, ok := extToLang[strings.ToLower(filepath.Ext(d.Name()))]; ok {
-						s.fileCache.Update(path)
-					}
-				}
-				return nil
-			})
+		successMu.Lock()
+		for _, path := range successPaths {
+			s.fileCache.Update(path)
 		}
+		successMu.Unlock()
 		_ = s.fileCache.Save()
 	}
 
 	return nil
 }
 
-func (s *SASTScanner) scanFile(ctx context.Context, path, lang string, findings chan<- core.Finding) {
+func (s *SASTScanner) scanFile(ctx context.Context, path, lang string, findings chan<- core.Finding) bool {
 	src, err := os.ReadFile(path)
 	if err != nil {
-		return
+		return false
 	}
 
 	prompt := buildPrompt(path, lang, string(src))
@@ -201,7 +205,7 @@ func (s *SASTScanner) scanFile(ctx context.Context, path, lang string, findings 
 		if ctx.Err() == nil {
 			fmt.Fprintf(os.Stderr, "warning: sast ai scan of %s: %v\n", path, err)
 		}
-		return
+		return false
 	}
 
 	parsed := parseLLMResponse(path, response)
@@ -211,9 +215,9 @@ func (s *SASTScanner) scanFile(ctx context.Context, path, lang string, findings 
 		select {
 		case findings <- f:
 		case <-ctx.Done():
-			return
 		}
 	}
+	return true
 }
 
 func (s *SASTScanner) Close() error { return nil }

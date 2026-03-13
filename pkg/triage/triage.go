@@ -69,13 +69,19 @@ func (t *Triager) Run(ctx context.Context, findings []core.Finding) []core.Findi
 }
 
 func triageFinding(ctx context.Context, client *ai.Client, f *core.Finding) (verdict, reason, fix string) {
+	var codeCtx string
+	if f.Type == core.ScanTypeSecrets {
+		codeCtx = fmt.Sprintf("detected value (redacted): %s", f.Redacted)
+	} else {
+		codeCtx = core.FileContext(f.FilePath, f.StartLine, 8)
+	}
 	prompt := fmt.Sprintf(triagePrompt,
 		f.Type,
 		f.RuleName,
 		f.Severity.String(),
 		f.Description,
 		f.FilePath, f.StartLine,
-		core.FileContext(f.FilePath, f.StartLine, 8),
+		codeCtx,
 	)
 
 	resp, err := client.Complete(ctx, prompt, 512)

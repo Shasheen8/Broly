@@ -22,8 +22,8 @@ type RequireEntry struct {
 }
 
 type Baseline struct {
-	Suppress []SuppressEntry `yaml:"suppress"`
-	Require  []RequireEntry  `yaml:"require"`
+	Suppressions []SuppressEntry `yaml:"suppress"`
+	Require      []RequireEntry  `yaml:"require"`
 }
 
 func Load(path string) (*Baseline, error) {
@@ -42,12 +42,12 @@ func Load(path string) (*Baseline, error) {
 }
 
 func (b *Baseline) Apply(findings []core.Finding) (filtered []core.Finding, missing []string, suppressed int) {
-	if len(b.Suppress) == 0 && len(b.Require) == 0 {
+	if len(b.Suppressions) == 0 && len(b.Require) == 0 {
 		return findings, nil, 0
 	}
 
-	suppressSet := make(map[string]bool, len(b.Suppress))
-	for _, e := range b.Suppress {
+	suppressSet := make(map[string]bool, len(b.Suppressions))
+	for _, e := range b.Suppressions {
 		if e.Fingerprint != "" {
 			suppressSet[e.Fingerprint] = true
 		}
@@ -75,6 +75,47 @@ func (b *Baseline) Apply(findings []core.Finding) (filtered []core.Finding, miss
 	}
 
 	return filtered, missing, suppressed
+}
+
+// CheckRequired returns descriptions of required findings that are absent from findings.
+func (b *Baseline) CheckRequired(findings []core.Finding) []string {
+	var missing []string
+	for _, req := range b.Require {
+		found := false
+		for _, f := range findings {
+			if matchesRequire(f, req) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			missing = append(missing, requireDesc(req))
+		}
+	}
+	return missing
+}
+
+// Suppress removes findings that match a suppress entry. Returns filtered slice and count.
+func (b *Baseline) Suppress(findings []core.Finding) ([]core.Finding, int) {
+	if len(b.Suppressions) == 0 {
+		return findings, 0
+	}
+	suppressSet := make(map[string]bool, len(b.Suppressions))
+	for _, e := range b.Suppressions {
+		if e.Fingerprint != "" {
+			suppressSet[e.Fingerprint] = true
+		}
+	}
+	var out []core.Finding
+	var count int
+	for _, f := range findings {
+		if suppressSet[f.Fingerprint] {
+			count++
+			continue
+		}
+		out = append(out, f)
+	}
+	return out, count
 }
 
 func matchesRequire(f core.Finding, req RequireEntry) bool {

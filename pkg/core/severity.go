@@ -3,6 +3,8 @@ package core
 import (
 	"encoding/json"
 	"strings"
+
+	"gopkg.in/yaml.v3"
 )
 
 type Severity int
@@ -42,6 +44,11 @@ func (s *Severity) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*s = ParseSeverity(str)
+	return nil
+}
+
+func (s *Severity) UnmarshalYAML(value *yaml.Node) error {
+	*s = ParseSeverity(value.Value)
 	return nil
 }
 

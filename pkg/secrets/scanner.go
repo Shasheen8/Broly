@@ -15,6 +15,12 @@ import (
 	"github.com/Shasheen8/Broly/pkg/core"
 )
 
+var secretsSkipDirs = map[string]bool{
+	"vendor": true, "node_modules": true, ".git": true,
+	"dist": true, "build": true, "__pycache__": true,
+	".venv": true, "venv": true, "target": true,
+}
+
 type SecretsScanner struct {
 	scanner          *titus.Scanner
 	validator        *AIValidator
@@ -110,6 +116,9 @@ func (s *SecretsScanner) scanPath(ctx context.Context, root string, findings cha
 		}
 
 		if d.IsDir() {
+			if secretsSkipDirs[name] {
+				return filepath.SkipDir
+			}
 			return nil
 		}
 
