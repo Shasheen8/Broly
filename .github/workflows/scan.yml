@@ -206,7 +206,8 @@ jobs:
                   : '-';
                 if (!hasTriage) return `| ${sev} | ${type} | ${issue} | ${loc} |`;
                 const vIcon   = verdictIcon[f.verdict] || '❔';
-                const verdict = f.verdict ? `${vIcon}&nbsp;${f.verdict}` : '-';
+                const conf = f.confidence ? ` · ${f.confidence}` : '';
+                const verdict = f.verdict ? `${vIcon}&nbsp;${f.verdict}${conf}` : '-';
                 return `| ${sev} | ${type} | ${issue} | ${loc} | ${verdict} |`;
               }).join('\n');
 
@@ -223,7 +224,7 @@ jobs:
                     f.fix_suggestion,
                     '```',
                     '',
-                    f.verdict_reason ? `> ${f.verdict_reason}` : '',
+                    f.explanation ? `> ${f.explanation}` : (f.verdict_reason ? `> ${f.verdict_reason}` : ''),
                     '',
                     '</details>',
                   ].join('\n');

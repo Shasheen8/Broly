@@ -123,7 +123,7 @@ func (o *Orchestrator) Run(ctx context.Context) (*core.ScanResult, error) {
 
 	// AI triage: verdict + fix suggestion per finding.
 	if o.config.AITriage && len(findings) > 0 {
-		t := triage.New(o.config.AIModel)
+		t := triage.New(o.config.AIModel, o.config.Explain)
 		if t != nil {
 			findings = t.Run(ctx, findings)
 		} else {

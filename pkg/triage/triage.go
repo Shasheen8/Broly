@@ -10,7 +10,7 @@ import (
 	"github.com/Shasheen8/Broly/pkg/core"
 )
 
-const triagePrompt = `You are a security expert triaging a code vulnerability finding.
+const triagePromptBase = `You are a security expert triaging a code vulnerability finding.
 
 Scanner:     %s
 Rule:        %s
@@ -25,24 +25,53 @@ Code context:
 
 Determine:
 1. Is this a TRUE_POSITIVE (real, exploitable vulnerability) or FALSE_POSITIVE (test/placeholder/safe pattern)?
-2. If TRUE_POSITIVE, provide a concrete code fix — actual code, not advice.
+2. Your confidence in that verdict.
+3. If TRUE_POSITIVE, provide a concrete code fix — actual code, not advice.
 
 Respond with exactly:
 VERDICT: TRUE_POSITIVE or FALSE_POSITIVE
+CONFIDENCE: HIGH or MEDIUM or LOW
 REASON: One sentence.
 FIX:
 <2-5 lines of corrected code, or N/A if false positive>`
 
+const triagePromptExplain = `You are a security expert triaging a code vulnerability finding.
+
+Scanner:     %s
+Rule:        %s
+Severity:    %s
+Description: %s
+File:        %s:%d
+
+Code context:
+` + "```" + `
+%s
+` + "```" + `
+
+Determine:
+1. Is this a TRUE_POSITIVE (real, exploitable vulnerability) or FALSE_POSITIVE (test/placeholder/safe pattern)?
+2. Your confidence in that verdict.
+3. If TRUE_POSITIVE, provide a concrete code fix — actual code, not advice.
+
+Respond with exactly:
+VERDICT: TRUE_POSITIVE or FALSE_POSITIVE
+CONFIDENCE: HIGH or MEDIUM or LOW
+REASON: One sentence.
+EXPLANATION: One sentence. Concrete attack vector and real-world impact specific to this code — not generic advice.
+FIX:
+<2-5 lines of corrected code, or N/A if false positive>`
+
 type Triager struct {
-	client *ai.Client
+	client  *ai.Client
+	explain bool
 }
 
-func New(model string) *Triager {
+func New(model string, explain bool) *Triager {
 	c, ok := ai.New(model)
 	if !ok {
 		return nil
 	}
-	return &Triager{client: c}
+	return &Triager{client: c, explain: explain}
 }
 
 func (t *Triager) Run(ctx context.Context, findings []core.Finding) []core.Finding {
@@ -58,9 +87,11 @@ func (t *Triager) Run(ctx context.Context, findings []core.Finding) []core.Findi
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
-			verdict, reason, fix := triageFinding(ctx, t.client, &out[i])
+			verdict, confidence, reason, explanation, fix := triageFinding(ctx, t.client, &out[i], t.explain)
 			out[i].Verdict = verdict
+			out[i].Confidence = confidence
 			out[i].VerdictReason = reason
+			out[i].Explanation = explanation
 			out[i].FixSuggestion = fix
 		}(i)
 	}
@@ -68,14 +99,19 @@ func (t *Triager) Run(ctx context.Context, findings []core.Finding) []core.Findi
 	return out
 }
 
-func triageFinding(ctx context.Context, client *ai.Client, f *core.Finding) (verdict, reason, fix string) {
+func triageFinding(ctx context.Context, client *ai.Client, f *core.Finding, explain bool) (verdict, confidence, reason, explanation, fix string) {
 	var codeCtx string
 	if f.Type == core.ScanTypeSecrets {
 		codeCtx = fmt.Sprintf("detected value (redacted): %s", f.Redacted)
 	} else {
 		codeCtx = core.FileContext(f.FilePath, f.StartLine, 8)
 	}
-	prompt := fmt.Sprintf(triagePrompt,
+
+	tmpl := triagePromptBase
+	if explain {
+		tmpl = triagePromptExplain
+	}
+	prompt := fmt.Sprintf(tmpl,
 		f.Type,
 		f.RuleName,
 		f.Severity.String(),
@@ -84,15 +120,15 @@ func triageFinding(ctx context.Context, client *ai.Client, f *core.Finding) (ver
 		codeCtx,
 	)
 
-	resp, err := client.Complete(ctx, prompt, 512)
+	resp, err := client.Complete(ctx, prompt, 768)
 	if err != nil {
-		return "UNKNOWN", "AI triage failed: " + err.Error(), ""
+		return "UNKNOWN", "", "AI triage failed: " + err.Error(), "", ""
 	}
 
 	return parseTriageResponse(resp)
 }
 
-func parseTriageResponse(resp string) (verdict, reason, fix string) {
+func parseTriageResponse(resp string) (verdict, confidence, reason, explanation, fix string) {
 	verdict = "UNKNOWN"
 	var fixLines []string
 	inFix := false
@@ -111,8 +147,26 @@ func parseTriageResponse(resp string) (verdict, reason, fix string) {
 			inFix = false
 			continue
 		}
+		if strings.HasPrefix(upper, "CONFIDENCE:") {
+			val := strings.TrimSpace(strings.TrimPrefix(upper, "CONFIDENCE:"))
+			switch {
+			case strings.Contains(val, "HIGH"):
+				confidence = "HIGH"
+			case strings.Contains(val, "MEDIUM"):
+				confidence = "MEDIUM"
+			case strings.Contains(val, "LOW"):
+				confidence = "LOW"
+			}
+			inFix = false
+			continue
+		}
 		if strings.HasPrefix(upper, "REASON:") {
 			reason = strings.TrimSpace(trimmed[7:])
+			inFix = false
+			continue
+		}
+		if strings.HasPrefix(upper, "EXPLANATION:") {
+			explanation = strings.TrimSpace(trimmed[12:])
 			inFix = false
 			continue
 		}
@@ -130,7 +184,7 @@ func parseTriageResponse(resp string) (verdict, reason, fix string) {
 	}
 
 	fix = strings.Join(fixLines, "\n")
-	return verdict, reason, fix
+	return verdict, confidence, reason, explanation, fix
 }
 
 func isCodeFence(s string) bool {

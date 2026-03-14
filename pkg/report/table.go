@@ -224,10 +224,18 @@ func printSecretsTable(w io.Writer, clr color, findings []core.Finding) {
 			clr.s(gray, trunc(f.Redacted, 30)),
 		)
 		if f.Verdict != "" {
-			fmt.Fprintf(w, "  %s %s\n",
+			conf := ""
+			if f.Confidence != "" {
+				conf = " [" + f.Confidence + "]"
+			}
+			fmt.Fprintf(w, "  %s%s %s\n",
 				verdictColor(f.Verdict, clr),
-				clr.s(gray, trunc(f.VerdictReason, 90)),
+				clr.s(gray, conf),
+				clr.s(gray, trunc(f.VerdictReason, 80)),
 			)
+			if f.Explanation != "" {
+				fmt.Fprintf(w, "  %s\n", clr.s(dim, "    "+f.Explanation))
+			}
 		}
 	}
 }
@@ -252,10 +260,18 @@ func printSCATable(w io.Writer, clr color, findings []core.Finding) {
 			clr.s(dim, f.Ecosystem),
 		)
 		if f.Verdict != "" {
-			fmt.Fprintf(w, "  %s %s\n",
+			conf := ""
+			if f.Confidence != "" {
+				conf = " [" + f.Confidence + "]"
+			}
+			fmt.Fprintf(w, "  %s%s %s\n",
 				verdictColor(f.Verdict, clr),
-				clr.s(gray, trunc(f.VerdictReason, 90)),
+				clr.s(gray, conf),
+				clr.s(gray, trunc(f.VerdictReason, 80)),
 			)
+			if f.Explanation != "" {
+				fmt.Fprintf(w, "  %s\n", clr.s(dim, "    "+f.Explanation))
+			}
 		}
 	}
 }
@@ -273,10 +289,18 @@ func printSASTTable(w io.Writer, clr color, findings []core.Finding) {
 			clr.s(gray, trunc(f.Title, 30)),
 		)
 		if f.Verdict != "" {
-			fmt.Fprintf(w, "  %s %s\n",
+			conf := ""
+			if f.Confidence != "" {
+				conf = " [" + f.Confidence + "]"
+			}
+			fmt.Fprintf(w, "  %s%s %s\n",
 				verdictColor(f.Verdict, clr),
-				clr.s(gray, trunc(f.VerdictReason, 90)),
+				clr.s(gray, conf),
+				clr.s(gray, trunc(f.VerdictReason, 80)),
 			)
+			if f.Explanation != "" {
+				fmt.Fprintf(w, "  %s\n", clr.s(dim, "    "+f.Explanation))
+			}
 		}
 		if f.FixSuggestion != "" {
 			fmt.Fprintf(w, "  %s\n", clr.s(dim+cyan, "  fix:"))

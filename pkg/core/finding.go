@@ -53,6 +53,7 @@ type Finding struct {
 	Verdict       string `json:"verdict,omitempty"`        // TRUE_POSITIVE, FALSE_POSITIVE, UNKNOWN
 	VerdictReason string `json:"verdict_reason,omitempty"` // one-sentence explanation
 	FixSuggestion string `json:"fix_suggestion,omitempty"` // concrete code fix from LLM
+	Explanation   string `json:"explanation,omitempty"`
 }
 
 // FileContext returns up to radius lines on each side of lineNum, with line numbers.

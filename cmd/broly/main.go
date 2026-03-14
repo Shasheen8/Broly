@@ -64,6 +64,7 @@ func scanCmd() *cobra.Command {
 		aiFilterSecrets     bool
 		aiSCAReachability   bool
 		aiTriage            bool
+		explain             bool
 		baselineFile        string
 		incremental         bool
 		cachePath           string
@@ -136,6 +137,9 @@ By default all scanners are enabled and the current directory is scanned.`,
 			if f.Changed("ai-triage") {
 				cfg.AITriage = aiTriage
 			}
+			if f.Changed("explain") {
+				cfg.Explain = explain
+			}
 			if f.Changed("baseline") {
 				cfg.BaselineFile = baselineFile
 			}
@@ -190,6 +194,7 @@ By default all scanners are enabled and the current directory is scanned.`,
 	flags.BoolVar(&aiFilterSecrets, "ai-filter-secrets", false, "Use AI to filter false positive secrets findings (requires TOGETHER_API_KEY)")
 	flags.BoolVar(&aiSCAReachability, "ai-sca-reachability", false, "Use AI to analyze reachability of vulnerable dependencies (requires TOGETHER_API_KEY)")
 	flags.BoolVar(&aiTriage, "ai-triage", false, "Use AI to triage findings: TRUE/FALSE positive verdict + fix suggestion (requires TOGETHER_API_KEY)")
+	flags.BoolVar(&explain, "explain", false, "Add a plain-language attack scenario per finding (use with --ai-triage)")
 	flags.BoolVarP(&quiet, "quiet", "q", false, "Suppress progress output")
 	flags.StringVar(&baselineFile, "baseline", "", "Baseline file for suppress/require rules (default: .broly-baseline.yaml)")
 	flags.BoolVar(&incremental, "incremental", false, "Only re-scan SAST files changed since last run")
