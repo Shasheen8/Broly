@@ -117,6 +117,33 @@ require:
     description: "SQL injection in user lookup - must be detected"
 ```
 
+### Developer Feedback Loop
+
+> [!TIP]
+> Check a box in the PR comment to mark a finding as a false positive. Broly commits the suppression to `.broly-baseline.yaml` automatically. The finding never surfaces again.
+
+When Broly scans a PR it posts a **Mark as False Positive** section at the bottom of the comment:
+
+```
+### Mark as False Positive
+
+- [ ] 🔴 CRITICAL · SQL injection in get_user() · api/handlers.py:7
+- [ ] 🔴 CRITICAL · OS command injection in run_job() · api/handlers.py:11
+
+Check a box to suppress a finding. Broly will auto-update .broly-baseline.yaml on the next commit.
+```
+
+Check a box — a GitHub Action fires, verifies you have write access, and commits:
+
+```yaml
+# .broly-baseline.yaml
+suppress:
+  - fingerprint: "a1b2c3d4..."
+    reason: "marked false positive by @shasheen on PR #5"
+```
+
+The next scan reads the baseline and the finding is gone. The suppression accumulates over time — each repo builds its own false positive memory.
+
 ### Inline suppression
 
 Add a comment on the finding line or the line above:
