@@ -167,14 +167,6 @@ query = f"SELECT * FROM users WHERE id = {user_id}"  # broly:ignore SQL-INJECTIO
 broly vdev - scanning api/handlers.py
 scanners: sast | workers: 8
 
-
-  ╔══════════════════════════════════════════════════════╗
-  ║                                                      ║
-  ║      ⚡  BROLY  Berserker Vulnerability Scanner       ║
-  ║    Secrets · SCA · SAST · Powered by Together AI     ║
-  ║                                                      ║
-  ╚══════════════════════════════════════════════════════╝
-
   ▸ SAST (4 findings)
 
   SEVERITY     ISSUE                            FILE                      DESCRIPTION
@@ -183,17 +175,9 @@ scanners: sast | workers: 8
   CRITICAL     OS command injection via uns..   api/handlers.py:15        OS command injection via u..
   HIGH         Path traversal in read_file      api/handlers.py:20        Path traversal in read_fil..
   HIGH         Insecure deserialization via..   api/handlers.py:25        Insecure deserialization v..
-
-  ╔══════════════════════════════════════════════════════╗
-  ║                                                      ║
-  ║  4  total findings                                   ║
-  ║  Critical 2    High 2    Medium 0    Low 0           ║
-  ║  duration: 9.592s                                    ║
-  ║                                                      ║
-  ╚══════════════════════════════════════════════════════╝
 ```
 
-The SAST engine sends each file directly to `Qwen/Qwen3-Coder-Next-FP8` with a structured security prompt. No rule files. No rule engine. No YAML. The model traces data flow from source to sink, infers CVSS scores, and pinpoints exact line numbers, finding what static rules miss.
+Each file is sent directly to `Qwen/Qwen3-Coder-Next-FP8` with a structured security prompt. The model traces data flow from source to sink, infers CVSS scores, and finds what static rules miss.
 
 ---
 
