@@ -1,19 +1,25 @@
-<p align="center">
-  <img src="assets/broly-logo.png" alt="Broly" width="350"/>
-</p>
+<table>
+<tr>
+<td width="300">
+<img src="assets/broly-logo.png" alt="Broly" width="280"/>
+</td>
+<td>
 
-<h1 align="center">Broly</h1>
-<h3 align="center">A berserker code security scanner.</h3>
+# Broly
 
-<p align="center">Secrets · SCA · SAST in a single binary.</p>
-<p align="center">AI-powered. No rule files. No rule engine.</p>
+### A berserker code security scanner.
 
-<p align="center">
-  <a href="https://github.com/Shasheen8/Broly"><img src="https://img.shields.io/badge/Go-1.26-00ADD8?style=flat&logo=go" alt="Go"></a>
-  <a href="https://github.com/Shasheen8/Broly/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=flat" alt="License"></a>
-  <a href="https://github.com/Shasheen8/Broly/releases"><img src="https://img.shields.io/badge/Release-latest-blue?style=flat" alt="Release"></a>
-  <a href="https://together.ai"><img src="https://img.shields.io/badge/Powered%20by-Together%20AI-blueviolet?style=flat" alt="Together AI"></a>
-</p>
+Secrets · SCA · SAST in a single binary.
+AI-powered. No rule files. No rule engine.
+
+<a href="https://github.com/Shasheen8/Broly"><img src="https://img.shields.io/badge/Go-1.26-00ADD8?style=flat&logo=go" alt="Go"></a>
+<a href="https://github.com/Shasheen8/Broly/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=flat" alt="License"></a>
+<a href="https://github.com/Shasheen8/Broly/releases"><img src="https://img.shields.io/badge/Release-latest-blue?style=flat" alt="Release"></a>
+<a href="https://together.ai"><img src="https://img.shields.io/badge/Powered%20by-Together%20AI-blueviolet?style=flat" alt="Together AI"></a>
+
+</td>
+</tr>
+</table>
 
 ---
 
@@ -25,7 +31,7 @@ Broly runs three security scanners in parallel on your codebase and delivers res
 |---------|--------|----------|
 | **Secrets** | [Titus](https://github.com/praetorian-inc/titus) · 487 rules · Hyperscan | `--ai-filter-secrets` eliminates false positives |
 | **SCA** | [osv-scalibr](https://github.com/google/osv-scalibr) + [osv.dev](https://osv.dev) · 19 ecosystems | `--ai-sca-reachability` checks if the vuln is actually called |
-| **SAST** | [Together AI](https://together.ai) · `Qwen/Qwen3-Coder-Next-FP8` · **no rule files,  no rule engine** | Always-on · data flow analysis · CVSS scoring |
+| **SAST** | [Together AI](https://together.ai) · `Qwen/Qwen3-Coder-Next-FP8` | Always-on · source-to-sink data flow · CVSS scoring |
 
 ---
 
@@ -61,33 +67,122 @@ export TOGETHER_API_KEY=your_key_here
 ## Usage
 
 ```bash
-broly scan                                        # run all scanners on current directory
-broly scan /path/to/project                       # specific path
+broly scan                                         # all scanners, current directory
+broly scan /path/to/project                        # specific path
 
-# Individual scanners
-broly scan --secrets                              # secrets only
-broly scan --sca                                  # SCA only
-broly scan --sast                                 # SAST only (requires TOGETHER_API_KEY)
+# individual scanners
+broly scan --secrets                               # secrets only
+broly scan --sca                                   # SCA only
+broly scan --sast                                  # SAST only (requires TOGETHER_API_KEY)
 
-# AI triage suggestions
-broly scan --ai-filter-secrets                    # filter secrets false positives with AI
-broly scan --ai-sca-reachability                  # check if vulnerable deps are actually called
-broly scan --ai-triage                            # verdict (TP/FP) + fix suggestion per finding
-broly scan --ai-triage --explain                  # + concise attack-scenario sentence per finding
+
+# AI enhancements
+broly scan --ai-filter-secrets                     # filter secrets false positives with AI
+broly scan --ai-sca-reachability                   # check if vulnerable deps are actually called
+broly scan --ai-triage                             # verdict (TP/FP) + fix suggestion per finding
+broly scan --ai-triage --explain                   # + concise attack-scenario sentence per finding
 broly scan --ai-model Qwen/Qwen3-Coder-Next-FP8   # override model (default)
 
-# Outputs
-broly scan -f json                                # JSON output
-broly scan -f sarif -o results.sarif              # SARIF for GitHub Code Scanning
-broly scan --min-severity high                    # only high and critical
-broly scan --sca --offline                        # skip OSV API lookup
 
-# Scan config 
-broly scan --config .broly.yaml                   # load project config file
-broly scan --baseline .broly-baseline.yaml        # suppress known FPs / require specific findings
-broly scan --incremental                          # skip SAST on unchanged files (uses .broly-cache.json)
-broly scan --quiet                                # suppress progress output
+# output
+broly scan -f json                                 # JSON output
+broly scan -f sarif -o results.sarif               # SARIF 2.1.0 for GitHub Code Scanning
+broly scan --min-severity high                     # only high and critical
+broly scan --quiet                                 # suppress progress output
+
+
+# config
+broly scan --config .broly.yaml                    # load project config file
+broly scan --baseline .broly-baseline.yaml         # suppress known FPs / require specific findings
+broly scan --incremental                           # skip unchanged files (uses .broly-cache.json)
+broly scan --sca --offline                         # skip OSV API lookup
 ```
+
+---
+
+## Scanner Output
+
+### SAST
+
+Each file is sent to `Qwen/Qwen3-Coder-Next-FP8` with a structured security prompt. The model traces data flow from source to sink, infers CVSS scores, and finds what static rules miss.
+
+```
+  ▸ SAST (4 findings)
+
+  SEVERITY     ISSUE                            FILE                      DESCRIPTION
+  ──────────────────────────────────────────────────────────────────────────────────────────────────
+  CRITICAL     SQL injection via unsanitize..   api/handlers.py:10        User input flows directly ..
+  CRITICAL     OS command injection via uns..   api/handlers.py:15        OS command injection via u..
+  HIGH         Path traversal in read_file      api/handlers.py:20        Path traversal in read_fil..
+  HIGH         Insecure deserialization via..   api/handlers.py:25        Insecure deserialization v..
+```
+
+### Secrets
+
+487 rules covering AWS, GCP, Azure, GitHub, OpenAI, Anthropic, Slack, Stripe, SSH/PGP keys, database URIs, JWTs, and more.
+
+`--ai-filter-secrets` reads surrounding code context and filters out placeholders, test values, and examples:
+
+```
+  ▸ SECRETS (3 findings)
+
+  SEVERITY     RULE                             FILE                      REDACTED
+  ──────────────────────────────────────────────────────────────────────────────────
+  HIGH         AWS API Key                      config/example.py:6       AKIA****MPLE
+  HIGH         AWS API Credentials              config/example.py:6       AKIA****KEY"
+  HIGH         GitHub Personal Access Token     config/example.py:9       ghp_****8B4a
+```
+
+With `--ai-filter-secrets`: `✔ No findings detected. Clean scan!`
+
+### SCA
+
+19 ecosystems (Go, Python, JS, Ruby, Rust, Java, PHP, .NET, Dart, C/C++, and more), 50+ lockfile formats.
+
+```
+  ▸ SCA (13 findings)
+
+  SEVERITY     VULN ID                PACKAGE            VERSION        FIXED            ECOSYSTEM
+  ──────────────────────────────────────────────────────────────────────────────────────────────────
+  MEDIUM       GHSA-9hjg-9r4m-mvj7    requests           2.31.0         no fix           PyPI
+  MEDIUM       GHSA-496j-2rq6-j6cc    grpcio             1.54.0         no fix           PyPI
+  MEDIUM       GHSA-cfgp-2977-2fmm    grpcio             1.54.0         no fix           PyPI
+  ...
+```
+
+`--ai-sca-reachability` checks whether the vulnerable functions are actually called. Unreachable findings are downgraded one severity level and tagged `[Unreachable]`.
+
+### AI Triage
+
+`--ai-triage` labels each finding TRUE/FALSE positive with a confidence score and a fix. `--explain` adds a one-sentence attack scenario:
+
+```
+  CRITICAL     SQL injection via unsanitize..   api/handlers.py:10        User input flows directly ..
+  🔺 TRUE_POSITIVE [HIGH]  User input flows directly into raw SQL query without parameterization
+      An attacker sends id=1 OR 1=1 to dump the entire users table.
+    fix:
+      query = "SELECT * FROM users WHERE id = %s"
+      cursor.execute(query, (user_id,))
+
+  HIGH         Path traversal in read_file      api/handlers.py:20        Path traversal in read_fil..
+  🟢 FALSE_POSITIVE [HIGH]  File path is validated against an allowlist before use
+```
+
+---
+
+## Developer Feedback Loop
+
+Check a box in the PR comment to mark a finding as a false positive. Broly verifies write access, commits the fingerprint to `.broly-baseline.yaml`, and the finding never surfaces again.
+
+```
+- [ ] 🔴 CRITICAL · SQL injection in get_user() · api/handlers.py:7
+```
+
+Suppressions accumulate over time; each repo builds its own false positive memory.
+
+---
+
+## Configuration
 
 ### Config file
 
@@ -109,7 +204,7 @@ workers: 8
 
 ```yaml
 suppress:
-  - fingerprint: "abc123..."    # silence accepted risk / known FP
+  - fingerprint: "abc123..."
     reason: "test fixture"
 
 require:
@@ -117,16 +212,6 @@ require:
     file: "api/handlers.py"
     reason: "SQL injection in user lookup - must be detected"
 ```
-
-### Developer Feedback Loop
-
-Check a box in the PR comment to mark a finding as a false positive. Broly verifies write access, commits the fingerprint to `.broly-baseline.yaml`, and the finding never surfaces again.
-
-```
-- [ ] 🔴 CRITICAL · SQL injection in get_user() · api/handlers.py:7
-```
-
-Suppressions accumulate over time; each repo builds its own false positive memory.
 
 ### Inline suppression
 
@@ -137,144 +222,19 @@ query = f"SELECT * FROM users WHERE id = {user_id}"  # broly:ignore SQL-INJECTIO
 
 ---
 
-## Output Results
-
-### AI Triage - verdict and fix per finding
-
-`--ai-triage` labels each finding TRUE/FALSE positive with a confidence score and attaches a fix. Add `--explain` for a one-sentence attack scenario:
-
-```
-  ▸ SAST (2 findings)
-
-  SEVERITY     ISSUE                            FILE                      DESCRIPTION
-  ──────────────────────────────────────────────────────────────────────────────────────────────────
-  CRITICAL     SQL injection via unsanitize..   api/handlers.py:10        SQL injection via unsaniti..
-  🔺 TRUE_POSITIVE [HIGH]  User input flows directly into raw SQL query without parameterization
-      An attacker sends id=1 OR 1=1 to dump the entire users table.
-    fix:
-      query = "SELECT * FROM users WHERE id = %s"
-      cursor.execute(query, (user_id,))
-
-  HIGH         Path traversal in read_file      api/handlers.py:20        Path traversal in read_fil..
-  🟢 FALSE_POSITIVE [HIGH]  File path is validated against an allowlist before use
-```
-
----
-
-### SAST - AI-powered code analysis
-
-```
-broly vdev - scanning api/handlers.py
-scanners: sast | workers: 8
-
-  ▸ SAST (4 findings)
-
-  SEVERITY     ISSUE                            FILE                      DESCRIPTION
-  ──────────────────────────────────────────────────────────────────────────────────────────────────
-  CRITICAL     SQL injection via unsanitize..   api/handlers.py:10        SQL injection via unsaniti..
-  CRITICAL     OS command injection via uns..   api/handlers.py:15        OS command injection via u..
-  HIGH         Path traversal in read_file      api/handlers.py:20        Path traversal in read_fil..
-  HIGH         Insecure deserialization via..   api/handlers.py:25        Insecure deserialization v..
-```
-
-Each file is sent directly to `Qwen/Qwen3-Coder-Next-FP8` with a structured security prompt. The model traces data flow from source to sink, infers CVSS scores, and finds what static rules miss.
-
----
-
-### Secrets - with AI false positive filtering
-
-Without `--ai-filter-secrets` (raw regex hits):
-
-```
-  ▸ SECRETS (3 findings)
-
-  SEVERITY     RULE                             FILE                      REDACTED
-  ──────────────────────────────────────────────────────────────────────────────────
-  HIGH         AWS API Key                      config/example.py:6       AKIA****MPLE
-  HIGH         AWS API Credentials              config/example.py:6       AKIA****KEY"
-  HIGH         GitHub Personal Access Token     config/example.py:9       ghp_****8B4a
-```
-
-With `--ai-filter-secrets` (AI reads surrounding context):
-
-```
-  ✔  No findings detected. Clean scan!
-```
-
-The AI recognized the file contained documented placeholder values (`EXAMPLE` in variable names, "Test / dummy values" comment) and filtered them all as false positives, reducing noise to zero.
-
----
-
-### SCA - dependency vulnerability scan
-
-```
-broly vdev - scanning /path/to/project
-scanners: sca | workers: 8
-
-
-  ▸ SCA (13 findings)
-
-  SEVERITY     VULN ID                PACKAGE            VERSION        FIXED            ECOSYSTEM
-  ──────────────────────────────────────────────────────────────────────────────────────────────────
-  MEDIUM       GHSA-9hjg-9r4m-mvj7    requests           2.31.0         no fix           PyPI
-  MEDIUM       GHSA-496j-2rq6-j6cc    grpcio             1.54.0         no fix           PyPI
-  MEDIUM       GHSA-cfgp-2977-2fmm    grpcio             1.54.0         no fix           PyPI
-  MEDIUM       GHSA-wh2j-26j7-9728    google-cloud-ai    1.25.0         no fix           PyPI
-  MEDIUM       GHSA-7gcm-g887-7qv7    protobuf           3.20.3         no fix           PyPI
-  ...
-
-  ╔══════════════════════════════════════════════════════╗
-  ║                                                      ║
-  ║  13  total findings                                  ║
-  ║  Critical 0    High 0    Medium 13   Low 0           ║
-  ║  duration: 388ms                                     ║
-  ║                                                      ║
-  ╚══════════════════════════════════════════════════════╝
-```
-
-Add `--ai-sca-reachability` to check whether the vulnerable functions are actually called in your code. Unreachable findings are automatically downgraded one severity level and tagged `[Unreachable]`.
-
----
-
-## What Gets Scanned
-
-**Secrets** - 487 rules across:
-```
-AWS, GitHub, OpenAI, Anthropic, GCP, Azure, Cloudflare, Slack, Stripe, Twilio,
-SendGrid, Docker, npm, SSH/PGP/RSA/EC keys, database URIs, JWTs, generic tokens
-```
-
-**SCA** - 19 ecosystems, 50+ lockfile formats:
-```
-Go, Python, JavaScript, Ruby, Rust, Java, PHP, .NET, Dart, C/C++, Haskell,
-Elixir, Erlang, R, Swift, Lua, Nim, OCaml, Julia
-```
-
-**SAST** - AI analysis across 18 languages. No rule files. No rule engine. No maintenance:
-```
-Go, Python, JavaScript, TypeScript, Java, Ruby, PHP, C#, Rust, C, C++,
-Kotlin, Swift, Bash, and more
-```
-
----
-
-## Output Formats
-
-| Format | Flag | Use case |
-|--------|------|----------|
-| Table (default) | `-f table` | Terminal, human review |
-| JSON | `-f json` | CI pipelines, tooling |
-| SARIF 2.1.0 | `-f sarif` | GitHub Code Scanning |
-
----
-
 ## Acknowledgments
 
-- [Titus](https://github.com/praetorian-inc/titus) - secrets engine
-- [osv-scalibr](https://github.com/google/osv-scalibr) - lockfile extraction
-- [osv.dev](https://osv.dev) - vulnerability database
-- [Together AI](https://together.ai) - AI inference
+Broly stands on the shoulders of some excellent open-source projects:
+
+| Project | Role |
+|---------|------|
+| [Titus](https://github.com/praetorian-inc/titus) | Secrets engine: 487 rules, Hyperscan + Go regex |
+| [osv-scalibr](https://github.com/google/osv-scalibr) | Lockfile extraction across 50+ formats |
+| [osv.dev](https://osv.dev) | Vulnerability database by Google |
+| [Together AI](https://together.ai) | AI inference for SAST, triage, and reachability |
+
+---
 
 ## License
 
-[MIT](LICENSE)
+MIT. See [LICENSE](LICENSE) for the full text.
