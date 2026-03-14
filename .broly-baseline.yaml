@@ -1,3 +1,4 @@
-suppress: []
-
+suppress:
+- fingerprint: ac36d30d7e7ae1393d2dae25aa7dd0d2db2fc7085db7b4e2ba0ca8829752d247
+  reason: 'marked false positive by @Shasheen8 on PR #5'
 require: []
