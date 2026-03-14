@@ -73,6 +73,7 @@ broly scan --sast                                 # SAST only (requires TOGETHER
 broly scan --ai-filter-secrets                    # filter secrets false positives with AI
 broly scan --ai-sca-reachability                  # check if vulnerable deps are actually called
 broly scan --ai-triage                            # verdict (TP/FP) + fix suggestion per finding
+broly scan --ai-triage --explain                  # + concise attack-scenario sentence per finding
 broly scan --ai-model Qwen/Qwen3-Coder-Next-FP8   # override model (default)
 
 # Outputs
@@ -159,7 +160,7 @@ query = f"SELECT * FROM users WHERE id = {user_id}"  # broly:ignore SQL-INJECTIO
 
 ### AI Triage - verdict and fix per finding
 
-Add `--ai-triage` to any scan. Each finding gets a TRUE/FALSE positive verdict and a concrete code fix from the model:
+Add `--ai-triage` to any scan. Each finding gets a TRUE/FALSE positive verdict, a confidence score, and a concrete code fix. Add `--explain` for a one-sentence attack scenario:
 
 ```
   ▸ SAST (2 findings)
@@ -167,13 +168,14 @@ Add `--ai-triage` to any scan. Each finding gets a TRUE/FALSE positive verdict a
   SEVERITY     ISSUE                            FILE                      DESCRIPTION
   ──────────────────────────────────────────────────────────────────────────────────────────────────
   CRITICAL     SQL injection via unsanitize..   api/handlers.py:10        SQL injection via unsaniti..
-  ● TRUE_POSITIVE  User input flows directly into raw SQL query without parameterization
+  🔺 TRUE_POSITIVE [HIGH]  User input flows directly into raw SQL query without parameterization
+      An attacker sends id=1 OR 1=1 to dump the entire users table.
     fix:
       query = "SELECT * FROM users WHERE id = %s"
       cursor.execute(query, (user_id,))
 
   HIGH         Path traversal in read_file      api/handlers.py:20        Path traversal in read_fil..
-  ● FALSE_POSITIVE  File path is validated against an allowlist before use
+  🟢 FALSE_POSITIVE [HIGH]  File path is validated against an allowlist before use
 ```
 
 In PR comments, verdicts appear as a column in the findings table and confirmed true positives get a collapsible fix block.
