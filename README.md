@@ -115,7 +115,7 @@ suppress:
 require:
   - rule_id: "SQL-INJECTION"
     file: "api/handlers.py"
-    description: "SQL injection in user lookup - must be detected"
+    reason: "SQL injection in user lookup - must be detected"
 ```
 
 ### Developer Feedback Loop

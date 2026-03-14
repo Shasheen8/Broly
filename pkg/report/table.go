@@ -223,20 +223,7 @@ func printSecretsTable(w io.Writer, clr color, findings []core.Finding) {
 			clr.s(dim, trunc(location, 40)),
 			clr.s(gray, trunc(f.Redacted, 30)),
 		)
-		if f.Verdict != "" {
-			conf := ""
-			if f.Confidence != "" {
-				conf = " [" + f.Confidence + "]"
-			}
-			fmt.Fprintf(w, "  %s%s %s\n",
-				verdictColor(f.Verdict, clr),
-				clr.s(gray, conf),
-				clr.s(gray, trunc(f.VerdictReason, 80)),
-			)
-			if f.Explanation != "" {
-				fmt.Fprintf(w, "  %s\n", clr.s(dim, "    "+f.Explanation))
-			}
-		}
+		printVerdictAndFix(w, clr, f)
 	}
 }
 
@@ -259,20 +246,7 @@ func printSCATable(w io.Writer, clr color, findings []core.Finding) {
 			fixed,
 			clr.s(dim, f.Ecosystem),
 		)
-		if f.Verdict != "" {
-			conf := ""
-			if f.Confidence != "" {
-				conf = " [" + f.Confidence + "]"
-			}
-			fmt.Fprintf(w, "  %s%s %s\n",
-				verdictColor(f.Verdict, clr),
-				clr.s(gray, conf),
-				clr.s(gray, trunc(f.VerdictReason, 80)),
-			)
-			if f.Explanation != "" {
-				fmt.Fprintf(w, "  %s\n", clr.s(dim, "    "+f.Explanation))
-			}
-		}
+		printVerdictAndFix(w, clr, f)
 	}
 }
 
@@ -286,27 +260,31 @@ func printSASTTable(w io.Writer, clr color, findings []core.Finding) {
 			severityColor(f.Severity, clr),
 			trunc(f.RuleName, 30),
 			clr.s(dim, trunc(location, 40)),
-			clr.s(gray, trunc(f.Title, 30)),
+			clr.s(gray, trunc(f.Description, 30)),
 		)
-		if f.Verdict != "" {
-			conf := ""
-			if f.Confidence != "" {
-				conf = " [" + f.Confidence + "]"
-			}
-			fmt.Fprintf(w, "  %s%s %s\n",
-				verdictColor(f.Verdict, clr),
-				clr.s(gray, conf),
-				clr.s(gray, trunc(f.VerdictReason, 80)),
-			)
-			if f.Explanation != "" {
-				fmt.Fprintf(w, "  %s\n", clr.s(dim, "    "+f.Explanation))
-			}
+		printVerdictAndFix(w, clr, f)
+	}
+}
+
+func printVerdictAndFix(w io.Writer, clr color, f core.Finding) {
+	if f.Verdict != "" {
+		conf := ""
+		if f.Confidence != "" {
+			conf = " [" + f.Confidence + "]"
 		}
-		if f.FixSuggestion != "" {
-			fmt.Fprintf(w, "  %s\n", clr.s(dim+cyan, "  fix:"))
-			for _, line := range strings.Split(f.FixSuggestion, "\n") {
-				fmt.Fprintf(w, "  %s\n", clr.s(dim, "    "+line))
-			}
+		fmt.Fprintf(w, "  %s%s %s\n",
+			verdictColor(f.Verdict, clr),
+			clr.s(gray, conf),
+			clr.s(gray, trunc(f.VerdictReason, 80)),
+		)
+		if f.Explanation != "" {
+			fmt.Fprintf(w, "  %s\n", clr.s(dim, "    "+f.Explanation))
+		}
+	}
+	if f.FixSuggestion != "" {
+		fmt.Fprintf(w, "  %s\n", clr.s(dim+cyan, "  fix:"))
+		for _, line := range strings.Split(f.FixSuggestion, "\n") {
+			fmt.Fprintf(w, "  %s\n", clr.s(dim, "    "+line))
 		}
 	}
 }

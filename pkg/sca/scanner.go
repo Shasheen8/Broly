@@ -202,29 +202,41 @@ func parseCVSSSeverity(vuln *osvschema.Vulnerability) (core.Severity, float64) {
 		if f, err := strconv.ParseFloat(score, 64); err == nil {
 			return core.SeverityFromCVSS(f), f
 		}
-		if s, ok := cvssVectorSeverity(score); ok {
-			return s, 0
+		if s, score, ok := cvssVectorSeverity(score); ok {
+			return s, score
 		}
 	}
 	return core.SeverityMedium, 0
 }
 
-func cvssVectorSeverity(vector string) (core.Severity, bool) {
+func cvssVectorSeverity(vector string) (core.Severity, float64, bool) {
 	upper := strings.ToUpper(vector)
 	if !strings.HasPrefix(upper, "CVSS:") {
-		return 0, false
+		return 0, 0, false
 	}
 	c := strings.Contains(upper, "/C:H")
 	i := strings.Contains(upper, "/I:H")
 	a := strings.Contains(upper, "/A:H")
+	scopeChanged := strings.Contains(upper, "/S:C")
+	network := strings.Contains(upper, "/AV:N")
+	lowAC := strings.Contains(upper, "/AC:L")
+	noPriv := strings.Contains(upper, "/PR:N") || strings.Contains(upper, "/PR:L")
+
+	twoHigh := (c && i) || (c && a) || (i && a)
+
+	var sev core.Severity
+	var approxScore float64
 	switch {
-	case c && i && a:
-		return core.SeverityCritical, true
+	case twoHigh || (scopeChanged && (c || i || a)):
+		sev, approxScore = core.SeverityCritical, 9.5
 	case c || i || a:
-		return core.SeverityHigh, true
+		sev, approxScore = core.SeverityHigh, 8.0
+	case network && lowAC && noPriv:
+		sev, approxScore = core.SeverityMedium, 6.5
 	default:
-		return core.SeverityMedium, true
+		sev, approxScore = core.SeverityLow, 3.5
 	}
+	return sev, approxScore, true
 }
 
 func extractFixedVersion(vuln *osvschema.Vulnerability) string {

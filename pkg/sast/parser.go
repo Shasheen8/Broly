@@ -16,6 +16,7 @@ func parseLLMResponse(filePath, response string) []parsedFinding {
 
 	var findings []parsedFinding
 	var current *parsedFinding
+	inFix := false
 
 	lines := strings.Split(resp, "\n")
 	for _, raw := range lines {
@@ -27,6 +28,7 @@ func parseLLMResponse(filePath, response string) []parsedFinding {
 			}
 			current = &parsedFinding{}
 			current.level = strings.Trim(val, "[]")
+			inFix = false
 			continue
 		}
 
@@ -36,18 +38,24 @@ func parseLLMResponse(filePath, response string) []parsedFinding {
 
 		if _, val, ok := extractField(line, "Issue"); ok {
 			current.issue = val
+			inFix = false
 		} else if _, val, ok := extractField(line, "Location"); ok {
 			current.location = val
-		} else if _, val, ok := extractField(line, "CVSS Vector"); ok {
-			current.cvssVector = val
+			inFix = false
 		} else if _, val, ok := extractField(line, "Risk"); ok {
 			current.risk = val
+			inFix = false
 		} else if _, val, ok := extractField(line, "Fix"); ok {
 			current.fix = val
+			inFix = true
 		} else if line == "---" || line == "***" {
-			// separator — do nothing, next Vulnerability Level starts new finding
-		} else if line != "" && current.fix != "" {
-			current.fix += "\n" + line
+			inFix = false
+		} else if line != "" && inFix {
+			if current.fix != "" {
+				current.fix += "\n" + line
+			} else {
+				current.fix = line
+			}
 		}
 	}
 
@@ -59,12 +67,11 @@ func parseLLMResponse(filePath, response string) []parsedFinding {
 }
 
 type parsedFinding struct {
-	level      string
-	issue      string
-	location   string
-	cvssVector string
-	risk       string
-	fix        string
+	level    string
+	issue    string
+	location string
+	risk     string
+	fix      string
 }
 
 func extractField(line, field string) (string, string, bool) {

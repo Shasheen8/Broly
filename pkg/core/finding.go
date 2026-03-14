@@ -39,7 +39,6 @@ type Finding struct {
 	FixedVersion   string  `json:"fixed_version,omitempty"`
 	CVE            string  `json:"cve,omitempty"`
 	CVSSScore      float64 `json:"cvss_score,omitempty"`
-	Advisory       string  `json:"advisory_url,omitempty"`
 
 	Redacted string  `json:"redacted,omitempty"`
 	Entropy  float64 `json:"entropy,omitempty"`
@@ -78,36 +77,47 @@ func FileContext(path string, lineNum, radius int) string {
 	return sb.String()
 }
 
-// FileContextSafe returns up to radius lines on each side of lineNum, redacting the exact lineNum line.
-func FileContextSafe(path string, lineNum, radius int) string {
+// FileContextSafe returns up to radius lines on each side of startLine, redacting all lines
+// from startLine through endLine inclusive (covers multiline secrets like PEM blocks).
+func FileContextSafe(path string, startLine, endLine, radius int) string {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return ""
 	}
 	lines := strings.Split(string(data), "\n")
-	start := lineNum - radius - 1
-	if start < 0 {
-		start = 0
+	if endLine < startLine {
+		endLine = startLine
 	}
-	end := lineNum + radius
-	if end > len(lines) {
-		end = len(lines)
+	winStart := startLine - radius - 1
+	if winStart < 0 {
+		winStart = 0
+	}
+	winEnd := endLine + radius
+	if winEnd > len(lines) {
+		winEnd = len(lines)
 	}
 	var sb strings.Builder
-	for i := start; i < end; i++ {
+	for i := winStart; i < winEnd; i++ {
 		content := lines[i]
-		if i+1 == lineNum {
+		lineNum := i + 1
+		if lineNum >= startLine && lineNum <= endLine {
 			content = "<content redacted>"
 		}
-		fmt.Fprintf(&sb, "%4d  %s\n", i+1, content)
+		fmt.Fprintf(&sb, "%4d  %s\n", lineNum, content)
 	}
 	return sb.String()
 }
 
 // ComputeFingerprint sets a deduplication hash. Changes when file path or line changes.
+// For secrets findings, always uses the redacted value so fingerprints are stable
+// regardless of whether --no-redact is set.
 func (f *Finding) ComputeFingerprint() {
+	snippet := f.Snippet
+	if f.Type == ScanTypeSecrets && f.Redacted != "" {
+		snippet = f.Redacted
+	}
 	data := fmt.Sprintf("%s:%s:%s:%s:%d",
-		f.Type, f.RuleID, f.FilePath, f.Snippet, f.StartLine,
+		f.Type, f.RuleID, f.FilePath, snippet, f.StartLine,
 	)
 	hash := sha256.Sum256([]byte(data))
 	f.Fingerprint = fmt.Sprintf("%x", hash[:])

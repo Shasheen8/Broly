@@ -53,7 +53,7 @@ func newAIValidator(model string) *AIValidator {
 }
 
 func (v *AIValidator) validate(ctx context.Context, f core.Finding) bool {
-	ctxLines := core.FileContextSafe(f.FilePath, f.StartLine, 8)
+	ctxLines := core.FileContextSafe(f.FilePath, f.StartLine, f.EndLine, 8)
 	prompt := fmt.Sprintf(fpPrompt,
 		f.RuleName,
 		f.FilePath,

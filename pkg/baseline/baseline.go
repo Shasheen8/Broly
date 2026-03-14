@@ -41,42 +41,6 @@ func Load(path string) (*Baseline, error) {
 	return &b, nil
 }
 
-func (b *Baseline) Apply(findings []core.Finding) (filtered []core.Finding, missing []string, suppressed int) {
-	if len(b.Suppressions) == 0 && len(b.Require) == 0 {
-		return findings, nil, 0
-	}
-
-	suppressSet := make(map[string]bool, len(b.Suppressions))
-	for _, e := range b.Suppressions {
-		if e.Fingerprint != "" {
-			suppressSet[e.Fingerprint] = true
-		}
-	}
-
-	for _, f := range findings {
-		if suppressSet[f.Fingerprint] {
-			suppressed++
-			continue
-		}
-		filtered = append(filtered, f)
-	}
-
-	for _, req := range b.Require {
-		found := false
-		for _, f := range findings { // check against full original set
-			if matchesRequire(f, req) {
-				found = true
-				break
-			}
-		}
-		if !found {
-			missing = append(missing, requireDesc(req))
-		}
-	}
-
-	return filtered, missing, suppressed
-}
-
 // CheckRequired returns descriptions of required findings that are absent from findings.
 func (b *Baseline) CheckRequired(findings []core.Finding) []string {
 	var missing []string

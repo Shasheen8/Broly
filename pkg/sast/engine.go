@@ -215,6 +215,7 @@ func (s *SASTScanner) scanFile(ctx context.Context, path, lang string, findings 
 		select {
 		case findings <- f:
 		case <-ctx.Done():
+			return false
 		}
 	}
 	return true
