@@ -1,3 +1,4 @@
-suppress: []
-
+suppress:
+- fingerprint: e903f0ae2dbafc2cf19b7c88f1bee8ce84deeee0b84dd9dbf3a8bac53076fca6
+  reason: 'marked false positive by @github-actions[bot] on PR #4'
 require: []
