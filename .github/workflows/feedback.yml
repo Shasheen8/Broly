@@ -1,0 +1,99 @@
+name: Broly Feedback Loop
+
+# Fires when a developer checks a checkbox in a Broly PR comment.
+# Extracts fingerprints from checked lines, adds them to .broly-baseline.yaml,
+# and commits the updated baseline back to the PR branch so future scans
+# suppress the marked findings automatically.
+
+on:
+  issue_comment:
+    types: [edited]
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  update-baseline:
+    name: Update Baseline
+    # Only run on PR comments that contain the Broly scan marker.
+    if: |
+      github.event.issue.pull_request != null &&
+      contains(github.event.comment.body, '<!-- broly-scan -->')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Get PR branch
+        id: pr-info
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+            });
+            core.setOutput('branch', pr.data.head.ref);
+
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.pr-info.outputs.branch }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update .broly-baseline.yaml
+        env:
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          COMMENT_USER: ${{ github.event.comment.user.login }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          python3 << 'EOF'
+          import yaml, os, re, sys
+
+          body = os.environ['COMMENT_BODY']
+          user = os.environ['COMMENT_USER']
+          pr   = os.environ['PR_NUMBER']
+
+          # Extract fingerprints from checked checkboxes: - [x] ... <!-- fp:HASH -->
+          checked = re.findall(r'- \[x\].*?<!-- fp:([0-9a-f]+) -->', body, re.IGNORECASE)
+          if not checked:
+              print('No checked boxes found — nothing to do.')
+              sys.exit(0)
+
+          path = '.broly-baseline.yaml'
+          baseline = {'suppress': [], 'require': []}
+          if os.path.exists(path):
+              loaded = yaml.safe_load(open(path).read()) or {}
+              baseline = {**baseline, **loaded}
+
+          if not isinstance(baseline.get('suppress'), list):
+              baseline['suppress'] = []
+
+          existing = {e['fingerprint'] for e in baseline['suppress'] if 'fingerprint' in e}
+          added = 0
+          for fp in checked:
+              if fp not in existing:
+                  baseline['suppress'].append({
+                      'fingerprint': fp,
+                      'reason': f'marked false positive by @{user} on PR #{pr}',
+                  })
+                  existing.add(fp)
+                  added += 1
+
+          if added == 0:
+              print('All checked fingerprints already suppressed.')
+              sys.exit(0)
+
+          with open(path, 'w') as f:
+              yaml.dump(baseline, f, default_flow_style=False, sort_keys=False)
+          print(f'Added {added} suppress entr{"y" if added == 1 else "ies"} to {path}')
+          EOF
+
+      - name: Commit baseline update
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .broly-baseline.yaml
+          git diff --cached --quiet && echo "Nothing to commit." && exit 0
+          git commit -m "chore: suppress false positives from PR #${{ github.event.issue.number }}"
+          git push

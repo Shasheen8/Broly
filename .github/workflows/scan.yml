@@ -173,6 +173,7 @@ jobs:
             let body;
             if (findings.length === 0) {
               body = [
+                '<!-- broly-scan -->',
                 '## Broly Security Scan',
                 '',
                 '✅ No findings detected.',
@@ -228,11 +229,21 @@ jobs:
                   ].join('\n');
                 }).join('\n');
 
+              const checkboxes = findings.slice(0, 30)
+                .filter(f => f.fingerprint)
+                .map(f => {
+                  const icon = sevIcon[f.severity] || '';
+                  const rule = (f.rule_name || f.title || f.rule_id || 'Finding').substring(0, 50);
+                  const loc  = f.file_path ? `${f.file_path}:${f.start_line || ''}` : '';
+                  return `- [ ] ${icon} ${f.severity} · ${rule}${loc ? ' · ' + loc : ''} <!-- fp:${f.fingerprint} -->`;
+                }).join('\n');
+
               const note = findings.length > 30
                 ? `\n> Showing top 30 of ${findings.length} findings. See [Security tab](../../security/code-scanning) for full results.`
                 : '';
 
               body = [
+                '<!-- broly-scan -->',
                 '## Broly Security Scan',
                 '',
                 summary,
@@ -242,6 +253,7 @@ jobs:
                 rows,
                 note,
                 fixes ? '\n### Fix Suggestions\n\n' + fixes : '',
+                checkboxes ? '\n### Mark as False Positive\n\n' + checkboxes + '\n\n*Check a box to suppress a finding. Broly will auto-update `.broly-baseline.yaml` on the next commit.*' : '',
                 '',
                 '> [Broly](https://github.com/Shasheen8/Broly) — Secrets · SCA · SAST · Powered by Together AI',
               ].join('\n');
@@ -255,7 +267,7 @@ jobs:
 
             const existing = comments.find(c =>
               c.user.login === 'github-actions[bot]' &&
-              c.body.includes('## Broly Security Scan')
+              c.body.includes('<!-- broly-scan -->')
             );
 
             if (existing) {
