@@ -105,7 +105,7 @@ workers: 8
 ### Baseline
 
 > [!NOTE]
-> `suppress` silences known false positives. `require` asserts specific findings must be detected every scan — missing entries cause a non-zero exit. See [`.broly-baseline.yaml`](.broly-baseline.yaml) for a working example.
+> `suppress` silences known false positives. `require` asserts specific findings must be detected every scan; missing entries cause a non-zero exit. See [`.broly-baseline.yaml`](.broly-baseline.yaml) for a working example.
 
 ```yaml
 suppress:
@@ -134,7 +134,7 @@ When Broly scans a PR it posts a **Mark as False Positive** section at the botto
 Check a box to suppress a finding. Broly will auto-update .broly-baseline.yaml on the next commit.
 ```
 
-Check a box — a GitHub Action fires, verifies you have write access, and commits:
+Check a box: a GitHub Action fires, verifies you have write access, and commits:
 
 ```yaml
 # .broly-baseline.yaml
@@ -143,7 +143,7 @@ suppress:
     reason: "marked false positive by @shasheen on PR #5"
 ```
 
-The next scan reads the baseline and the finding is gone. The suppression accumulates over time — each repo builds its own false positive memory.
+The next scan reads the baseline and the finding is gone. The suppression accumulates over time; each repo builds its own false positive memory.
 
 ### Inline suppression
 
