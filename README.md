@@ -120,34 +120,15 @@ require:
 
 ### Developer Feedback Loop
 
-> [!TIP]
-> Check a box in the PR comment to mark a finding as a false positive. Broly commits the suppression to `.broly-baseline.yaml` automatically. The finding never surfaces again.
-
-When Broly scans a PR it posts a **Mark as False Positive** section at the bottom of the comment:
+Check a box in the PR comment to mark a finding as a false positive. Broly verifies write access, commits the fingerprint to `.broly-baseline.yaml`, and the finding never surfaces again.
 
 ```
-### Mark as False Positive
-
 - [ ] 🔴 CRITICAL · SQL injection in get_user() · api/handlers.py:7
-- [ ] 🔴 CRITICAL · OS command injection in run_job() · api/handlers.py:11
-
-Check a box to suppress a finding. Broly will auto-update .broly-baseline.yaml on the next commit.
 ```
 
-Check a box: a GitHub Action fires, verifies you have write access, and commits:
-
-```yaml
-# .broly-baseline.yaml
-suppress:
-  - fingerprint: "a1b2c3d4..."
-    reason: "marked false positive by @shasheen on PR #5"
-```
-
-The next scan reads the baseline and the finding is gone. The suppression accumulates over time; each repo builds its own false positive memory.
+Suppressions accumulate over time; each repo builds its own false positive memory.
 
 ### Inline suppression
-
-Add a comment on the finding line or the line above:
 
 ```python
 query = "SELECT * FROM users WHERE id = " + user_id  # broly:ignore
@@ -160,7 +141,7 @@ query = f"SELECT * FROM users WHERE id = {user_id}"  # broly:ignore SQL-INJECTIO
 
 ### AI Triage - verdict and fix per finding
 
-Add `--ai-triage` to any scan. Each finding gets a TRUE/FALSE positive verdict, a confidence score, and a concrete code fix. Add `--explain` for a one-sentence attack scenario:
+`--ai-triage` labels each finding TRUE/FALSE positive with a confidence score and attaches a fix. Add `--explain` for a one-sentence attack scenario:
 
 ```
   ▸ SAST (2 findings)
@@ -177,8 +158,6 @@ Add `--ai-triage` to any scan. Each finding gets a TRUE/FALSE positive verdict, 
   HIGH         Path traversal in read_file      api/handlers.py:20        Path traversal in read_fil..
   🟢 FALSE_POSITIVE [HIGH]  File path is validated against an allowlist before use
 ```
-
-In PR comments, verdicts appear as a column in the findings table and confirmed true positives get a collapsible fix block.
 
 ---
 
