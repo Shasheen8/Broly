@@ -5,3 +5,4 @@ exclude_paths:
   - node_modules
   - testdata
 workers: 8
+baseline_file: .broly-baseline.yaml

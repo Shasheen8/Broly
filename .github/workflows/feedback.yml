@@ -4,6 +4,8 @@ name: Broly Feedback Loop
 # Extracts fingerprints from checked lines, adds them to .broly-baseline.yaml,
 # and commits the updated baseline back to the PR branch so future scans
 # suppress the marked findings automatically.
+#
+# Only users with write/admin access to the repo can trigger suppression.
 
 on:
   issue_comment:
@@ -23,8 +25,35 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Check sender authorization
+        id: authz
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const sender = context.payload.sender.login;
+            // Bots editing their own comment should not trigger baseline updates.
+            if (context.payload.sender.type === 'Bot') {
+              core.info(`Sender is a bot (${sender}) — skipping.`);
+              core.setOutput('authorized', 'false');
+              return;
+            }
+            const { data } = await github.rest.repos.getCollaboratorPermissionLevel({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              username: sender,
+            });
+            const allowed = ['admin', 'write'].includes(data.permission);
+            if (!allowed) {
+              core.warning(`@${sender} has "${data.permission}" access — checkbox ignored. Write access required to suppress findings.`);
+            } else {
+              core.info(`@${sender} has "${data.permission}" access — authorized.`);
+            }
+            core.setOutput('authorized', allowed ? 'true' : 'false');
+            core.setOutput('sender', sender);
+
       - name: Get PR branch
         id: pr-info
+        if: steps.authz.outputs.authorized == 'true'
         uses: actions/github-script@v7
         with:
           script: |
@@ -36,22 +65,24 @@ jobs:
             core.setOutput('branch', pr.data.head.ref);
 
       - name: Checkout PR branch
+        if: steps.authz.outputs.authorized == 'true'
         uses: actions/checkout@v4
         with:
           ref: ${{ steps.pr-info.outputs.branch }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Update .broly-baseline.yaml
+        if: steps.authz.outputs.authorized == 'true'
         env:
           COMMENT_BODY: ${{ github.event.comment.body }}
-          COMMENT_USER: ${{ github.event.comment.user.login }}
+          SENDER: ${{ steps.authz.outputs.sender }}
           PR_NUMBER: ${{ github.event.issue.number }}
         run: |
           python3 << 'EOF'
           import yaml, os, re, sys
 
           body = os.environ['COMMENT_BODY']
-          user = os.environ['COMMENT_USER']
+          user = os.environ['SENDER']
           pr   = os.environ['PR_NUMBER']
 
           # Extract fingerprints from checked checkboxes: - [x] ... <!-- fp:HASH -->
@@ -90,6 +121,7 @@ jobs:
           EOF
 
       - name: Commit baseline update
+        if: steps.authz.outputs.authorized == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
