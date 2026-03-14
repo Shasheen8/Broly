@@ -81,7 +81,7 @@ broly scan --ai-filter-secrets                     # filter secrets false positi
 broly scan --ai-sca-reachability                   # check if vulnerable deps are actually called
 broly scan --ai-triage                             # verdict (TP/FP) + fix suggestion per finding
 broly scan --ai-triage --explain                   # + concise attack-scenario sentence per finding
-broly scan --ai-model Qwen/Qwen3-Coder-Next-FP8   # override model (default)
+broly scan --ai-model Qwen/Qwen3-Coder-Next-FP8    # override model (default)
 
 
 # output
