@@ -1,5 +1,6 @@
 import sqlite3
 import subprocess
+import logging
 
 def get_user(user_id):
     conn = sqlite3.connect("app.db")
