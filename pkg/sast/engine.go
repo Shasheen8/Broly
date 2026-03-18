@@ -155,7 +155,10 @@ func (s *SASTScanner) Scan(ctx context.Context, paths []string, findings chan<- 
 			ext := strings.ToLower(filepath.Ext(name))
 			lang, ok := extToLang[ext]
 			if !ok {
-				return nil
+				lang, ok = detectLangByName(name)
+				if !ok {
+					return nil
+				}
 			}
 			if len(s.langFilter) > 0 && !s.langFilter[lang] {
 				return nil
