@@ -32,6 +32,7 @@ Broly runs three security scanners in parallel on your codebase and delivers res
 | **Secrets** | [Titus](https://github.com/praetorian-inc/titus) · 487 rules · Hyperscan | `--ai-filter-secrets` eliminates false positives |
 | **SCA** | [osv-scalibr](https://github.com/google/osv-scalibr) + [osv.dev](https://osv.dev) · 19 ecosystems | `--ai-sca-reachability` checks if the vuln is actually called |
 | **SAST** | [Together AI](https://together.ai) · `Qwen/Qwen3-Coder-Next-FP8` | Always-on · source-to-sink data flow · CVSS scoring |
+| **Dockerfile** | AI-powered · Dockerfile, Containerfile, Compose | Privilege escalation, secret exposure, dangerous mounts |
 
 ---
 
@@ -115,6 +116,25 @@ Each file is sent to `Qwen/Qwen3-Coder-Next-FP8` with a structured security prom
   CRITICAL     OS command injection via uns..   api/handlers.py:15        OS command injection via u..
   HIGH         Path traversal in read_file      api/handlers.py:20        Path traversal in read_fil..
   HIGH         Insecure deserialization via..   api/handlers.py:25        Insecure deserialization v..
+```
+
+### Dockerfile and Compose
+
+Dockerfiles, Containerfiles, and Compose files are auto-detected and scanned with specialized security prompts. Covers privilege escalation, hardcoded secrets, dangerous mounts, unpinned base images, curl-pipe-bash, and more.
+
+```
+  ▸ SAST (18 findings)
+
+  SEVERITY     ISSUE                            FILE                                DESCRIPTION
+  ──────────────────────────────────────────────────────────────────────────────────────────────────
+  CRITICAL     Hardcoded secrets (DB_PASSWO..   Dockerfile:0                        An attacker with access to t..
+  CRITICAL     Container is running in priv..   docker-compose.yml:0                An attacker who compromises ..
+  CRITICAL     Docker socket mounted            docker-compose.yml:0                Full control over Docker dae..
+  HIGH         ADD from remote URL              Dockerfile:9                        MITM or compromised source c..
+  HIGH         curl piped to bash               Dockerfile:10                       Compromised script runs as r..
+  MEDIUM       Running as root (no USER)        Dockerfile:0                        Increases blast radius of an..
+  MEDIUM       Unpinned base image :latest      Dockerfile:1                        May pull a changed or compro..
+  ...
 ```
 
 ### Secrets
