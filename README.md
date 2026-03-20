@@ -177,21 +177,6 @@ With `--ai-filter-secrets`: `✔ No findings detected. Clean scan!`
 
 `--ai-sca-reachability` checks whether the vulnerable functions are actually called. Unreachable findings are downgraded one severity level and tagged `[Unreachable]`.
 
-### Container Scanning
-
-`--container` pulls an image (registry, Docker daemon, or tarball) and scans for OS and language package vulnerabilities:
-
-```
-  ▸ CONTAINER (5 findings)
-
-  SEVERITY     VULN ID                PACKAGE            VERSION        FIXED            ECOSYSTEM
-  ──────────────────────────────────────────────────────────────────────────────────────────────────
-  HIGH         CVE-2024-6119          openssl            3.1.4-r5       3.1.4-r6         Alpine
-  HIGH         CVE-2024-5535          openssl            3.1.4-r5       3.1.4-r6         Alpine
-  MEDIUM       CVE-2024-4603          openssl            3.1.4-r5       3.1.4-r6         Alpine
-  ...
-```
-
 ### AI Triage
 
 `--ai-triage` labels each finding TRUE/FALSE positive with a confidence score and a fix. `--explain` adds a one-sentence attack scenario:
