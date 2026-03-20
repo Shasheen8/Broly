@@ -165,11 +165,14 @@ func extractLineNumber(loc string) int {
 
 func slugify(s string) string {
 	var b strings.Builder
+	lastUnderscore := false
 	for _, r := range strings.ToLower(s) {
 		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
 			b.WriteRune(r)
-		} else if b.Len() > 0 && b.String()[b.Len()-1] != '_' {
+			lastUnderscore = false
+		} else if b.Len() > 0 && !lastUnderscore {
 			b.WriteByte('_')
+			lastUnderscore = true
 		}
 	}
 	result := strings.Trim(b.String(), "_")

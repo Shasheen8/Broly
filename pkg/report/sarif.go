@@ -3,6 +3,8 @@ package report
 import (
 	"encoding/json"
 	"io"
+	"path/filepath"
+	"strings"
 
 	"github.com/Shasheen8/Broly/pkg/core"
 )
@@ -113,7 +115,7 @@ func (f *SARIFFormatter) Format(w io.Writer, result *core.ScanResult) error {
 			Message: sarifMessage{Text: finding.Description},
 			Locations: []sarifLocation{{
 				PhysicalLocation: sarifPhysicalLocation{
-					ArtifactLocation: sarifArtifactLocation{URI: finding.FilePath},
+					ArtifactLocation: sarifArtifactLocation{URI: toFileURI(finding.FilePath)},
 					Region: sarifRegion{
 						StartLine:   startLine,
 						EndLine:     endLine,
@@ -160,6 +162,14 @@ func severityToSARIFLevel(s core.Severity) string {
 	default:
 		return "none"
 	}
+}
+
+func toFileURI(path string) string {
+	path = filepath.ToSlash(path)
+	if strings.HasPrefix(path, "/") {
+		return "file://" + path
+	}
+	return path
 }
 
 func (f *SARIFFormatter) sarifVersion() string {

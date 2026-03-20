@@ -53,19 +53,24 @@ func (s *Severity) UnmarshalYAML(value *yaml.Node) error {
 }
 
 func ParseSeverity(s string) Severity {
+	sev, _ := ParseSeverityStrict(s)
+	return sev
+}
+
+func ParseSeverityStrict(s string) (Severity, bool) {
 	switch strings.ToUpper(strings.TrimSpace(s)) {
 	case "CRITICAL":
-		return SeverityCritical
+		return SeverityCritical, true
 	case "HIGH":
-		return SeverityHigh
+		return SeverityHigh, true
 	case "MEDIUM":
-		return SeverityMedium
+		return SeverityMedium, true
 	case "LOW":
-		return SeverityLow
+		return SeverityLow, true
 	case "INFO":
-		return SeverityInfo
+		return SeverityInfo, true
 	default:
-		return SeverityInfo
+		return SeverityInfo, false
 	}
 }
 

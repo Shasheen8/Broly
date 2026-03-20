@@ -104,21 +104,25 @@ func (o *Orchestrator) Run(ctx context.Context) (*core.ScanResult, error) {
 		baselineSuppressed int
 		missingRequired    []string
 	)
+	var bl *baseline.Baseline
 	if o.config.BaselineFile != "" {
-		bl, err := baseline.Load(o.config.BaselineFile)
+		var err error
+		bl, err = baseline.Load(o.config.BaselineFile)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "warning: could not load baseline %s: %v\n", o.config.BaselineFile, err)
-		} else {
-			missingRequired = bl.CheckRequired(findings)
-			findings = filterBySeverity(findings, o.config.MinSeverity)
-			findings = filterByRuleIDs(findings, o.config.IncludeRuleIDs, o.config.ExcludeRuleIDs)
-			findings, inlineSuppressed = suppress.Filter(findings)
-			findings, baselineSuppressed = bl.Suppress(findings)
+			bl = nil
 		}
-	} else {
-		findings = filterBySeverity(findings, o.config.MinSeverity)
-		findings = filterByRuleIDs(findings, o.config.IncludeRuleIDs, o.config.ExcludeRuleIDs)
-		findings, inlineSuppressed = suppress.Filter(findings)
+	}
+	if bl != nil {
+		missingRequired = bl.CheckRequired(findings)
+	}
+
+	// These always run regardless of baseline load success/failure.
+	findings = filterBySeverity(findings, o.config.MinSeverity)
+	findings = filterByRuleIDs(findings, o.config.IncludeRuleIDs, o.config.ExcludeRuleIDs)
+	findings, inlineSuppressed = suppress.Filter(findings)
+	if bl != nil {
+		findings, baselineSuppressed = bl.Suppress(findings)
 	}
 
 	// AI triage: verdict + fix suggestion per finding.
@@ -152,10 +156,13 @@ func (o *Orchestrator) Run(ctx context.Context) (*core.ScanResult, error) {
 func deduplicateFindings(findings []core.Finding) []core.Finding {
 	seen := make(map[string]bool, len(findings))
 	out := make([]core.Finding, 0, len(findings))
-	for _, f := range findings {
-		if f.Fingerprint == "" || !seen[f.Fingerprint] {
-			seen[f.Fingerprint] = true
-			out = append(out, f)
+	for i := range findings {
+		if findings[i].Fingerprint == "" {
+			findings[i].ComputeFingerprint()
+		}
+		if !seen[findings[i].Fingerprint] {
+			seen[findings[i].Fingerprint] = true
+			out = append(out, findings[i])
 		}
 	}
 	return out

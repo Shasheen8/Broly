@@ -78,9 +78,10 @@ func parseReachability(resp string) reachabilityResult {
 		line = strings.TrimSpace(line)
 		upper := strings.ToUpper(line)
 		if strings.HasPrefix(upper, "REACHABILITY:") {
-			res.status = strings.TrimSpace(strings.TrimPrefix(upper, "REACHABILITY:"))
-		} else if strings.HasPrefix(strings.ToUpper(line), "REASON:") {
-			res.reason = strings.TrimSpace(line[7:])
+			res.status = strings.TrimSpace(line[len("REACHABILITY:"):])
+			res.status = strings.ToUpper(res.status)
+		} else if strings.HasPrefix(upper, "REASON:") {
+			res.reason = strings.TrimSpace(line[len("REASON:"):])
 		}
 	}
 	return res

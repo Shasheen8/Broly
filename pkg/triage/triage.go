@@ -92,7 +92,9 @@ func (t *Triager) Run(ctx context.Context, findings []core.Finding) []core.Findi
 			out[i].Confidence = confidence
 			out[i].VerdictReason = reason
 			out[i].Explanation = explanation
-			out[i].FixSuggestion = fix
+			if fix != "" || out[i].FixSuggestion == "" {
+				out[i].FixSuggestion = fix
+			}
 		}(i)
 	}
 	wg.Wait()

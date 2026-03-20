@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -23,6 +24,8 @@ import (
 var (
 	version = "dev"
 	commit  = "none"
+
+	errFindings = errors.New("findings detected")
 )
 
 func main() {
@@ -39,6 +42,9 @@ Secrets scanning into a single fast binary. Built in Go for speed.`,
 	root.AddCommand(validateCmd())
 
 	if err := root.Execute(); err != nil {
+		if errors.Is(err, errFindings) {
+			os.Exit(1)
+		}
 		os.Exit(2)
 	}
 }
@@ -100,7 +106,11 @@ By default all scanners are enabled and the current directory is scanned.`,
 				cfg.Workers = workers
 			}
 			if f.Changed("min-severity") {
-				cfg.MinSeverity = core.ParseSeverity(minSeverity)
+				sev, ok := core.ParseSeverityStrict(minSeverity)
+				if !ok {
+					return fmt.Errorf("unknown severity %q (use: info, low, medium, high, critical)", minSeverity)
+				}
+				cfg.MinSeverity = sev
 			} else if cfg.MinSeverity == 0 {
 				cfg.MinSeverity = core.ParseSeverity(minSeverity)
 			}
@@ -196,7 +206,7 @@ By default all scanners are enabled and the current directory is scanned.`,
 	flags.BoolVar(&aiTriage, "ai-triage", false, "Use AI to triage findings: TRUE/FALSE positive verdict + fix suggestion (requires TOGETHER_API_KEY)")
 	flags.BoolVar(&explain, "explain", false, "Add a plain-language attack scenario per finding (use with --ai-triage)")
 	flags.BoolVarP(&quiet, "quiet", "q", false, "Suppress progress output")
-	flags.StringVar(&baselineFile, "baseline", "", "Baseline file for suppress/require rules (default: .broly-baseline.yaml)")
+	flags.StringVar(&baselineFile, "baseline", "", "Baseline file for suppress/require rules")
 	flags.BoolVar(&incremental, "incremental", false, "Only re-scan SAST files changed since last run")
 	flags.StringVar(&cachePath, "cache-path", "", "Path to incremental scan cache (default: .broly-cache.json)")
 
@@ -277,7 +287,7 @@ func runScan(cfg *core.Config) error {
 	}
 
 	if len(result.Findings) > 0 || len(result.MissingRequired) > 0 {
-		os.Exit(1)
+		return errFindings
 	}
 	return nil
 }
