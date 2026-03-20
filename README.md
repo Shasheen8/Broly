@@ -92,6 +92,11 @@ broly scan --min-severity high                     # only high and critical
 broly scan --quiet                                 # suppress progress output
 
 
+# container scanning
+broly scan --container alpine:3.19                 # scan a container image for vulnerabilities
+broly scan --container ./image.tar                 # scan from tarball
+
+
 # config
 broly scan --config .broly.yaml                    # load project config file
 broly scan --baseline .broly-baseline.yaml         # suppress known FPs / require specific findings
