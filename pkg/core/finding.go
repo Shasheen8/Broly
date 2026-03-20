@@ -11,9 +11,11 @@ import (
 type ScanType string
 
 const (
-	ScanTypeSAST    ScanType = "sast"
-	ScanTypeSCA     ScanType = "sca"
-	ScanTypeSecrets ScanType = "secrets"
+	ScanTypeSAST       ScanType = "sast"
+	ScanTypeSCA        ScanType = "sca"
+	ScanTypeSecrets    ScanType = "secrets"
+	ScanTypeDockerfile ScanType = "dockerfile"
+	ScanTypeContainer  ScanType = "container"
 )
 
 type Finding struct {

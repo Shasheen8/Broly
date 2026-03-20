@@ -90,11 +90,12 @@ func extractField(line, field string) (string, string, bool) {
 	return field, strings.TrimSpace(rest), true
 }
 
-func (p *parsedFinding) toFinding(filePath string) core.Finding {
+func (p *parsedFinding) toFinding(filePath, lang string) core.Finding {
 	sev := parseLLMSeverity(p.level)
-	ruleID := "broly.sast.ai." + slugify(p.issue)
 
-	// Extract line number from location if present (e.g., "src/main.go:42" or "line 42")
+	scanType, rulePrefix, tags := scanTypeForLang(lang)
+	ruleID := rulePrefix + slugify(p.issue)
+
 	startLine := extractLineNumber(p.location)
 	description := p.risk
 	if description == "" {
@@ -105,22 +106,31 @@ func (p *parsedFinding) toFinding(filePath string) core.Finding {
 	cwe := extractCWE(p.issue + " " + p.risk)
 
 	f := core.Finding{
-		Type:        core.ScanTypeSAST,
-		RuleID:      ruleID,
-		RuleName:    p.issue,
-		Severity:    sev,
-		Confidence:  "high",
-		Title:       p.issue,
-		Description: description,
-		FilePath:    filePath,
-		StartLine:   startLine,
-		CWE:         cwe,
-		Tags:        []string{"sast", "ai"},
+		Type:          scanType,
+		RuleID:        ruleID,
+		RuleName:      p.issue,
+		Severity:      sev,
+		Confidence:    "high",
+		Title:         p.issue,
+		Description:   description,
+		FilePath:      filePath,
+		StartLine:     startLine,
+		CWE:           cwe,
+		Tags:          tags,
 		FixSuggestion: fix,
 	}
 
 	f.ComputeFingerprint()
 	return f
+}
+
+func scanTypeForLang(lang string) (core.ScanType, string, []string) {
+	switch lang {
+	case "dockerfile", "docker-compose":
+		return core.ScanTypeDockerfile, "broly.dockerfile.", []string{"dockerfile", "ai"}
+	default:
+		return core.ScanTypeSAST, "broly.sast.ai.", []string{"sast", "ai"}
+	}
 }
 
 func parseLLMSeverity(level string) core.Severity {

@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
+	"github.com/Shasheen8/Broly/pkg/container"
 	"github.com/Shasheen8/Broly/pkg/core"
 	"github.com/Shasheen8/Broly/pkg/orchestrator"
 	"github.com/Shasheen8/Broly/pkg/report"
@@ -74,6 +75,7 @@ func scanCmd() *cobra.Command {
 		baselineFile        string
 		incremental         bool
 		cachePath           string
+		containerImage      string
 	)
 
 	cmd := &cobra.Command{
@@ -159,6 +161,9 @@ By default all scanners are enabled and the current directory is scanned.`,
 			if f.Changed("cache-path") {
 				cfg.CachePath = cachePath
 			}
+			if f.Changed("container") {
+				cfg.ContainerImage = containerImage
+			}
 
 			// Scanner enable flags: CLI always wins; if none set and config has none, enable all.
 			cliSAST    := f.Changed("sast")
@@ -209,6 +214,7 @@ By default all scanners are enabled and the current directory is scanned.`,
 	flags.StringVar(&baselineFile, "baseline", "", "Baseline file for suppress/require rules")
 	flags.BoolVar(&incremental, "incremental", false, "Only re-scan SAST files changed since last run")
 	flags.StringVar(&cachePath, "cache-path", "", "Path to incremental scan cache (default: .broly-cache.json)")
+	flags.StringVar(&containerImage, "container", "", "Container image to scan (image:tag, path/to/image.tar)")
 
 	return cmd
 }
@@ -257,6 +263,9 @@ func runScan(cfg *core.Config) error {
 	}
 	if cfg.EnableSAST {
 		orch.Register(sast.NewSASTScanner())
+	}
+	if cfg.ContainerImage != "" {
+		orch.Register(container.NewContainerScanner())
 	}
 
 	start := time.Now()

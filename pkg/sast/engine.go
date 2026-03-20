@@ -213,7 +213,7 @@ func (s *SASTScanner) scanFile(ctx context.Context, path, lang string, findings 
 
 	parsed := parseLLMResponse(path, response)
 	for _, pf := range parsed {
-		f := pf.toFinding(path)
+		f := pf.toFinding(path, lang)
 		f.Timestamp = time.Now()
 		select {
 		case findings <- f:

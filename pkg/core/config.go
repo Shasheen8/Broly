@@ -31,5 +31,6 @@ type Config struct {
 	BaselineFile string `yaml:"baseline_file" json:"baseline_file"`
 	Incremental  bool   `yaml:"incremental" json:"incremental"`
 	CachePath    string `yaml:"cache_path" json:"cache_path"`
-	Quiet        bool   `yaml:"quiet" json:"quiet"`
+	Quiet          bool   `yaml:"quiet" json:"quiet"`
+	ContainerImage string `yaml:"container_image" json:"container_image"`
 }
