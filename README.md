@@ -33,6 +33,7 @@ Broly runs three security scanners in parallel on your codebase and delivers res
 | **SCA** | [osv-scalibr](https://github.com/google/osv-scalibr) + [osv.dev](https://osv.dev) · 19 ecosystems | `--ai-sca-reachability` checks if the vuln is actually called |
 | **SAST** | [Together AI](https://together.ai) · `Qwen/Qwen3-Coder-Next-FP8` | Always-on · source-to-sink data flow · CVSS scoring |
 | **Dockerfile** | AI-powered · Dockerfile, Containerfile, Compose | Privilege escalation, secret exposure, dangerous mounts |
+| **Container** | [go-containerregistry](https://github.com/google/go-containerregistry) + [osv.dev](https://osv.dev) | `--container image:tag` scans OS packages for known CVEs |
 
 ---
 
@@ -128,7 +129,7 @@ Each file is sent to `Qwen/Qwen3-Coder-Next-FP8` with a structured security prom
 Dockerfiles, Containerfiles, and Compose files are auto-detected and scanned with specialized security prompts. Covers privilege escalation, hardcoded secrets, dangerous mounts, unpinned base images, curl-pipe-bash, and more.
 
 ```
-  ▸ SAST (18 findings)
+  ▸ DOCKERFILE (7 findings)
 
   SEVERITY     ISSUE                            FILE                                DESCRIPTION
   ──────────────────────────────────────────────────────────────────────────────────────────────────
@@ -136,9 +137,6 @@ Dockerfiles, Containerfiles, and Compose files are auto-detected and scanned wit
   CRITICAL     Container is running in priv..   docker-compose.yml:0                An attacker who compromises ..
   CRITICAL     Docker socket mounted            docker-compose.yml:0                Full control over Docker dae..
   HIGH         ADD from remote URL              Dockerfile:9                        MITM or compromised source c..
-  HIGH         curl piped to bash               Dockerfile:10                       Compromised script runs as r..
-  MEDIUM       Running as root (no USER)        Dockerfile:0                        Increases blast radius of an..
-  MEDIUM       Unpinned base image :latest      Dockerfile:1                        May pull a changed or compro..
   ...
 ```
 
@@ -176,6 +174,21 @@ With `--ai-filter-secrets`: `✔ No findings detected. Clean scan!`
 ```
 
 `--ai-sca-reachability` checks whether the vulnerable functions are actually called. Unreachable findings are downgraded one severity level and tagged `[Unreachable]`.
+
+### Container Scanning
+
+`--container` pulls an image (registry, Docker daemon, or tarball), extracts OS packages, and matches against OSV. Supports Alpine and Debian/Ubuntu.
+
+```
+  ▸ CONTAINER (5 findings)
+
+  SEVERITY     VULN ID                PACKAGE            VERSION        FIXED            ECOSYSTEM
+  ──────────────────────────────────────────────────────────────────────────────────────────────────
+  MEDIUM       ALPINE-CVE-2023-42..   busybox            1.36.1-r2      no fix           Alpine:v3.18
+  MEDIUM       ALPINE-CVE-2023-42..   busybox            1.36.1-r2      no fix           Alpine:v3.18
+  MEDIUM       ALPINE-CVE-2025-26..   musl               1.2.4-r1       no fix           Alpine:v3.18
+  ...
+```
 
 ### AI Triage
 
