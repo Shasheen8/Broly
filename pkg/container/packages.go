@@ -7,12 +7,12 @@ import (
 	"strings"
 
 	v1 "github.com/google/go-containerregistry/pkg/v1"
-	"github.com/google/go-containerregistry/pkg/v1/mutate"
 )
 
 type pkg struct {
-	Name    string
-	Version string
+	Name        string
+	Version     string
+	LayerDigest string
 }
 
 type distroInfo struct {
@@ -20,27 +20,76 @@ type distroInfo struct {
 	Version string // e.g. "3.19", "12", "22.04"
 }
 
-// extractPackages reads the flattened image filesystem and parses OS package metadata.
+// extractPackages walks layers individually to parse OS packages and attribute each
+// package to the layer that introduced it.
 func extractPackages(img v1.Image) ([]pkg, distroInfo, error) {
-	reader := mutate.Extract(img)
-	defer reader.Close()
+	layers, err := img.Layers()
+	if err != nil {
+		return nil, distroInfo{}, err
+	}
 
 	var (
-		apkData     []byte
-		dpkgData    []byte
-		releaseData []byte
+		distro      distroInfo
+		prevPkgSet  map[string]bool
+		allPkgs     []pkg
 	)
 
-	tr := tar.NewReader(reader)
+	for _, layer := range layers {
+		layerDigest, _ := layer.Digest()
+		digestStr := layerDigest.String()
+
+		apkData, dpkgData, releaseData := extractLayerFiles(layer)
+
+		if releaseData != nil {
+			distro = parseOSRelease(releaseData)
+		}
+
+		// Parse the full package state from this layer's metadata file.
+		var layerPkgs []pkg
+		if apkData != nil {
+			layerPkgs = parseAPK(apkData)
+		}
+		if dpkgData != nil {
+			layerPkgs = append(layerPkgs, parseDPKG(dpkgData)...)
+		}
+
+		if len(layerPkgs) == 0 {
+			continue
+		}
+
+		// Build current set and diff against previous to find new packages.
+		curSet := make(map[string]bool, len(layerPkgs))
+		for _, p := range layerPkgs {
+			key := p.Name + "@" + p.Version
+			curSet[key] = true
+			if prevPkgSet == nil || !prevPkgSet[key] {
+				allPkgs = append(allPkgs, pkg{
+					Name:        p.Name,
+					Version:     p.Version,
+					LayerDigest: digestStr,
+				})
+			}
+		}
+		prevPkgSet = curSet
+	}
+
+	return allPkgs, distro, nil
+}
+
+// extractLayerFiles reads a single layer tar for package metadata files.
+func extractLayerFiles(layer v1.Layer) (apkData, dpkgData, releaseData []byte) {
+	rc, err := layer.Uncompressed()
+	if err != nil {
+		return
+	}
+	defer rc.Close()
+
+	tr := tar.NewReader(rc)
 	for {
 		hdr, err := tr.Next()
-		if err == io.EOF {
-			break
-		}
 		if err != nil {
 			break
 		}
-
 		name := strings.TrimPrefix(hdr.Name, "./")
 		switch name {
 		case "lib/apk/db/installed":
@@ -50,22 +99,8 @@ func extractPackages(img v1.Image) ([]pkg, distroInfo, error) {
 		case "etc/os-release":
 			releaseData, _ = io.ReadAll(tr)
 		}
-
-		if apkData != nil && dpkgData != nil && releaseData != nil {
-			break
-		}
 	}
-
-	distro := parseOSRelease(releaseData)
-
-	var pkgs []pkg
-	if apkData != nil {
-		pkgs = append(pkgs, parseAPK(apkData)...)
-	}
-	if dpkgData != nil {
-		pkgs = append(pkgs, parseDPKG(dpkgData)...)
-	}
-	return pkgs, distro, nil
+	return
 }
 
 // parseAPK parses /lib/apk/db/installed (Alpine).

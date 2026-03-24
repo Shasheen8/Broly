@@ -54,12 +54,19 @@ func (s *ContainerScanner) Scan(ctx context.Context, paths []string, findings ch
 	}
 
 	digest, _ := img.Digest()
+	manifest, _ := img.Manifest()
 	layers, err := img.Layers()
 	if err != nil {
 		return fmt.Errorf("read layers: %w", err)
 	}
 
-	fmt.Fprintf(os.Stderr, "image: %s | digest: %s | layers: %d\n", s.imageRef, digest, len(layers))
+	var baseImage string
+	if manifest != nil && len(manifest.Annotations) > 0 {
+		baseImage = manifest.Annotations["org.opencontainers.image.base.name"]
+	}
+
+	digestStr := digest.String()
+	fmt.Fprintf(os.Stderr, "image: %s | digest: %s | layers: %d\n", s.imageRef, digestStr, len(layers))
 
 	pkgs, distro, err := extractPackages(img)
 	if err != nil {
@@ -70,6 +77,11 @@ func (s *ContainerScanner) Scan(ctx context.Context, paths []string, findings ch
 	if ecosystem == "" {
 		fmt.Fprintf(os.Stderr, "warning: unknown distro %q — skipping vuln matching\n", distro.ID)
 		return nil
+	}
+
+	imgMeta := imageMetadata{
+		digest:    digestStr,
+		baseImage: baseImage,
 	}
 
 	fmt.Fprintf(os.Stderr, "distro: %s %s | ecosystem: %s | packages: %d\n", distro.ID, distro.Version, ecosystem, len(pkgs))
@@ -109,7 +121,7 @@ func (s *ContainerScanner) Scan(ctx context.Context, paths []string, findings ch
 			p := batch[i]
 
 			for _, vuln := range vulnList.GetVulns() {
-				f := vulnToFinding(vuln, p, ecosystem, s.imageRef)
+				f := vulnToFinding(vuln, p, ecosystem, s.imageRef, imgMeta)
 				select {
 				case findings <- f:
 				case <-ctx.Done():
@@ -124,7 +136,12 @@ func (s *ContainerScanner) Scan(ctx context.Context, paths []string, findings ch
 
 func (s *ContainerScanner) Close() error { return nil }
 
-func vulnToFinding(vuln *osvschema.Vulnerability, p pkg, ecosystem, imageRef string) core.Finding {
+type imageMetadata struct {
+	digest    string
+	baseImage string
+}
+
+func vulnToFinding(vuln *osvschema.Vulnerability, p pkg, ecosystem, imageRef string, meta imageMetadata) core.Finding {
 	id := vuln.GetId()
 
 	var cve string
@@ -157,6 +174,9 @@ func vulnToFinding(vuln *osvschema.Vulnerability, p pkg, ecosystem, imageRef str
 		FixedVersion:   containerFixedVersion(vuln),
 		CVE:            cve,
 		References:     refs,
+		ImageDigest:    meta.digest,
+		LayerDigest:    p.LayerDigest,
+		BaseImage:      meta.baseImage,
 		Tags:           []string{"container", strings.ToLower(ecosystem)},
 		Timestamp:      time.Now(),
 	}

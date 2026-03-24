@@ -45,6 +45,10 @@ type Finding struct {
 	Redacted string  `json:"redacted,omitempty"`
 	Entropy  float64 `json:"entropy,omitempty"`
 
+	ImageDigest string `json:"image_digest,omitempty"`
+	LayerDigest string `json:"layer_digest,omitempty"`
+	BaseImage   string `json:"base_image,omitempty"`
+
 	CWE         []string  `json:"cwe,omitempty"`
 	References  []string  `json:"references,omitempty"`
 	Tags        []string  `json:"tags,omitempty"`
