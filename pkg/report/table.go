@@ -240,7 +240,7 @@ func printSCATable(w io.Writer, clr color, findings []core.Finding) {
 	for _, f := range findings {
 		fixed := f.FixedVersion
 		if fixed == "" {
-			fixed = clr.s(red, "no fix")
+			fixed = clr.s(red, "no patch")
 		} else {
 			fixed = clr.s(green, fixed)
 		}

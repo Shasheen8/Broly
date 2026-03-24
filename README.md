@@ -167,9 +167,9 @@ With `--ai-filter-secrets`: `✔ No findings detected. Clean scan!`
 
   SEVERITY     VULN ID                PACKAGE            VERSION        FIXED            ECOSYSTEM
   ──────────────────────────────────────────────────────────────────────────────────────────────────
-  MEDIUM       GHSA-9hjg-9r4m-mvj7    requests           2.31.0         no fix           PyPI
-  MEDIUM       GHSA-496j-2rq6-j6cc    grpcio             1.54.0         no fix           PyPI
-  MEDIUM       GHSA-cfgp-2977-2fmm    grpcio             1.54.0         no fix           PyPI
+  MEDIUM       GHSA-9hjg-9r4m-mvj7    requests           2.31.0         no patch           PyPI
+  MEDIUM       GHSA-496j-2rq6-j6cc    grpcio             1.54.0         no patch           PyPI
+  MEDIUM       GHSA-cfgp-2977-2fmm    grpcio             1.54.0         no patch           PyPI
   ...
 ```
 
@@ -184,9 +184,9 @@ With `--ai-filter-secrets`: `✔ No findings detected. Clean scan!`
 
   SEVERITY     VULN ID                PACKAGE            VERSION        FIXED            ECOSYSTEM
   ──────────────────────────────────────────────────────────────────────────────────────────────────
-  MEDIUM       ALPINE-CVE-2023-42..   busybox            1.36.1-r2      no fix           Alpine:v3.18
-  MEDIUM       ALPINE-CVE-2023-42..   busybox            1.36.1-r2      no fix           Alpine:v3.18
-  MEDIUM       ALPINE-CVE-2025-26..   musl               1.2.4-r1       no fix           Alpine:v3.18
+  MEDIUM       ALPINE-CVE-2023-42..   busybox            1.36.1-r2      no patch           Alpine:v3.18
+  MEDIUM       ALPINE-CVE-2023-42..   busybox            1.36.1-r2      no patch           Alpine:v3.18
+  MEDIUM       ALPINE-CVE-2025-26..   musl               1.2.4-r1       no patch           Alpine:v3.18
   ...
 ```
 
