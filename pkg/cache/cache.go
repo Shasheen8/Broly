@@ -41,7 +41,7 @@ func (c *Cache) Save() error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(c.path, data, 0644)
+	return os.WriteFile(c.path, data, 0600)
 }
 
 // Changed reports whether the file has changed since it was last recorded.

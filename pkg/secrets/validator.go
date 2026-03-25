@@ -88,6 +88,7 @@ func (v *AIValidator) filterBatch(ctx context.Context, batch []core.Finding) []c
 	}
 	results := make([]result, len(batch))
 	var wg sync.WaitGroup
+	var resMu sync.Mutex
 	sem := make(chan struct{}, 4)
 
 	for i, f := range batch {
@@ -96,7 +97,10 @@ func (v *AIValidator) filterBatch(ctx context.Context, batch []core.Finding) []c
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
-			results[i] = result{idx: i, tp: v.validate(ctx, f)}
+			tp := v.validate(ctx, f)
+			resMu.Lock()
+			results[i] = result{idx: i, tp: tp}
+			resMu.Unlock()
 		}(i, f)
 	}
 	wg.Wait()
@@ -109,4 +113,3 @@ func (v *AIValidator) filterBatch(ctx context.Context, batch []core.Finding) []c
 	}
 	return out
 }
-

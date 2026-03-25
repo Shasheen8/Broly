@@ -9,6 +9,7 @@ require (
 	github.com/praetorian-inc/titus v1.1.4
 	github.com/spf13/cobra v1.10.2
 	github.com/togethercomputer/together-go v0.6.0
+	golang.org/x/time v0.15.0
 	gopkg.in/yaml.v3 v3.0.1
 	osv.dev/bindings/go v0.0.0-20260119002423-9eebd248ed28
 )

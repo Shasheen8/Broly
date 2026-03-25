@@ -7,9 +7,16 @@ import (
 	"os"
 
 	"github.com/togethercomputer/together-go"
+	"golang.org/x/time/rate"
 )
 
 const DefaultModel = "Qwen/Qwen3-Coder-Next-FP8"
+
+var globalLimiter = rate.NewLimiter(rate.Limit(10), 20)
+
+func SetRateLimit(requestsPerSecond int, burst int) {
+	globalLimiter = rate.NewLimiter(rate.Limit(requestsPerSecond), burst)
+}
 
 // Client wraps the Together.ai SDK for use by Broly scanners.
 type Client struct {
@@ -32,6 +39,9 @@ func New(model string) (*Client, bool) {
 // Complete sends a single-turn prompt and returns the response text.
 // maxTokens controls the response length (0 = use default 2048).
 func (c *Client) Complete(ctx context.Context, prompt string, maxTokens int) (string, error) {
+	if err := globalLimiter.Wait(ctx); err != nil {
+		return "", fmt.Errorf("rate limit: %w", err)
+	}
 	if maxTokens <= 0 {
 		maxTokens = 2048
 	}
