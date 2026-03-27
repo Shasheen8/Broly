@@ -3,10 +3,13 @@ package container
 import (
 	"archive/tar"
 	"bufio"
+	"database/sql"
 	"io"
+	"os"
 	"strings"
 
 	v1 "github.com/google/go-containerregistry/pkg/v1"
+	_ "modernc.org/sqlite"
 )
 
 type pkg struct {
@@ -41,7 +44,7 @@ func extractPackages(img v1.Image) ([]pkg, distroInfo, error) {
 		layerDigest, _ := layer.Digest()
 		digestStr := layerDigest.String()
 
-		apkData, dpkgData, releaseData := extractLayerFiles(layer)
+		apkData, dpkgData, rpmData, releaseData := extractLayerFiles(layer)
 
 		if releaseData != nil {
 			distro = parseOSRelease(releaseData)
@@ -54,6 +57,9 @@ func extractPackages(img v1.Image) ([]pkg, distroInfo, error) {
 		}
 		if dpkgData != nil {
 			layerPkgs = append(layerPkgs, parseDPKG(dpkgData)...)
+		}
+		if rpmData != nil {
+			layerPkgs = append(layerPkgs, parseRPM(rpmData)...)
 		}
 
 		if len(layerPkgs) == 0 {
@@ -82,7 +88,7 @@ func extractPackages(img v1.Image) ([]pkg, distroInfo, error) {
 }
 
 // extractLayerFiles reads a single layer tar for package metadata files.
-func extractLayerFiles(layer v1.Layer) (apkData, dpkgData, releaseData []byte) {
+func extractLayerFiles(layer v1.Layer) (apkData, dpkgData, rpmData, releaseData []byte) {
 	rc, err := layer.Uncompressed()
 	if err != nil {
 		return
@@ -101,6 +107,8 @@ func extractLayerFiles(layer v1.Layer) (apkData, dpkgData, releaseData []byte) {
 			apkData, _ = io.ReadAll(tr)
 		case "var/lib/dpkg/status":
 			dpkgData, _ = io.ReadAll(tr)
+		case "var/lib/rpm/rpmdb.sqlite", "usr/lib/sysimage/rpm/rpmdb.sqlite":
+			rpmData, _ = io.ReadAll(tr)
 		case "etc/os-release":
 			releaseData, _ = io.ReadAll(tr)
 		}
@@ -166,6 +174,47 @@ func parseDPKG(data []byte) []pkg {
 	return pkgs
 }
 
+// parseRPM parses an rpmdb.sqlite file (RHEL 8+, Fedora 33+).
+func parseRPM(data []byte) []pkg {
+	tmp, err := os.CreateTemp("", "broly-rpmdb-*.sqlite")
+	if err != nil {
+		return nil
+	}
+	defer os.Remove(tmp.Name())
+	defer tmp.Close()
+
+	if _, err := tmp.Write(data); err != nil {
+		return nil
+	}
+	tmp.Close()
+
+	db, err := sql.Open("sqlite", tmp.Name())
+	if err != nil {
+		return nil
+	}
+	defer db.Close()
+
+	rows, err := db.Query("SELECT name, version, release FROM Packages")
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+
+	var pkgs []pkg
+	for rows.Next() {
+		var name, version, release string
+		if err := rows.Scan(&name, &version, &release); err != nil {
+			continue
+		}
+		ver := version
+		if release != "" {
+			ver += "-" + release
+		}
+		pkgs = append(pkgs, pkg{Name: name, Version: ver})
+	}
+	return pkgs
+}
+
 // parseOSRelease parses /etc/os-release into distro ID and version.
 func parseOSRelease(data []byte) distroInfo {
 	if data == nil {
@@ -193,9 +242,20 @@ func (d distroInfo) osvEcosystem() string {
 		return "Debian:" + d.Version
 	case "ubuntu":
 		return "Ubuntu:" + d.Version
+	case "rhel", "centos", "rocky", "almalinux", "ol":
+		return "Red Hat:" + majorOnly(d.Version)
+	case "fedora":
+		return "Fedora:" + d.Version
 	default:
 		return ""
 	}
+}
+
+func majorOnly(v string) string {
+	if idx := strings.Index(v, "."); idx >= 0 {
+		return v[:idx]
+	}
+	return v
 }
 
 func majorMinor(v string) string {
