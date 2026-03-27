@@ -13,6 +13,8 @@ type pkg struct {
 	Name        string
 	Version     string
 	LayerDigest string
+	LayerIndex  int
+	TotalLayers int
 }
 
 type distroInfo struct {
@@ -34,7 +36,8 @@ func extractPackages(img v1.Image) ([]pkg, distroInfo, error) {
 		allPkgs     []pkg
 	)
 
-	for _, layer := range layers {
+	totalLayers := len(layers)
+	for layerIdx, layer := range layers {
 		layerDigest, _ := layer.Digest()
 		digestStr := layerDigest.String()
 
@@ -67,6 +70,8 @@ func extractPackages(img v1.Image) ([]pkg, distroInfo, error) {
 					Name:        p.Name,
 					Version:     p.Version,
 					LayerDigest: digestStr,
+					LayerIndex:  layerIdx,
+					TotalLayers: totalLayers,
 				})
 			}
 		}

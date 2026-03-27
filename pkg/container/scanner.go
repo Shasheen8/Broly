@@ -177,11 +177,21 @@ func vulnToFinding(vuln *osvschema.Vulnerability, p pkg, ecosystem, imageRef str
 		ImageDigest:    meta.digest,
 		LayerDigest:    p.LayerDigest,
 		BaseImage:      meta.baseImage,
-		Tags:           []string{"container", strings.ToLower(ecosystem)},
+		Tags:           containerTags(p, ecosystem),
 		Timestamp:      time.Now(),
 	}
 	f.ComputeFingerprint()
 	return f
+}
+
+func containerTags(p pkg, ecosystem string) []string {
+	tags := []string{"container", strings.ToLower(ecosystem)}
+	if p.LayerIndex == 0 {
+		tags = append(tags, "base-layer")
+	} else {
+		tags = append(tags, "app-layer")
+	}
+	return tags
 }
 
 func containerCVSSSeverity(vuln *osvschema.Vulnerability) (core.Severity, float64) {

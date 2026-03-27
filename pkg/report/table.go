@@ -208,8 +208,10 @@ func printScanTypeTable(w io.Writer, clr color, scanType core.ScanType, findings
 	switch scanType {
 	case core.ScanTypeSecrets:
 		printSecretsTable(w, clr, findings)
-	case core.ScanTypeSCA, core.ScanTypeContainer:
+	case core.ScanTypeSCA:
 		printSCATable(w, clr, findings)
+	case core.ScanTypeContainer:
+		printContainerTable(w, clr, findings)
 	case core.ScanTypeSAST:
 		printSASTTable(w, clr, findings)
 	case core.ScanTypeDockerfile:
@@ -251,6 +253,37 @@ func printSCATable(w io.Writer, clr color, findings []core.Finding) {
 			clr.s(gray, trunc(f.PackageVersion, 12)),
 			fixed,
 			clr.s(dim, f.Ecosystem),
+		)
+		printVerdictAndFix(w, clr, f)
+	}
+}
+
+func printContainerTable(w io.Writer, clr color, findings []core.Finding) {
+	hdr := clr.s(bold+gray, fmt.Sprintf("  %-12s %-22s %-18s %-14s %-16s %-18s %s", "SEVERITY", "VULN ID", "PACKAGE", "VERSION", "FIXED", "ECOSYSTEM", "LAYER"))
+	fmt.Fprintln(w, hdr)
+	fmt.Fprintf(w, "  %s\n", clr.s(gray, strings.Repeat("─", 120)))
+	for _, f := range findings {
+		fixed := f.FixedVersion
+		if fixed == "" {
+			fixed = clr.s(red, "no patch")
+		} else {
+			fixed = clr.s(green, fixed)
+		}
+		layer := clr.s(gray, "base")
+		for _, t := range f.Tags {
+			if t == "app-layer" {
+				layer = clr.s(yellow, "app")
+				break
+			}
+		}
+		fmt.Fprintf(w, "  %-12s %-22s %-18s %-14s %-16s %-18s %s\n",
+			severityColor(f.Severity, clr),
+			clr.s(cyan, trunc(f.RuleID, 20)),
+			clr.s(white, trunc(f.PackageName, 16)),
+			clr.s(gray, trunc(f.PackageVersion, 12)),
+			fixed,
+			clr.s(dim, trunc(f.Ecosystem, 16)),
+			layer,
 		)
 		printVerdictAndFix(w, clr, f)
 	}
