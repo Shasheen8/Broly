@@ -102,25 +102,31 @@ func (t *Triager) Run(ctx context.Context, findings []core.Finding) []core.Findi
 }
 
 func triageFinding(ctx context.Context, client *ai.Client, f *core.Finding, explain bool) (verdict, confidence, reason, explanation, fix string) {
-	var codeCtx string
-	if f.Type == core.ScanTypeSecrets {
-		codeCtx = fmt.Sprintf("detected value (redacted): %s", f.Redacted)
-	} else {
-		codeCtx = core.FileContext(f.FilePath, f.StartLine, 8)
-	}
+	var prompt string
 
-	tmpl := triagePromptBase
-	if explain {
-		tmpl = triagePromptExplain
+	if f.Type == core.ScanTypeContainer || f.Type == core.ScanTypeSCA {
+		prompt = buildContainerPrompt(f, explain)
+	} else {
+		var codeCtx string
+		if f.Type == core.ScanTypeSecrets {
+			codeCtx = fmt.Sprintf("detected value (redacted): %s", f.Redacted)
+		} else {
+			codeCtx = core.FileContext(f.FilePath, f.StartLine, 8)
+		}
+
+		tmpl := triagePromptBase
+		if explain {
+			tmpl = triagePromptExplain
+		}
+		prompt = fmt.Sprintf(tmpl,
+			f.Type,
+			f.RuleName,
+			f.Severity.String(),
+			f.Description,
+			f.FilePath, f.StartLine,
+			codeCtx,
+		)
 	}
-	prompt := fmt.Sprintf(tmpl,
-		f.Type,
-		f.RuleName,
-		f.Severity.String(),
-		f.Description,
-		f.FilePath, f.StartLine,
-		codeCtx,
-	)
 
 	resp, err := client.Complete(ctx, prompt, 768)
 	if err != nil {
@@ -128,6 +134,49 @@ func triageFinding(ctx context.Context, client *ai.Client, f *core.Finding, expl
 	}
 
 	return parseTriageResponse(resp)
+}
+
+func buildContainerPrompt(f *core.Finding, explain bool) string {
+	fixInfo := "Fixed in: " + f.FixedVersion
+	if f.FixedVersion == "" {
+		fixInfo = "No patched version available."
+	}
+
+	var explainLine string
+	if explain {
+		explainLine = "\nEXPLANATION: One sentence. Concrete attack scenario specific to this package vulnerability."
+	}
+
+	return fmt.Sprintf(`You are a security expert triaging a container image vulnerability.
+
+Vulnerability: %s
+Package:       %s@%s
+Ecosystem:     %s
+Severity:      %s
+Description:   %s
+CVE:           %s
+%s
+
+Determine:
+1. Is this a TRUE_POSITIVE (real risk in a running container) or FALSE_POSITIVE (package installed but vulnerability not exploitable in typical container usage)?
+2. Your confidence in that verdict.
+3. If TRUE_POSITIVE and no patch exists, suggest a concrete mitigation (e.g., use a newer base image, switch to a minimal/distroless image, pin a different package version, apply a config workaround). If a patch exists, state the upgrade command.
+
+Respond with exactly:
+VERDICT: TRUE_POSITIVE or FALSE_POSITIVE
+CONFIDENCE: HIGH or MEDIUM or LOW
+REASON: One sentence.%s
+FIX:
+<mitigation or upgrade command, or N/A if false positive>`,
+		f.RuleID,
+		f.PackageName, f.PackageVersion,
+		f.Ecosystem,
+		f.Severity.String(),
+		f.Description,
+		f.CVE,
+		fixInfo,
+		explainLine,
+	)
 }
 
 func parseTriageResponse(resp string) (verdict, confidence, reason, explanation, fix string) {
