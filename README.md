@@ -12,7 +12,7 @@
 Secrets · SCA · SAST · Containers in a single binary.
 AI-powered. No rule files. No rule engine.
 
-<a href="https://github.com/Shasheen8/Broly"><img src="https://img.shields.io/badge/Go-1.26-00ADD8?style=flat&logo=go" alt="Go"></a>
+<a href="https://github.com/Shasheen8/Broly"><img src="https://img.shields.io/badge/Go-1.24-00ADD8?style=flat&logo=go" alt="Go"></a>
 <a href="https://github.com/Shasheen8/Broly/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=flat" alt="License"></a>
 <a href="https://github.com/Shasheen8/Broly/releases"><img src="https://img.shields.io/badge/Release-latest-blue?style=flat" alt="Release"></a>
 <a href="https://together.ai"><img src="https://img.shields.io/badge/Powered%20by-Together%20AI-blueviolet?style=flat" alt="Together AI"></a>
@@ -25,44 +25,25 @@ AI-powered. No rule files. No rule engine.
 
 ## What It Does
 
-Broly runs three security scanners in parallel on your codebase and delivers results in seconds:
-
 | Scanner | Engine | AI Layer |
 |---------|--------|----------|
 | **Secrets** | [Titus](https://github.com/praetorian-inc/titus) · 487 rules · Hyperscan | `--ai-filter-secrets` eliminates false positives |
 | **SCA** | [osv-scalibr](https://github.com/google/osv-scalibr) + [osv.dev](https://osv.dev) · 19 ecosystems | `--ai-sca-reachability` checks if the vuln is actually called |
-| **SAST** | [Together AI](https://together.ai) · `Qwen/Qwen3-Coder-Next-FP8` | Always-on · source-to-sink data flow · CVSS scoring |
+| **SAST** | [Together AI](https://together.ai) · `Qwen/Qwen3-Coder-Next-FP8` | Source-to-sink data flow · CVSS scoring |
 | **Dockerfile** | AI-powered · Dockerfile, Containerfile, Compose | Privilege escalation, secret exposure, dangerous mounts |
-| **Container** | [go-containerregistry](https://github.com/google/go-containerregistry) + [osv.dev](https://osv.dev) | `--container image:tag` scans OS packages for known CVEs |
+| **Container** | [go-containerregistry](https://github.com/google/go-containerregistry) + [osv.dev](https://osv.dev) · Alpine, Debian, Ubuntu, RHEL | OS package CVEs with layer attribution |
 
 ---
 
 ## Install
 
-**Go install** (any platform):
-
 ```bash
 go install github.com/Shasheen8/Broly/cmd/broly@latest
 ```
 
-**Linux** - pre-built binary from [Releases](https://github.com/Shasheen8/Broly/releases).
+Pre-built Linux binaries on [Releases](https://github.com/Shasheen8/Broly/releases). macOS: build from source with `brew install vectorscan && make build` for Hyperscan support.
 
-**macOS** - build from source with Hyperscan (faster secrets scanning):
-
-```bash
-brew install vectorscan
-git clone https://github.com/Shasheen8/Broly.git
-cd Broly && make build
-```
-
-> [!TIP]
-> `go install` uses pure Go regex for secrets. The source build enables Hyperscan via `-tags vectorscan` for significantly faster pattern matching on large codebases.
-
-**SAST / AI features** require a Together AI key:
-
-```bash
-export TOGETHER_API_KEY=your_key_here
-```
+SAST and AI features require `export TOGETHER_API_KEY=your_key_here`.
 
 ---
 
@@ -71,6 +52,7 @@ export TOGETHER_API_KEY=your_key_here
 ```bash
 broly scan                                         # all scanners, current directory
 broly scan /path/to/project                        # specific path
+
 
 # individual scanners
 broly scan --secrets                               # secrets only
@@ -83,14 +65,6 @@ broly scan --ai-filter-secrets                     # filter secrets false positi
 broly scan --ai-sca-reachability                   # check if vulnerable deps are actually called
 broly scan --ai-triage                             # verdict (TP/FP) + fix suggestion per finding
 broly scan --ai-triage --explain                   # + concise attack-scenario sentence per finding
-broly scan --ai-model Qwen/Qwen3-Coder-Next-FP8    # override model (default)
-
-
-# output
-broly scan -f json                                 # JSON output
-broly scan -f sarif -o results.sarif               # SARIF 2.1.0 for GitHub Code Scanning
-broly scan --min-severity high                     # only high and critical
-broly scan --quiet                                 # suppress progress output
 
 
 # container scanning
@@ -98,11 +72,16 @@ broly scan --container alpine:3.19                 # scan a container image for 
 broly scan --container ./image.tar                 # scan from tarball
 
 
+# output
+broly scan -f json                                 # JSON output
+broly scan -f sarif -o results.sarif               # SARIF 2.1.0 for GitHub Code Scanning
+broly scan --min-severity high                     # only high and critical
+
+
 # config
 broly scan --config .broly.yaml                    # load project config file
 broly scan --baseline .broly-baseline.yaml         # suppress known FPs / require specific findings
 broly scan --incremental                           # skip unchanged files (uses .broly-cache.json)
-broly scan --sca --offline                         # skip OSV API lookup
 ```
 
 ---
@@ -111,7 +90,7 @@ broly scan --sca --offline                         # skip OSV API lookup
 
 ### SAST
 
-Each file is sent to `Qwen/Qwen3-Coder-Next-FP8` with a structured security prompt. The model traces data flow from source to sink, infers CVSS scores, and finds what static rules miss.
+Each file is sent to the LLM with a structured security prompt. The model traces data flow from source to sink, infers CVSS scores, and finds what static rules miss.
 
 ```
   ▸ SAST (4 findings)
@@ -126,25 +105,22 @@ Each file is sent to `Qwen/Qwen3-Coder-Next-FP8` with a structured security prom
 
 ### Dockerfile and Compose
 
-Dockerfiles, Containerfiles, and Compose files are auto-detected and scanned with specialized security prompts. Covers privilege escalation, hardcoded secrets, dangerous mounts, unpinned base images, curl-pipe-bash, and more.
+Auto-detected during normal scans. Specialized prompts cover privilege escalation, hardcoded secrets, dangerous mounts, unpinned base images, and more.
 
 ```
-  ▸ DOCKERFILE (7 findings)
+  ▸ DOCKERFILE (4 findings)
 
   SEVERITY     ISSUE                            FILE                                DESCRIPTION
   ──────────────────────────────────────────────────────────────────────────────────────────────────
-  CRITICAL     Hardcoded secrets (DB_PASSWO..   Dockerfile:0                        An attacker with access to t..
-  CRITICAL     Container is running in priv..   docker-compose.yml:0                An attacker who compromises ..
-  CRITICAL     Docker socket mounted            docker-compose.yml:0                Full control over Docker dae..
-  HIGH         ADD from remote URL              Dockerfile:9                        MITM or compromised source c..
-  ...
+  CRITICAL     Hardcoded secrets in ENV/ARG     Dockerfile:3                        Secrets visible in image hi..
+  CRITICAL     Docker socket mounted            docker-compose.yml:14               Full control over Docker da..
+  HIGH         curl piped to bash               Dockerfile:10                       Compromised script runs as ..
+  MEDIUM       Running as root (no USER)        Dockerfile:1                        Increases blast radius of a..
 ```
 
 ### Secrets
 
-487 rules covering AWS, GCP, Azure, GitHub, OpenAI, Anthropic, Slack, Stripe, SSH/PGP keys, database URIs, JWTs, and more.
-
-`--ai-filter-secrets` reads surrounding code context and filters out placeholders, test values, and examples:
+487 rules. `--ai-filter-secrets` reads surrounding code context and eliminates placeholders and test values:
 
 ```
   ▸ SECRETS (3 findings)
@@ -156,43 +132,36 @@ Dockerfiles, Containerfiles, and Compose files are auto-detected and scanned wit
   HIGH         GitHub Personal Access Token     config/example.py:9       ghp_****8B4a
 ```
 
-With `--ai-filter-secrets`: `✔ No findings detected. Clean scan!`
-
 ### SCA
 
-19 ecosystems (Go, Python, JS, Ruby, Rust, Java, PHP, .NET, Dart, C/C++, and more), 50+ lockfile formats.
+19 ecosystems, 50+ lockfile formats. `--ai-sca-reachability` checks if the vulnerable function is actually called:
 
 ```
-  ▸ SCA (13 findings)
+  ▸ SCA (3 findings)
 
   SEVERITY     VULN ID                PACKAGE            VERSION        FIXED            ECOSYSTEM
   ──────────────────────────────────────────────────────────────────────────────────────────────────
-  MEDIUM       GHSA-9hjg-9r4m-mvj7    requests           2.31.0         no patch           PyPI
-  MEDIUM       GHSA-496j-2rq6-j6cc    grpcio             1.54.0         no patch           PyPI
-  MEDIUM       GHSA-cfgp-2977-2fmm    grpcio             1.54.0         no patch           PyPI
-  ...
+  MEDIUM       GHSA-9hjg-9r4m-mvj7    requests           2.31.0         no patch         PyPI
+  MEDIUM       GHSA-496j-2rq6-j6cc    grpcio             1.54.0         no patch         PyPI
+  MEDIUM       GHSA-cfgp-2977-2fmm    grpcio             1.54.0         no patch         PyPI
 ```
 
-`--ai-sca-reachability` checks whether the vulnerable functions are actually called. Unreachable findings are downgraded one severity level and tagged `[Unreachable]`.
+### Container
 
-### Container Scanning
-
-`--container` pulls an image (registry, Docker daemon, or tarball), extracts OS packages, and matches against OSV. Supports Alpine and Debian/Ubuntu.
+`--container` pulls an image, extracts OS packages, and matches against OSV. Each finding shows which layer introduced it:
 
 ```
   ▸ CONTAINER (5 findings)
 
-  SEVERITY     VULN ID                PACKAGE            VERSION        FIXED            ECOSYSTEM
-  ──────────────────────────────────────────────────────────────────────────────────────────────────
-  MEDIUM       ALPINE-CVE-2023-42..   busybox            1.36.1-r2      no patch           Alpine:v3.18
-  MEDIUM       ALPINE-CVE-2023-42..   busybox            1.36.1-r2      no patch           Alpine:v3.18
-  MEDIUM       ALPINE-CVE-2025-26..   musl               1.2.4-r1       no patch           Alpine:v3.18
-  ...
+  SEVERITY     VULN ID                PACKAGE            VERSION        FIXED            ECOSYSTEM          LAYER
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  MEDIUM       ALPINE-CVE-2023-42..   busybox            1.36.1-r2      no patch         Alpine:v3.18       base
+  MEDIUM       ALPINE-CVE-2025-26..   musl               1.2.4-r1       no patch         Alpine:v3.18       base
 ```
 
 ### AI Triage
 
-`--ai-triage` labels each finding TRUE/FALSE positive with a confidence score and a fix. `--explain` adds a one-sentence attack scenario:
+`--ai-triage` labels each finding TRUE/FALSE positive with a confidence score and a fix. For container/SCA findings with no patch, it suggests mitigations. `--explain` adds a one-sentence attack scenario:
 
 ```
   CRITICAL     SQL injection via unsanitize..   api/handlers.py:10        User input flows directly ..
@@ -225,7 +194,7 @@ Suppressions accumulate over time; each repo builds its own false positive memor
 ### Config file
 
 > [!TIP]
-> `.broly.yaml` is loaded automatically from the repo root. CLI flags always override it. See [`.broly.yaml`](.broly.yaml) for a working example.
+> `.broly.yaml` is loaded automatically from the repo root. CLI flags always override it.
 
 ```yaml
 min_severity: low
@@ -238,7 +207,7 @@ workers: 8
 ### Baseline
 
 > [!NOTE]
-> `suppress` silences known false positives. `require` asserts specific findings must be detected every scan; missing entries cause a non-zero exit. See [`.broly-baseline.yaml`](.broly-baseline.yaml) for a working example.
+> `suppress` silences known false positives. `require` asserts specific findings must be detected every scan; missing entries cause a non-zero exit.
 
 ```yaml
 suppress:
@@ -262,13 +231,12 @@ query = f"SELECT * FROM users WHERE id = {user_id}"  # broly:ignore SQL-INJECTIO
 
 ## Acknowledgments
 
-Broly stands on the shoulders of some excellent open-source projects:
-
 | Project | Role |
 |---------|------|
 | [Titus](https://github.com/praetorian-inc/titus) | Secrets engine: 487 rules, Hyperscan + Go regex |
 | [osv-scalibr](https://github.com/google/osv-scalibr) | Lockfile extraction across 50+ formats |
 | [osv.dev](https://osv.dev) | Vulnerability database by Google |
+| [go-containerregistry](https://github.com/google/go-containerregistry) | Container image pulling and layer inspection |
 | [Together AI](https://together.ai) | AI inference for SAST, triage, and reachability |
 
 ---

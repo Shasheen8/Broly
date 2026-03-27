@@ -200,6 +200,9 @@ func containerCVSSSeverity(vuln *osvschema.Vulnerability) (core.Severity, float6
 		if f, err := strconv.ParseFloat(score, 64); err == nil {
 			return core.SeverityFromCVSS(f), f
 		}
+		if s, score, ok := core.SeverityFromCVSSVector(score); ok {
+			return s, score
+		}
 	}
 	return core.SeverityMedium, 0
 }
