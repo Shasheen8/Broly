@@ -43,7 +43,11 @@ go install github.com/Shasheen8/Broly/cmd/broly@latest
 
 Pre-built Linux binaries on [Releases](https://github.com/Shasheen8/Broly/releases). macOS: build from source with `brew install vectorscan && make build` for Hyperscan support.
 
-SAST and AI features require `export TOGETHER_API_KEY=your_key_here`.
+SAST and AI features are powered by [Together AI](https://together.ai) and require an API key:
+
+```bash
+export TOGETHER_API_KEY=your_key_here
+```
 
 ---
 
