@@ -6,11 +6,37 @@ import (
 	"database/sql"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	_ "modernc.org/sqlite"
 )
+
+// lockfileNames are filenames that osv-scalibr can extract packages from.
+var lockfileNames = map[string]bool{
+	"requirements.txt": true, "requirements-dev.txt": true,
+	"Pipfile.lock": true, "poetry.lock": true, "pdm.lock": true,
+	"package-lock.json": true, "yarn.lock": true, "pnpm-lock.yaml": true,
+	"go.sum": true, "go.mod": true,
+	"Gemfile.lock": true,
+	"Cargo.lock": true,
+	"composer.lock": true,
+	"pom.xml": true, "build.gradle": true, "build.gradle.kts": true,
+	"packages.lock.json": true, "packages.config": true,
+	"pubspec.lock": true,
+	"mix.lock": true,
+	"rebar.lock": true,
+}
+
+// lockfileResult tracks an extracted lockfile and the layer it came from.
+type lockfileResult struct {
+	layerDigest string
+	layerIndex  int
+	files       map[string]bool // relative paths written to tempdir
+}
+
+const maxLockfileSize = 10 * 1024 * 1024 // 10MB cap per lockfile
 
 type pkg struct {
 	Name        string
@@ -109,7 +135,7 @@ func extractLayerFiles(layer v1.Layer) (apkData, dpkgData, rpmData, releaseData 
 			dpkgData, _ = io.ReadAll(tr)
 		case "var/lib/rpm/rpmdb.sqlite", "usr/lib/sysimage/rpm/rpmdb.sqlite":
 			rpmData, _ = io.ReadAll(tr)
-		case "etc/os-release":
+		case "etc/os-release", "usr/lib/os-release":
 			releaseData, _ = io.ReadAll(tr)
 		}
 	}
@@ -249,6 +275,77 @@ func (d distroInfo) osvEcosystem() string {
 	default:
 		return ""
 	}
+}
+
+// extractLockfiles walks image layers and writes any lockfiles to a temp directory.
+// Returns the temp dir path (caller must clean up) and per-file layer attribution.
+func extractLockfiles(img v1.Image) (string, []lockfileResult, error) {
+	layers, err := img.Layers()
+	if err != nil {
+		return "", nil, err
+	}
+
+	tmpDir, err := os.MkdirTemp("", "broly-container-sca-*")
+	if err != nil {
+		return "", nil, err
+	}
+
+	var results []lockfileResult
+
+	for layerIdx, layer := range layers {
+		layerDigest, _ := layer.Digest()
+
+		rc, err := layer.Uncompressed()
+		if err != nil {
+			continue
+		}
+
+		lr := lockfileResult{
+			layerDigest: layerDigest.String(),
+			layerIndex:  layerIdx,
+			files:       make(map[string]bool),
+		}
+
+		tr := tar.NewReader(rc)
+		for {
+			hdr, err := tr.Next()
+			if err != nil {
+				break
+			}
+			if hdr.Typeflag != tar.TypeReg {
+				continue
+			}
+
+			name := strings.TrimPrefix(hdr.Name, "./")
+			base := filepath.Base(name)
+			if !lockfileNames[base] {
+				continue
+			}
+
+			if hdr.Size > maxLockfileSize {
+				continue
+			}
+
+			destPath := filepath.Join(tmpDir, name)
+			if err := os.MkdirAll(filepath.Dir(destPath), 0700); err != nil {
+				continue
+			}
+			f, err := os.OpenFile(destPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
+			if err != nil {
+				continue
+			}
+			io.Copy(f, io.LimitReader(tr, maxLockfileSize))
+			f.Close()
+			lr.files[name] = true
+		}
+		rc.Close()
+
+		if len(lr.files) > 0 {
+			results = append(results, lr)
+		}
+	}
+
+	return tmpDir, results, nil
 }
 
 func majorOnly(v string) string {

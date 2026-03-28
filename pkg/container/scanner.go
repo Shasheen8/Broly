@@ -16,6 +16,13 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/google/go-containerregistry/pkg/v1/tarball"
 
+	"github.com/google/osv-scalibr/extractor/filesystem"
+	"github.com/google/osv-scalibr/extractor/filesystem/list"
+	scalibrfs "github.com/google/osv-scalibr/fs"
+	"github.com/google/osv-scalibr/stats"
+
+	cpb "github.com/google/osv-scalibr/binary/proto/config_go_proto"
+
 	"github.com/ossf/osv-schema/bindings/go/osvschema"
 	"osv.dev/bindings/go/api"
 	"osv.dev/bindings/go/osvdev"
@@ -68,29 +75,34 @@ func (s *ContainerScanner) Scan(ctx context.Context, paths []string, findings ch
 	digestStr := digest.String()
 	fmt.Fprintf(os.Stderr, "image: %s | digest: %s | layers: %d\n", s.imageRef, digestStr, len(layers))
 
-	pkgs, distro, err := extractPackages(img)
-	if err != nil {
-		return fmt.Errorf("extract packages: %w", err)
-	}
-
-	ecosystem := distro.osvEcosystem()
-	if ecosystem == "" {
-		fmt.Fprintf(os.Stderr, "warning: unknown distro %q — skipping vuln matching\n", distro.ID)
-		return nil
-	}
-
 	imgMeta := imageMetadata{
 		digest:    digestStr,
 		baseImage: baseImage,
 	}
 
-	fmt.Fprintf(os.Stderr, "distro: %s %s | ecosystem: %s | packages: %d\n", distro.ID, distro.Version, ecosystem, len(pkgs))
-
-	if len(pkgs) == 0 {
-		return nil
+	pkgs, distro, err := extractPackages(img)
+	if err != nil {
+		return fmt.Errorf("extract packages: %w", err)
 	}
 
-	// Query OSV in batches of 1000.
+	// OS package scan (requires known distro).
+	ecosystem := distro.osvEcosystem()
+	if ecosystem != "" && len(pkgs) > 0 {
+		fmt.Fprintf(os.Stderr, "distro: %s %s | ecosystem: %s | packages: %d\n", distro.ID, distro.Version, ecosystem, len(pkgs))
+		s.scanOSPackages(ctx, pkgs, ecosystem, imgMeta, findings)
+	} else if distro.ID != "" {
+		fmt.Fprintf(os.Stderr, "warning: distro %q not mapped to OSV ecosystem\n", distro.ID)
+	}
+
+	// Language package scan (always runs).
+	if err := s.scanLanguagePackages(ctx, img, imgMeta, findings); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: container language package scan: %v\n", err)
+	}
+
+	return nil
+}
+
+func (s *ContainerScanner) scanOSPackages(ctx context.Context, pkgs []pkg, ecosystem string, imgMeta imageMetadata, findings chan<- core.Finding) {
 	for start := 0; start < len(pkgs); start += 1000 {
 		end := start + 1000
 		if end > len(pkgs) {
@@ -111,7 +123,8 @@ func (s *ContainerScanner) Scan(ctx context.Context, paths []string, findings ch
 
 		resp, err := s.osvClient.QueryBatch(ctx, queries)
 		if err != nil {
-			return fmt.Errorf("osv query: %w", err)
+			fmt.Fprintf(os.Stderr, "warning: osv query: %v\n", err)
+			return
 		}
 
 		for i, vulnList := range resp.GetResults() {
@@ -121,17 +134,114 @@ func (s *ContainerScanner) Scan(ctx context.Context, paths []string, findings ch
 			p := batch[i]
 
 			for _, vuln := range vulnList.GetVulns() {
-				f := vulnToFinding(vuln, p, ecosystem, s.imageRef, imgMeta)
+				f := containerFinding(vuln, p.Name, p.Version, ecosystem, s.imageRef, p.LayerDigest, p.LayerIndex, imgMeta)
 				select {
 				case findings <- f:
 				case <-ctx.Done():
-					return nil
+					return
 				}
+			}
+		}
+	}
+}
+
+func (s *ContainerScanner) scanLanguagePackages(ctx context.Context, img v1.Image, meta imageMetadata, findings chan<- core.Finding) error {
+	tmpDir, layerResults, err := extractLockfiles(img)
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(tmpDir)
+
+	if len(layerResults) == 0 {
+		return nil
+	}
+
+	// Build scalibr extractors for all supported ecosystems.
+	var extractors []filesystem.Extractor
+	for _, eco := range []string{"go", "python", "javascript", "ruby", "rust", "java", "php", "dotnet", "dart"} {
+		exts, err := list.ExtractorsFromName(eco, &cpb.PluginConfig{})
+		if err != nil {
+			continue
+		}
+		extractors = append(extractors, exts...)
+	}
+	if len(extractors) == 0 {
+		return nil
+	}
+
+	// Build a map of file path -> layer info for attribution.
+	fileToLayer := make(map[string]lockfileResult)
+	for _, lr := range layerResults {
+		for f := range lr.files {
+			fileToLayer[f] = lr
+		}
+	}
+
+	// Run scalibr on the temp dir.
+	inv, _, err := filesystem.Run(ctx, &filesystem.Config{
+		Extractors: extractors,
+		ScanRoots:  []*scalibrfs.ScanRoot{{Path: tmpDir, FS: scalibrfs.DirFS(tmpDir)}},
+		Stats:      stats.NoopCollector{},
+	})
+	if err != nil {
+		return err
+	}
+
+	pkgs := inv.Packages
+	if len(pkgs) == 0 {
+		return nil
+	}
+
+	fmt.Fprintf(os.Stderr, "container language packages: %d\n", len(pkgs))
+
+	// Query OSV.
+	queries := make([]*api.Query, len(pkgs))
+	for i, p := range pkgs {
+		queries[i] = &api.Query{
+			Package: &osvschema.Package{
+				Name:      p.Name,
+				Ecosystem: p.Ecosystem().String(),
+			},
+			Param: &api.Query_Version{Version: p.Version},
+		}
+	}
+
+	resp, err := s.osvClient.QueryBatch(ctx, queries)
+	if err != nil {
+		return fmt.Errorf("osv query (language): %w", err)
+	}
+
+	for i, vulnList := range resp.GetResults() {
+		if i >= len(pkgs) {
+			break
+		}
+		p := pkgs[i]
+		eco := p.Ecosystem()
+
+		// Find which layer this package's lockfile came from.
+		lr := findLayerForPackage(p.Locations, fileToLayer, tmpDir)
+
+		for _, vuln := range vulnList.GetVulns() {
+			f := containerFinding(vuln, p.Name, p.Version, eco.String(), s.imageRef, lr.layerDigest, lr.layerIndex, meta)
+			select {
+			case findings <- f:
+			case <-ctx.Done():
+				return nil
 			}
 		}
 	}
 
 	return nil
+}
+
+func findLayerForPackage(locations []string, fileToLayer map[string]lockfileResult, tmpDir string) lockfileResult {
+	if len(locations) > 0 {
+		rel := strings.TrimPrefix(locations[0], tmpDir+"/")
+		if lr, ok := fileToLayer[rel]; ok {
+			return lr
+		}
+	}
+	return lockfileResult{}
 }
 
 func (s *ContainerScanner) Close() error { return nil }
@@ -141,7 +251,8 @@ type imageMetadata struct {
 	baseImage string
 }
 
-func vulnToFinding(vuln *osvschema.Vulnerability, p pkg, ecosystem, imageRef string, meta imageMetadata) core.Finding {
+// containerFinding builds a Finding from a vulnerability match. Used for both OS and language packages.
+func containerFinding(vuln *osvschema.Vulnerability, pkgName, pkgVersion, ecosystem, imageRef, layerDigest string, layerIndex int, meta imageMetadata) core.Finding {
 	id := vuln.GetId()
 
 	var cve string
@@ -158,40 +269,37 @@ func vulnToFinding(vuln *osvschema.Vulnerability, p pkg, ecosystem, imageRef str
 	}
 
 	sev, cvss := containerCVSSSeverity(vuln)
+	tags := []string{"container", strings.ToLower(ecosystem)}
+	if layerIndex == 0 {
+		tags = append(tags, "base-layer")
+	} else {
+		tags = append(tags, "app-layer")
+	}
+
 	f := core.Finding{
 		Type:           core.ScanTypeContainer,
 		RuleID:         id,
 		RuleName:       id,
 		Severity:       sev,
 		CVSSScore:      cvss,
-		Title:          fmt.Sprintf("%s: %s@%s", id, p.Name, p.Version),
+		Title:          fmt.Sprintf("%s: %s@%s", id, pkgName, pkgVersion),
 		Description:    vuln.GetSummary(),
 		FilePath:       imageRef,
 		StartLine:      1,
-		PackageName:    p.Name,
-		PackageVersion: p.Version,
+		PackageName:    pkgName,
+		PackageVersion: pkgVersion,
 		Ecosystem:      ecosystem,
 		FixedVersion:   containerFixedVersion(vuln),
 		CVE:            cve,
 		References:     refs,
 		ImageDigest:    meta.digest,
-		LayerDigest:    p.LayerDigest,
+		LayerDigest:    layerDigest,
 		BaseImage:      meta.baseImage,
-		Tags:           containerTags(p, ecosystem),
+		Tags:           tags,
 		Timestamp:      time.Now(),
 	}
 	f.ComputeFingerprint()
 	return f
-}
-
-func containerTags(p pkg, ecosystem string) []string {
-	tags := []string{"container", strings.ToLower(ecosystem)}
-	if p.LayerIndex == 0 {
-		tags = append(tags, "base-layer")
-	} else {
-		tags = append(tags, "app-layer")
-	}
-	return tags
 }
 
 func containerCVSSSeverity(vuln *osvschema.Vulnerability) (core.Severity, float64) {
