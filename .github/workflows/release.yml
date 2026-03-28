@@ -14,71 +14,13 @@ permissions:
   contents: write
 
 jobs:
-  build:
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-latest
-            goos: linux
-            goarch: amd64
-            cc: gcc
-          - os: ubuntu-latest
-            goos: linux
-            goarch: arm64
-            cc: aarch64-linux-gnu-gcc
-            extra_apt: gcc-aarch64-linux-gnu
-    runs-on: ${{ matrix.os }}
-    env:
-      CGO_ENABLED: "1"
-      GOOS: ${{ matrix.goos }}
-      GOARCH: ${{ matrix.goarch }}
-      CC: ${{ matrix.cc }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install deps
-        run: sudo apt-get update && sudo apt-get install -y libhyperscan-dev ${{ matrix.extra_apt }}
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-          cache: true
-
-      - name: Build
-        run: |
-          VERSION=${{ github.event.inputs.tag || github.ref_name }}
-          COMMIT=$(git rev-parse --short HEAD)
-          NAME="broly_${VERSION}_${{ matrix.goos }}_${{ matrix.goarch }}"
-          mkdir -p "dist/${NAME}"
-          go build -trimpath \
-            -ldflags "-s -w -X main.version=${VERSION} -X main.commit=${COMMIT}" \
-            -o "dist/${NAME}/broly" \
-            ./cmd/broly
-          tar czf "dist/${NAME}.tar.gz" -C dist "${NAME}"
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: bin-${{ matrix.goos }}-${{ matrix.goarch }}
-          path: dist/*.tar.gz
-          retention-days: 1
-
   release:
-    needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
-        with:
-          path: dist/
-          merge-multiple: true
-
-      - name: Checksums
-        run: cd dist && sha256sum *.tar.gz > checksums.txt
+      - uses: actions/checkout@v4
 
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
           token: ${{ secrets.GITHUB_TOKEN }}
-          files: |
-            dist/*.tar.gz
-            dist/checksums.txt
           generate_release_notes: true
