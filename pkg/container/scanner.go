@@ -84,10 +84,11 @@ func (s *ContainerScanner) Scan(ctx context.Context, paths []string, findings ch
 		baseImage: baseImage,
 	}
 
-	pkgs, distro, err := extractPackages(img)
+	pkgs, distro, baseBoundary, err := extractPackages(img)
 	if err != nil {
 		return fmt.Errorf("extract packages: %w", err)
 	}
+	imgMeta.baseBoundary = baseBoundary
 
 	// OS package scan (requires known distro).
 	ecosystem := distro.osvEcosystem()
@@ -95,7 +96,9 @@ func (s *ContainerScanner) Scan(ctx context.Context, paths []string, findings ch
 		if !s.quiet {
 			fmt.Fprintf(os.Stderr, "distro: %s %s | ecosystem: %s | packages: %d\n", distro.ID, distro.Version, ecosystem, len(pkgs))
 		}
-		s.scanOSPackages(ctx, pkgs, ecosystem, imgMeta, findings)
+		if err := s.scanOSPackages(ctx, pkgs, ecosystem, imgMeta, findings); err != nil {
+			return err
+		}
 	} else if distro.ID != "" {
 		fmt.Fprintf(os.Stderr, "warning: distro %q not mapped to OSV ecosystem\n", distro.ID)
 	}
@@ -108,7 +111,7 @@ func (s *ContainerScanner) Scan(ctx context.Context, paths []string, findings ch
 	return nil
 }
 
-func (s *ContainerScanner) scanOSPackages(ctx context.Context, pkgs []pkg, ecosystem string, imgMeta imageMetadata, findings chan<- core.Finding) {
+func (s *ContainerScanner) scanOSPackages(ctx context.Context, pkgs []pkg, ecosystem string, imgMeta imageMetadata, findings chan<- core.Finding) error {
 	for start := 0; start < len(pkgs); start += 1000 {
 		end := start + 1000
 		if end > len(pkgs) {
@@ -129,8 +132,7 @@ func (s *ContainerScanner) scanOSPackages(ctx context.Context, pkgs []pkg, ecosy
 
 		resp, err := s.osvClient.QueryBatch(ctx, queries)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "warning: osv query: %v\n", err)
-			return
+			return fmt.Errorf("osv query: %w", err)
 		}
 
 		for i, vulnList := range resp.GetResults() {
@@ -144,11 +146,12 @@ func (s *ContainerScanner) scanOSPackages(ctx context.Context, pkgs []pkg, ecosy
 				select {
 				case findings <- f:
 				case <-ctx.Done():
-					return
+					return nil
 				}
 			}
 		}
 	}
+	return nil
 }
 
 func (s *ContainerScanner) scanLanguagePackages(ctx context.Context, img v1.Image, meta imageMetadata, findings chan<- core.Finding) error {
@@ -261,8 +264,9 @@ func findLayerForPackage(locations []string, fileToLayer map[string]lockfileResu
 func (s *ContainerScanner) Close() error { return nil }
 
 type imageMetadata struct {
-	digest    string
-	baseImage string
+	digest        string
+	baseImage     string
+	baseBoundary  int // last layer index that modified OS package metadata
 }
 
 // containerFinding builds a Finding from a vulnerability match. Used for both OS and language packages.
@@ -284,7 +288,7 @@ func containerFinding(vuln *osvschema.Vulnerability, pkgName, pkgVersion, ecosys
 
 	sev, cvss := containerCVSSSeverity(vuln)
 	tags := []string{"container", strings.ToLower(ecosystem)}
-	if layerIndex == 0 {
+	if layerIndex <= meta.baseBoundary {
 		tags = append(tags, "base-layer")
 	} else {
 		tags = append(tags, "app-layer")
@@ -359,9 +363,11 @@ func pullImage(ctx context.Context, ref string) (v1.Image, error) {
 	}
 
 	// Try local Docker daemon if the socket exists.
+	// Note: local images may be stale vs the registry tag.
 	if dockerAvailable() {
 		img, err := daemon.Image(parsed)
 		if err == nil {
+			fmt.Fprintf(os.Stderr, "using local image (run with docker pull %s to update)\n", ref)
 			return img, nil
 		}
 	}

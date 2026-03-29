@@ -52,17 +52,19 @@ type distroInfo struct {
 }
 
 // extractPackages walks layers individually to parse OS packages and attribute each
-// package to the layer that introduced it.
-func extractPackages(img v1.Image) ([]pkg, distroInfo, error) {
+// package to the layer that introduced it. Returns packages, distro info, and the
+// index of the last layer that modified OS package metadata (the "base boundary").
+func extractPackages(img v1.Image) ([]pkg, distroInfo, int, error) {
 	layers, err := img.Layers()
 	if err != nil {
-		return nil, distroInfo{}, err
+		return nil, distroInfo{}, 0, err
 	}
 
 	var (
-		distro      distroInfo
-		prevPkgSet  map[string]bool
-		allPkgs     []pkg
+		distro        distroInfo
+		prevPkgSet    map[string]bool
+		allPkgs       []pkg
+		baseBoundary  int // last layer index that modified OS package metadata
 	)
 
 	totalLayers := len(layers)
@@ -91,6 +93,7 @@ func extractPackages(img v1.Image) ([]pkg, distroInfo, error) {
 		if len(layerPkgs) == 0 {
 			continue
 		}
+		baseBoundary = layerIdx
 
 		// Build current set and diff against previous to find new packages.
 		curSet := make(map[string]bool, len(layerPkgs))
@@ -110,7 +113,7 @@ func extractPackages(img v1.Image) ([]pkg, distroInfo, error) {
 		prevPkgSet = curSet
 	}
 
-	return allPkgs, distro, nil
+	return allPkgs, distro, baseBoundary, nil
 }
 
 // extractLayerFiles reads a single layer tar for package metadata files.
@@ -314,14 +317,18 @@ func extractLockfiles(img v1.Image) (string, []lockfileResult, error) {
 			}
 
 			name := filepath.Clean(strings.TrimPrefix(hdr.Name, "./"))
+			if strings.HasPrefix(name, "..") || filepath.IsAbs(name) {
+				continue
+			}
 
 			// Handle OCI whiteouts: .wh.<filename> means the file was deleted in this layer.
 			base := filepath.Base(name)
 			if strings.HasPrefix(base, ".wh.") {
 				deleted := filepath.Join(filepath.Dir(name), strings.TrimPrefix(base, ".wh."))
 				deletedPath := filepath.Join(tmpDir, deleted)
-				os.Remove(deletedPath)
-				// Also remove from any previous layer results.
+				if strings.HasPrefix(deletedPath, tmpDir+string(filepath.Separator)) {
+					os.Remove(deletedPath)
+				}
 				for ri := range results {
 					delete(results[ri].files, deleted)
 				}
@@ -329,9 +336,6 @@ func extractLockfiles(img v1.Image) (string, []lockfileResult, error) {
 			}
 
 			if hdr.Typeflag != tar.TypeReg {
-				continue
-			}
-			if strings.HasPrefix(name, "..") || filepath.IsAbs(name) {
 				continue
 			}
 			if !lockfileNames[base] {

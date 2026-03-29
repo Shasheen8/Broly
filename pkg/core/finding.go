@@ -121,8 +121,8 @@ func (f *Finding) ComputeFingerprint() {
 	var data string
 	switch f.Type {
 	case ScanTypeSCA, ScanTypeContainer:
-		data = fmt.Sprintf("%s:%s:%s:%s:%s",
-			f.Type, f.RuleID, f.PackageName, f.PackageVersion, f.Ecosystem,
+		data = fmt.Sprintf("%s:%s:%s:%s:%s:%s",
+			f.Type, f.RuleID, f.PackageName, f.PackageVersion, f.Ecosystem, f.FilePath,
 		)
 	case ScanTypeSecrets:
 		snippet := f.Redacted

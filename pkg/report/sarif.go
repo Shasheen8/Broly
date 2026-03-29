@@ -165,6 +165,10 @@ func severityToSARIFLevel(s core.Severity) string {
 }
 
 func toFileURI(path string) string {
+	// Container image refs (e.g. "alpine:3.19") are not file paths.
+	if strings.Contains(path, ":") && !strings.HasPrefix(path, "/") && !strings.HasPrefix(path, ".") {
+		return "container://" + path
+	}
 	path = filepath.ToSlash(path)
 	if strings.HasPrefix(path, "/") {
 		return "file://" + path
