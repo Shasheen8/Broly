@@ -14,10 +14,6 @@ const DefaultModel = "Qwen/Qwen3-Coder-Next-FP8"
 
 var globalLimiter = rate.NewLimiter(rate.Limit(10), 20)
 
-func SetRateLimit(requestsPerSecond int, burst int) {
-	globalLimiter = rate.NewLimiter(rate.Limit(requestsPerSecond), burst)
-}
-
 // Client wraps the Together.ai SDK for use by Broly scanners.
 type Client struct {
 	inner *together.Client

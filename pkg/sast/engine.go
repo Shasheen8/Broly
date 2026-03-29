@@ -212,6 +212,9 @@ func (s *SASTScanner) scanFile(ctx context.Context, path, lang string, findings 
 	}
 
 	parsed := parseLLMResponse(path, response)
+	if len(parsed) == 0 && len(strings.TrimSpace(response)) > 0 && !strings.Contains(response, "NO_FINDINGS") {
+		return false // unparsable response, don't cache
+	}
 	for _, pf := range parsed {
 		f := pf.toFinding(path, lang)
 		f.Timestamp = time.Now()

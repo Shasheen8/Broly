@@ -104,8 +104,10 @@ func (t *Triager) Run(ctx context.Context, findings []core.Finding) []core.Findi
 func triageFinding(ctx context.Context, client *ai.Client, f *core.Finding, explain bool) (verdict, confidence, reason, explanation, fix string) {
 	var prompt string
 
-	if f.Type == core.ScanTypeContainer || f.Type == core.ScanTypeSCA {
+	if f.Type == core.ScanTypeContainer {
 		prompt = buildContainerPrompt(f, explain)
+	} else if f.Type == core.ScanTypeSCA {
+		prompt = buildSCAPrompt(f, explain)
 	} else {
 		var codeCtx string
 		if f.Type == core.ScanTypeSecrets {
@@ -174,6 +176,51 @@ FIX:
 		f.Severity.String(),
 		f.Description,
 		f.CVE,
+		fixInfo,
+		explainLine,
+	)
+}
+
+func buildSCAPrompt(f *core.Finding, explain bool) string {
+	fixInfo := "Fixed in: " + f.FixedVersion
+	if f.FixedVersion == "" {
+		fixInfo = "No patched version available."
+	}
+
+	var explainLine string
+	if explain {
+		explainLine = "\nEXPLANATION: One sentence. Concrete attack scenario for this dependency vulnerability."
+	}
+
+	return fmt.Sprintf(`You are a security expert triaging a dependency vulnerability in a software project.
+
+Vulnerability: %s
+Package:       %s@%s
+Ecosystem:     %s
+Severity:      %s
+Description:   %s
+CVE:           %s
+Lockfile:      %s
+%s
+
+Determine:
+1. Is this a TRUE_POSITIVE (real risk if the vulnerable function is called) or FALSE_POSITIVE (vulnerability is in an unused code path or test dependency)?
+2. Your confidence in that verdict.
+3. If TRUE_POSITIVE, provide the upgrade command or a workaround. If no patch exists, suggest alternatives (different package, version constraint, or mitigation).
+
+Respond with exactly:
+VERDICT: TRUE_POSITIVE or FALSE_POSITIVE
+CONFIDENCE: HIGH or MEDIUM or LOW
+REASON: One sentence.%s
+FIX:
+<upgrade command or workaround, or N/A if false positive>`,
+		f.RuleID,
+		f.PackageName, f.PackageVersion,
+		f.Ecosystem,
+		f.Severity.String(),
+		f.Description,
+		f.CVE,
+		f.FilePath,
 		fixInfo,
 		explainLine,
 	)

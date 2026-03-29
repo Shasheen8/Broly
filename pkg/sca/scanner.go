@@ -98,24 +98,32 @@ func (s *SCAScanner) Scan(ctx context.Context, paths []string, findings chan<- c
 			continue
 		}
 
-		queries := make([]*api.Query, len(pkgs))
-		for i, pkg := range pkgs {
-			eco := pkg.Ecosystem()
-			queries[i] = &api.Query{
-				Package: &osvschema.Package{
-					Name:      pkg.Name,
-					Ecosystem: eco.String(),
-				},
-				Param: &api.Query_Version{Version: pkg.Version},
+		for start := 0; start < len(pkgs); start += 1000 {
+			end := start + 1000
+			if end > len(pkgs) {
+				end = len(pkgs)
 			}
-		}
+			batch := pkgs[start:end]
 
-		resp, err := s.osvClient.QueryBatch(ctx, queries)
-		if err != nil {
-			return fmt.Errorf("osv query: %w", err)
-		}
+			queries := make([]*api.Query, len(batch))
+			for i, pkg := range batch {
+				eco := pkg.Ecosystem()
+				queries[i] = &api.Query{
+					Package: &osvschema.Package{
+						Name:      pkg.Name,
+						Ecosystem: eco.String(),
+					},
+					Param: &api.Query_Version{Version: pkg.Version},
+				}
+			}
 
-		s.emitFindings(ctx, pkgs, resp, target, findings)
+			resp, err := s.osvClient.QueryBatch(ctx, queries)
+			if err != nil {
+				return fmt.Errorf("osv query: %w", err)
+			}
+
+			s.emitFindings(ctx, batch, resp, target, findings)
+		}
 	}
 
 	return nil

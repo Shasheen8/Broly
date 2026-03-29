@@ -249,6 +249,9 @@ func runScan(cfg *core.Config) error {
 		if cfg.EnableSAST {
 			scanners = append(scanners, "sast")
 		}
+		if cfg.ContainerImage != "" {
+			scanners = append(scanners, "container")
+		}
 		fmt.Fprintf(os.Stderr, "scanners: %s | workers: %d\n\n", strings.Join(scanners, ", "), cfg.Workers)
 	}
 

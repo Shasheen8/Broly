@@ -118,13 +118,25 @@ func FileContextSafe(path string, startLine, endLine, radius int) string {
 // For secrets findings, always uses the redacted value so fingerprints are stable
 // regardless of whether --no-redact is set.
 func (f *Finding) ComputeFingerprint() {
-	snippet := f.Snippet
-	if f.Type == ScanTypeSecrets && f.Redacted != "" {
-		snippet = f.Redacted
+	var data string
+	switch f.Type {
+	case ScanTypeSCA, ScanTypeContainer:
+		data = fmt.Sprintf("%s:%s:%s:%s:%s",
+			f.Type, f.RuleID, f.PackageName, f.PackageVersion, f.Ecosystem,
+		)
+	case ScanTypeSecrets:
+		snippet := f.Redacted
+		if snippet == "" {
+			snippet = f.Snippet
+		}
+		data = fmt.Sprintf("%s:%s:%s:%s:%d",
+			f.Type, f.RuleID, f.FilePath, snippet, f.StartLine,
+		)
+	default:
+		data = fmt.Sprintf("%s:%s:%s:%s:%d",
+			f.Type, f.RuleID, f.FilePath, f.Snippet, f.StartLine,
+		)
 	}
-	data := fmt.Sprintf("%s:%s:%s:%s:%d",
-		f.Type, f.RuleID, f.FilePath, snippet, f.StartLine,
-	)
 	hash := sha256.Sum256([]byte(data))
 	f.Fingerprint = fmt.Sprintf("%x", hash[:])
 }

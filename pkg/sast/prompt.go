@@ -25,7 +25,6 @@ Otherwise, for each finding use this exact format (separate multiple findings wi
 - **Vulnerability Level**: [CRITICAL/HIGH/MEDIUM/LOW/INFO]
 - **Issue**: Brief description of the vulnerability.
 - **Location**: File name and line number(s) where the vulnerability exists. If not applicable, use "N/A".
-- **CVSS Vector**: The full CVSS v3.1 vector string (e.g., "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"). Ensure the Privileges Required (PR) metric accurately reflects the access level needed for exploitation.
 - **Risk**: A brief explanation of the security impact, including specific mention of the attack prerequisites.
 - **Fix**: Specific remediation steps, including a secure code example.
 

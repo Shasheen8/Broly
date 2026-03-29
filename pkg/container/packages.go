@@ -312,12 +312,28 @@ func extractLockfiles(img v1.Image) (string, []lockfileResult, error) {
 			if err != nil {
 				break
 			}
-			if hdr.Typeflag != tar.TypeReg {
+
+			name := filepath.Clean(strings.TrimPrefix(hdr.Name, "./"))
+
+			// Handle OCI whiteouts: .wh.<filename> means the file was deleted in this layer.
+			base := filepath.Base(name)
+			if strings.HasPrefix(base, ".wh.") {
+				deleted := filepath.Join(filepath.Dir(name), strings.TrimPrefix(base, ".wh."))
+				deletedPath := filepath.Join(tmpDir, deleted)
+				os.Remove(deletedPath)
+				// Also remove from any previous layer results.
+				for ri := range results {
+					delete(results[ri].files, deleted)
+				}
 				continue
 			}
 
-			name := strings.TrimPrefix(hdr.Name, "./")
-			base := filepath.Base(name)
+			if hdr.Typeflag != tar.TypeReg {
+				continue
+			}
+			if strings.HasPrefix(name, "..") || filepath.IsAbs(name) {
+				continue
+			}
 			if !lockfileNames[base] {
 				continue
 			}
@@ -327,6 +343,9 @@ func extractLockfiles(img v1.Image) (string, []lockfileResult, error) {
 			}
 
 			destPath := filepath.Join(tmpDir, name)
+			if !strings.HasPrefix(destPath, tmpDir+string(filepath.Separator)) {
+				continue
+			}
 			if err := os.MkdirAll(filepath.Dir(destPath), 0700); err != nil {
 				continue
 			}

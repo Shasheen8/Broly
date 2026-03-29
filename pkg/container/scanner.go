@@ -32,6 +32,7 @@ import (
 
 type ContainerScanner struct {
 	imageRef  string
+	quiet     bool
 	osvClient *osvdev.OSVClient
 }
 
@@ -44,6 +45,7 @@ func (s *ContainerScanner) Type() core.ScanType { return core.ScanTypeContainer 
 
 func (s *ContainerScanner) Init(cfg *core.Config) error {
 	s.imageRef = cfg.ContainerImage
+	s.quiet = cfg.Quiet
 	s.osvClient = osvdev.DefaultClient()
 	s.osvClient.Config.UserAgent = "broly-container/1.0"
 	return nil
@@ -73,7 +75,9 @@ func (s *ContainerScanner) Scan(ctx context.Context, paths []string, findings ch
 	}
 
 	digestStr := digest.String()
-	fmt.Fprintf(os.Stderr, "image: %s | digest: %s | layers: %d\n", s.imageRef, digestStr, len(layers))
+	if !s.quiet {
+		fmt.Fprintf(os.Stderr, "image: %s | digest: %s | layers: %d\n", s.imageRef, digestStr, len(layers))
+	}
 
 	imgMeta := imageMetadata{
 		digest:    digestStr,
@@ -88,7 +92,9 @@ func (s *ContainerScanner) Scan(ctx context.Context, paths []string, findings ch
 	// OS package scan (requires known distro).
 	ecosystem := distro.osvEcosystem()
 	if ecosystem != "" && len(pkgs) > 0 {
-		fmt.Fprintf(os.Stderr, "distro: %s %s | ecosystem: %s | packages: %d\n", distro.ID, distro.Version, ecosystem, len(pkgs))
+		if !s.quiet {
+			fmt.Fprintf(os.Stderr, "distro: %s %s | ecosystem: %s | packages: %d\n", distro.ID, distro.Version, ecosystem, len(pkgs))
+		}
 		s.scanOSPackages(ctx, pkgs, ecosystem, imgMeta, findings)
 	} else if distro.ID != "" {
 		fmt.Fprintf(os.Stderr, "warning: distro %q not mapped to OSV ecosystem\n", distro.ID)
@@ -192,41 +198,49 @@ func (s *ContainerScanner) scanLanguagePackages(ctx context.Context, img v1.Imag
 		return nil
 	}
 
-	fmt.Fprintf(os.Stderr, "container language packages: %d\n", len(pkgs))
-
-	// Query OSV.
-	queries := make([]*api.Query, len(pkgs))
-	for i, p := range pkgs {
-		queries[i] = &api.Query{
-			Package: &osvschema.Package{
-				Name:      p.Name,
-				Ecosystem: p.Ecosystem().String(),
-			},
-			Param: &api.Query_Version{Version: p.Version},
-		}
+	if !s.quiet {
+		fmt.Fprintf(os.Stderr, "container language packages: %d\n", len(pkgs))
 	}
 
-	resp, err := s.osvClient.QueryBatch(ctx, queries)
-	if err != nil {
-		return fmt.Errorf("osv query (language): %w", err)
-	}
-
-	for i, vulnList := range resp.GetResults() {
-		if i >= len(pkgs) {
-			break
+	// Query OSV in batches of 1000.
+	for start := 0; start < len(pkgs); start += 1000 {
+		end := start + 1000
+		if end > len(pkgs) {
+			end = len(pkgs)
 		}
-		p := pkgs[i]
-		eco := p.Ecosystem()
+		batch := pkgs[start:end]
 
-		// Find which layer this package's lockfile came from.
-		lr := findLayerForPackage(p.Locations, fileToLayer, tmpDir)
+		queries := make([]*api.Query, len(batch))
+		for i, p := range batch {
+			queries[i] = &api.Query{
+				Package: &osvschema.Package{
+					Name:      p.Name,
+					Ecosystem: p.Ecosystem().String(),
+				},
+				Param: &api.Query_Version{Version: p.Version},
+			}
+		}
 
-		for _, vuln := range vulnList.GetVulns() {
-			f := containerFinding(vuln, p.Name, p.Version, eco.String(), s.imageRef, lr.layerDigest, lr.layerIndex, meta)
-			select {
-			case findings <- f:
-			case <-ctx.Done():
-				return nil
+		resp, err := s.osvClient.QueryBatch(ctx, queries)
+		if err != nil {
+			return fmt.Errorf("osv query (language): %w", err)
+		}
+
+		for i, vulnList := range resp.GetResults() {
+			if i >= len(batch) {
+				break
+			}
+			p := batch[i]
+			eco := p.Ecosystem()
+			lr := findLayerForPackage(p.Locations, fileToLayer, tmpDir)
+
+			for _, vuln := range vulnList.GetVulns() {
+				f := containerFinding(vuln, p.Name, p.Version, eco.String(), s.imageRef, lr.layerDigest, lr.layerIndex, meta)
+				select {
+				case findings <- f:
+				case <-ctx.Done():
+					return nil
+				}
 			}
 		}
 	}
