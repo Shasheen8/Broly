@@ -159,8 +159,8 @@ Auto-detected during normal scans. Specialized prompts cover privilege escalatio
 
   SEVERITY     VULN ID                PACKAGE            VERSION        FIXED            ECOSYSTEM          LAYER
   ────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-  MEDIUM       ALPINE-CVE-2023-42..   busybox            1.36.1-r2      no patch         Alpine:v3.18       base
-  MEDIUM       ALPINE-CVE-2025-26..   musl               1.2.4-r1       no patch         Alpine:v3.18       base
+  MEDIUM       ALPINE-CVE-2023-42..   busybox            1.36.1-r2      no patch         Alpine:v3.18       #1
+  MEDIUM       ALPINE-CVE-2025-26..   musl               1.2.4-r1       no patch         Alpine:v3.18       #1
 ```
 
 ### AI Triage

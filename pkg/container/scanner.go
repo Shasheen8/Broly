@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -57,7 +58,7 @@ func (s *ContainerScanner) Scan(ctx context.Context, paths []string, findings ch
 		return nil
 	}
 
-	img, err := pullImage(ctx, s.imageRef)
+	img, err := pullImage(ctx, s.imageRef, s.quiet)
 	if err != nil {
 		return fmt.Errorf("pull image %s: %w", s.imageRef, err)
 	}
@@ -84,11 +85,10 @@ func (s *ContainerScanner) Scan(ctx context.Context, paths []string, findings ch
 		baseImage: baseImage,
 	}
 
-	pkgs, distro, baseBoundary, err := extractPackages(img)
+	pkgs, distro, err := extractPackages(img)
 	if err != nil {
 		return fmt.Errorf("extract packages: %w", err)
 	}
-	imgMeta.baseBoundary = baseBoundary
 
 	// OS package scan (requires known distro).
 	ecosystem := distro.osvEcosystem()
@@ -105,7 +105,7 @@ func (s *ContainerScanner) Scan(ctx context.Context, paths []string, findings ch
 
 	// Language package scan (always runs).
 	if err := s.scanLanguagePackages(ctx, img, imgMeta, findings); err != nil {
-		fmt.Fprintf(os.Stderr, "warning: container language package scan: %v\n", err)
+		return fmt.Errorf("container language package scan: %w", err)
 	}
 
 	return nil
@@ -142,7 +142,7 @@ func (s *ContainerScanner) scanOSPackages(ctx context.Context, pkgs []pkg, ecosy
 			p := batch[i]
 
 			for _, vuln := range vulnList.GetVulns() {
-				f := containerFinding(vuln, p.Name, p.Version, ecosystem, s.imageRef, p.LayerDigest, p.LayerIndex, imgMeta)
+				f := containerFinding(vuln, p.Name, p.Version, ecosystem, s.imageRef, "", p.LayerDigest, p.LayerIndex, imgMeta)
 				select {
 				case findings <- f:
 				case <-ctx.Done():
@@ -236,9 +236,10 @@ func (s *ContainerScanner) scanLanguagePackages(ctx context.Context, img v1.Imag
 			p := batch[i]
 			eco := p.Ecosystem()
 			lr := findLayerForPackage(p.Locations, fileToLayer, tmpDir)
+			artifactPath := artifactPathFromLocations(p.Locations, tmpDir)
 
 			for _, vuln := range vulnList.GetVulns() {
-				f := containerFinding(vuln, p.Name, p.Version, eco.String(), s.imageRef, lr.layerDigest, lr.layerIndex, meta)
+				f := containerFinding(vuln, p.Name, p.Version, eco.String(), s.imageRef, artifactPath, lr.layerDigest, lr.layerIndex, meta)
 				select {
 				case findings <- f:
 				case <-ctx.Done():
@@ -251,26 +252,39 @@ func (s *ContainerScanner) scanLanguagePackages(ctx context.Context, img v1.Imag
 	return nil
 }
 
+func artifactPathFromLocations(locations []string, tmpDir string) string {
+	if len(locations) == 0 {
+		return ""
+	}
+	rel, err := filepath.Rel(tmpDir, locations[0])
+	if err != nil {
+		return ""
+	}
+	rel = filepath.Clean(rel)
+	if rel == "." || strings.HasPrefix(rel, "..") {
+		return ""
+	}
+	return filepath.ToSlash(rel)
+}
+
 func findLayerForPackage(locations []string, fileToLayer map[string]lockfileResult, tmpDir string) lockfileResult {
-	if len(locations) > 0 {
-		rel := strings.TrimPrefix(locations[0], tmpDir+"/")
-		if lr, ok := fileToLayer[rel]; ok {
+	if rel := artifactPathFromLocations(locations, tmpDir); rel != "" {
+		if lr, ok := fileToLayer[filepath.FromSlash(rel)]; ok {
 			return lr
 		}
 	}
-	return lockfileResult{}
+	return lockfileResult{layerIndex: -1}
 }
 
 func (s *ContainerScanner) Close() error { return nil }
 
 type imageMetadata struct {
-	digest        string
-	baseImage     string
-	baseBoundary  int // last layer index that modified OS package metadata
+	digest    string
+	baseImage string
 }
 
 // containerFinding builds a Finding from a vulnerability match. Used for both OS and language packages.
-func containerFinding(vuln *osvschema.Vulnerability, pkgName, pkgVersion, ecosystem, imageRef, layerDigest string, layerIndex int, meta imageMetadata) core.Finding {
+func containerFinding(vuln *osvschema.Vulnerability, pkgName, pkgVersion, ecosystem, imageRef, artifactPath, layerDigest string, layerIndex int, meta imageMetadata) core.Finding {
 	id := vuln.GetId()
 
 	var cve string
@@ -288,10 +302,9 @@ func containerFinding(vuln *osvschema.Vulnerability, pkgName, pkgVersion, ecosys
 
 	sev, cvss := containerCVSSSeverity(vuln)
 	tags := []string{"container", strings.ToLower(ecosystem)}
-	if layerIndex <= meta.baseBoundary {
-		tags = append(tags, "base-layer")
-	} else {
-		tags = append(tags, "app-layer")
+	layerNumber := 0
+	if layerIndex >= 0 {
+		layerNumber = layerIndex + 1
 	}
 
 	f := core.Finding{
@@ -303,6 +316,7 @@ func containerFinding(vuln *osvschema.Vulnerability, pkgName, pkgVersion, ecosys
 		Title:          fmt.Sprintf("%s: %s@%s", id, pkgName, pkgVersion),
 		Description:    vuln.GetSummary(),
 		FilePath:       imageRef,
+		ArtifactPath:   artifactPath,
 		StartLine:      1,
 		PackageName:    pkgName,
 		PackageVersion: pkgVersion,
@@ -312,6 +326,7 @@ func containerFinding(vuln *osvschema.Vulnerability, pkgName, pkgVersion, ecosys
 		References:     refs,
 		ImageDigest:    meta.digest,
 		LayerDigest:    layerDigest,
+		LayerIndex:     layerNumber,
 		BaseImage:      meta.baseImage,
 		Tags:           tags,
 		Timestamp:      time.Now(),
@@ -347,7 +362,7 @@ func containerFixedVersion(vuln *osvschema.Vulnerability) string {
 }
 
 // pullImage loads a container image from a registry, local Docker daemon, or tarball.
-func pullImage(ctx context.Context, ref string) (v1.Image, error) {
+func pullImage(ctx context.Context, ref string, quiet bool) (v1.Image, error) {
 	// Tarball: path ends in .tar or .tar.gz
 	if strings.HasSuffix(ref, ".tar") || strings.HasSuffix(ref, ".tar.gz") {
 		img, err := tarball.ImageFromPath(ref, nil)
@@ -362,25 +377,26 @@ func pullImage(ctx context.Context, ref string) (v1.Image, error) {
 		return nil, fmt.Errorf("parse reference %s: %w", ref, err)
 	}
 
-	// Try local Docker daemon if the socket exists.
-	// Note: local images may be stale vs the registry tag.
-	if dockerAvailable() {
-		img, err := daemon.Image(parsed)
-		if err == nil {
-			fmt.Fprintf(os.Stderr, "using local image (run with docker pull %s to update)\n", ref)
-			return img, nil
-		}
-	}
-
-	// Fall back to remote registry.
 	img, err := remote.Image(parsed,
 		remote.WithAuthFromKeychain(authn.DefaultKeychain),
 		remote.WithContext(ctx),
 	)
-	if err != nil {
-		return nil, fmt.Errorf("pull from registry %s: %w", ref, err)
+	if err == nil {
+		return img, nil
 	}
-	return img, nil
+	remoteErr := err
+
+	// Fall back to a local Docker image for unpublished or offline-only refs.
+	if dockerAvailable() {
+		img, err := daemon.Image(parsed)
+		if err == nil {
+			if !quiet {
+				fmt.Fprintf(os.Stderr, "using local image after registry pull failed: %v\n", remoteErr)
+			}
+			return img, nil
+		}
+	}
+	return nil, fmt.Errorf("pull from registry %s: %w", ref, remoteErr)
 }
 
 func dockerAvailable() bool {

@@ -28,12 +28,13 @@ type Finding struct {
 	Title       string   `json:"title"`
 	Description string   `json:"description"`
 
-	FilePath    string `json:"file_path"`
-	StartLine   int    `json:"start_line"`
-	EndLine     int    `json:"end_line"`
-	StartColumn int    `json:"start_column,omitempty"`
-	EndColumn   int    `json:"end_column,omitempty"`
-	Snippet     string `json:"snippet,omitempty"`
+	FilePath     string `json:"file_path"`
+	ArtifactPath string `json:"artifact_path,omitempty"`
+	StartLine    int    `json:"start_line"`
+	EndLine      int    `json:"end_line"`
+	StartColumn  int    `json:"start_column,omitempty"`
+	EndColumn    int    `json:"end_column,omitempty"`
+	Snippet      string `json:"snippet,omitempty"`
 
 	PackageName    string  `json:"package_name,omitempty"`
 	PackageVersion string  `json:"package_version,omitempty"`
@@ -47,6 +48,7 @@ type Finding struct {
 
 	ImageDigest string `json:"image_digest,omitempty"`
 	LayerDigest string `json:"layer_digest,omitempty"`
+	LayerIndex  int    `json:"layer_index,omitempty"`
 	BaseImage   string `json:"base_image,omitempty"`
 
 	CWE         []string  `json:"cwe,omitempty"`
@@ -120,9 +122,13 @@ func FileContextSafe(path string, startLine, endLine, radius int) string {
 func (f *Finding) ComputeFingerprint() {
 	var data string
 	switch f.Type {
-	case ScanTypeSCA, ScanTypeContainer:
+	case ScanTypeSCA:
 		data = fmt.Sprintf("%s:%s:%s:%s:%s:%s",
 			f.Type, f.RuleID, f.PackageName, f.PackageVersion, f.Ecosystem, f.FilePath,
+		)
+	case ScanTypeContainer:
+		data = fmt.Sprintf("%s:%s:%s:%s:%s:%s:%s:%s",
+			f.Type, f.RuleID, f.PackageName, f.PackageVersion, f.Ecosystem, f.FilePath, f.LayerDigest, f.ArtifactPath,
 		)
 	case ScanTypeSecrets:
 		snippet := f.Redacted

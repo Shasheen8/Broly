@@ -269,12 +269,9 @@ func printContainerTable(w io.Writer, clr color, findings []core.Finding) {
 		} else {
 			fixed = clr.s(green, fixed)
 		}
-		layer := clr.s(gray, "base")
-		for _, t := range f.Tags {
-			if t == "app-layer" {
-				layer = clr.s(yellow, "app")
-				break
-			}
+		layer := clr.s(gray, "unknown")
+		if f.LayerIndex > 0 {
+			layer = clr.s(yellow, fmt.Sprintf("#%d", f.LayerIndex))
 		}
 		fmt.Fprintf(w, "  %-12s %-22s %-18s %-14s %-16s %-18s %s\n",
 			severityColor(f.Severity, clr),

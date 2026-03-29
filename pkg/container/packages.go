@@ -19,14 +19,14 @@ var lockfileNames = map[string]bool{
 	"Pipfile.lock": true, "poetry.lock": true, "pdm.lock": true,
 	"package-lock.json": true, "yarn.lock": true, "pnpm-lock.yaml": true,
 	"go.sum": true, "go.mod": true,
-	"Gemfile.lock": true,
-	"Cargo.lock": true,
+	"Gemfile.lock":  true,
+	"Cargo.lock":    true,
 	"composer.lock": true,
-	"pom.xml": true, "build.gradle": true, "build.gradle.kts": true,
+	"pom.xml":       true, "build.gradle": true, "build.gradle.kts": true,
 	"packages.lock.json": true, "packages.config": true,
 	"pubspec.lock": true,
-	"mix.lock": true,
-	"rebar.lock": true,
+	"mix.lock":     true,
+	"rebar.lock":   true,
 }
 
 // lockfileResult tracks an extracted lockfile and the layer it came from.
@@ -52,19 +52,17 @@ type distroInfo struct {
 }
 
 // extractPackages walks layers individually to parse OS packages and attribute each
-// package to the layer that introduced it. Returns packages, distro info, and the
-// index of the last layer that modified OS package metadata (the "base boundary").
-func extractPackages(img v1.Image) ([]pkg, distroInfo, int, error) {
+// package to the layer that introduced it.
+func extractPackages(img v1.Image) ([]pkg, distroInfo, error) {
 	layers, err := img.Layers()
 	if err != nil {
-		return nil, distroInfo{}, 0, err
+		return nil, distroInfo{}, err
 	}
 
 	var (
-		distro        distroInfo
-		prevPkgSet    map[string]bool
-		allPkgs       []pkg
-		baseBoundary  int // last layer index that modified OS package metadata
+		distro     distroInfo
+		prevPkgSet map[string]bool
+		allPkgs    []pkg
 	)
 
 	totalLayers := len(layers)
@@ -93,7 +91,6 @@ func extractPackages(img v1.Image) ([]pkg, distroInfo, int, error) {
 		if len(layerPkgs) == 0 {
 			continue
 		}
-		baseBoundary = layerIdx
 
 		// Build current set and diff against previous to find new packages.
 		curSet := make(map[string]bool, len(layerPkgs))
@@ -113,7 +110,7 @@ func extractPackages(img v1.Image) ([]pkg, distroInfo, int, error) {
 		prevPkgSet = curSet
 	}
 
-	return allPkgs, distro, baseBoundary, nil
+	return allPkgs, distro, nil
 }
 
 // extractLayerFiles reads a single layer tar for package metadata files.
@@ -321,17 +318,19 @@ func extractLockfiles(img v1.Image) (string, []lockfileResult, error) {
 				continue
 			}
 
-			// Handle OCI whiteouts: .wh.<filename> means the file was deleted in this layer.
+			// Handle OCI whiteouts: .wh.<filename> deletes one file, .wh..wh..opq
+			// clears all lower-layer entries in the directory.
 			base := filepath.Base(name)
+			if base == ".wh..wh..opq" {
+				applyOpaqueWhiteout(tmpDir, filepath.Dir(name), results)
+				continue
+			}
 			if strings.HasPrefix(base, ".wh.") {
 				deleted := filepath.Join(filepath.Dir(name), strings.TrimPrefix(base, ".wh."))
-				deletedPath := filepath.Join(tmpDir, deleted)
-				if strings.HasPrefix(deletedPath, tmpDir+string(filepath.Separator)) {
-					os.Remove(deletedPath)
+				if deletedPath, ok := joinUnderRoot(tmpDir, deleted); ok {
+					_ = os.Remove(deletedPath)
 				}
-				for ri := range results {
-					delete(results[ri].files, deleted)
-				}
+				removeTrackedPath(results, deleted)
 				continue
 			}
 
@@ -346,8 +345,8 @@ func extractLockfiles(img v1.Image) (string, []lockfileResult, error) {
 				continue
 			}
 
-			destPath := filepath.Join(tmpDir, name)
-			if !strings.HasPrefix(destPath, tmpDir+string(filepath.Separator)) {
+			destPath, ok := joinUnderRoot(tmpDir, name)
+			if !ok {
 				continue
 			}
 			if err := os.MkdirAll(filepath.Dir(destPath), 0700); err != nil {
@@ -369,6 +368,60 @@ func extractLockfiles(img v1.Image) (string, []lockfileResult, error) {
 	}
 
 	return tmpDir, results, nil
+}
+
+func joinUnderRoot(root, rel string) (string, bool) {
+	rel = filepath.Clean(rel)
+	if rel == "." {
+		return root, true
+	}
+	if strings.HasPrefix(rel, "..") || filepath.IsAbs(rel) {
+		return "", false
+	}
+	full := filepath.Join(root, rel)
+	if full != root && !strings.HasPrefix(full, root+string(filepath.Separator)) {
+		return "", false
+	}
+	return full, true
+}
+
+func applyOpaqueWhiteout(tmpDir, dir string, results []lockfileResult) {
+	dir = filepath.Clean(dir)
+	if dir == "." {
+		dir = ""
+	}
+	targetDir, ok := joinUnderRoot(tmpDir, dir)
+	if ok {
+		entries, err := os.ReadDir(targetDir)
+		if err == nil {
+			for _, entry := range entries {
+				_ = os.RemoveAll(filepath.Join(targetDir, entry.Name()))
+			}
+		}
+	}
+	for ri := range results {
+		for path := range results[ri].files {
+			if dir == "" || pathInDir(path, dir) {
+				delete(results[ri].files, path)
+			}
+		}
+	}
+}
+
+func removeTrackedPath(results []lockfileResult, path string) {
+	path = filepath.Clean(path)
+	for ri := range results {
+		delete(results[ri].files, path)
+	}
+}
+
+func pathInDir(path, dir string) bool {
+	path = filepath.Clean(path)
+	dir = filepath.Clean(dir)
+	if dir == "." || dir == "" {
+		return true
+	}
+	return strings.HasPrefix(path, dir+string(filepath.Separator))
 }
 
 func majorOnly(v string) string {
