@@ -193,6 +193,19 @@ Suppressions accumulate over time; each repo builds its own false positive memor
 
 ---
 
+## GitHub App
+
+Install once, scans every PR automatically. No per-repo workflow setup.
+
+The app clones the repo at the PR head, runs Broly with AI triage, and posts findings as a check run + PR comment. Only findings in changed files are reported — no historic noise.
+
+```bash
+# run the app server locally
+APP_ID=123456 PRIVATE_KEY_PATH=./app.pem WEBHOOK_SECRET=your_secret go run ./cmd/broly-app
+```
+
+---
+
 ## Configuration
 
 ### Config file
@@ -241,6 +254,7 @@ query = f"SELECT * FROM users WHERE id = {user_id}"  # broly:ignore SQL-INJECTIO
 | [osv-scalibr](https://github.com/google/osv-scalibr) | Lockfile extraction across 50+ formats |
 | [osv.dev](https://osv.dev) | Vulnerability database by Google |
 | [go-containerregistry](https://github.com/google/go-containerregistry) | Container image pulling and layer inspection |
+| [go-github](https://github.com/google/go-github) + [ghinstallation](https://github.com/bradleyfalzon/ghinstallation) | GitHub App authentication and API |
 | [Together AI](https://together.ai) | AI inference for SAST, triage, and reachability |
 
 ---
