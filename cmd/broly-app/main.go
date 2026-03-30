@@ -32,6 +32,7 @@ func main() {
 	app := &App{
 		config:    cfg,
 		transport: transport,
+		scanSem:   make(chan struct{}, cfg.MaxConcurrent),
 	}
 
 	mux := http.NewServeMux()
@@ -70,6 +71,7 @@ type Config struct {
 	PrivateKeyPath string
 	WebhookSecret  string
 	Port           string
+	MaxConcurrent  int
 }
 
 func loadConfig() Config {
@@ -81,11 +83,18 @@ func loadConfig() Config {
 	if port == "" {
 		port = "8080"
 	}
+	maxConcurrent := 4
+	if v := os.Getenv("MAX_CONCURRENT_SCANS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			maxConcurrent = n
+		}
+	}
 	return Config{
 		AppID:          appID,
 		PrivateKeyPath: mustEnv("PRIVATE_KEY_PATH"),
 		WebhookSecret:  mustEnv("WEBHOOK_SECRET"),
 		Port:           port,
+		MaxConcurrent:  maxConcurrent,
 	}
 }
 
@@ -100,6 +109,7 @@ func mustEnv(key string) string {
 type App struct {
 	config    Config
 	transport *ghinstallation.AppsTransport
+	scanSem   chan struct{} // limits concurrent scans
 }
 
 func (a *App) handleWebhook(w http.ResponseWriter, r *http.Request) {

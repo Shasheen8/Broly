@@ -21,6 +21,9 @@ import (
 )
 
 func (a *App) scanPR(ctx context.Context, client *github.Client, req scanRequest) {
+	a.scanSem <- struct{}{}
+	defer func() { <-a.scanSem }()
+
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 
@@ -58,6 +61,9 @@ func (a *App) scanPR(ctx context.Context, client *github.Client, req scanRequest
 }
 
 func (a *App) scanPush(ctx context.Context, client *github.Client, req scanRequest) {
+	a.scanSem <- struct{}{}
+	defer func() { <-a.scanSem }()
+
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 
