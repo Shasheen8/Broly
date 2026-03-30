@@ -236,26 +236,6 @@ func (a *App) clientForInstallation(installationID int64) *github.Client {
 	return github.NewClient(&http.Client{Transport: itr})
 }
 
-func (a *App) scanPR(ctx context.Context, client *github.Client, req scanRequest) {
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
-	defer cancel()
-
-	log.Printf("scanning PR #%d on %s/%s at %s", req.prNumber, req.owner, req.repo, req.headSHA)
-
-	// TODO: clone repo, run broly scan, post results back
-	_ = client
-}
-
-func (a *App) scanPush(ctx context.Context, client *github.Client, req scanRequest) {
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
-	defer cancel()
-
-	log.Printf("scanning push on %s/%s at %s", req.owner, req.repo, req.headSHA)
-
-	// TODO: clone repo, run broly scan, upload SARIF
-	_ = client
-}
-
 func verifySignature(payload []byte, signature, secret string) bool {
 	if secret == "" || signature == "" {
 		return false
