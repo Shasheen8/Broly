@@ -44,10 +44,14 @@ func (a *App) scanPR(ctx context.Context, client *github.Client, req scanRequest
 		return
 	}
 
-	// Strip temp dir prefix from file paths so they're repo-relative.
 	stripPrefix(result, dir)
 
-	log.Printf("PR #%d on %s/%s: %d findings", req.prNumber, req.owner, req.repo, len(result.Findings))
+	// Filter to only findings in files changed by this PR.
+	if len(changed) > 0 {
+		result.Findings = filterToChangedFiles(result.Findings, changed)
+	}
+
+	log.Printf("PR #%d on %s/%s: %d findings (in changed files)", req.prNumber, req.owner, req.repo, len(result.Findings))
 
 	postCheckRun(ctx, client, req, result)
 	postPRComment(ctx, client, req, result)
@@ -66,7 +70,9 @@ func (a *App) scanPush(ctx context.Context, client *github.Client, req scanReque
 	}
 	defer cleanup()
 
-	result, err := runBrolyScan(ctx, dir, nil)
+	changed := getCommitFiles(ctx, client, req)
+
+	result, err := runBrolyScan(ctx, dir, changed)
 	if err != nil {
 		log.Printf("scan failed on %s/%s push %s: %v", req.owner, req.repo, req.headSHA, err)
 		return
@@ -74,7 +80,11 @@ func (a *App) scanPush(ctx context.Context, client *github.Client, req scanReque
 
 	stripPrefix(result, dir)
 
-	log.Printf("push on %s/%s: %d findings", req.owner, req.repo, len(result.Findings))
+	if len(changed) > 0 {
+		result.Findings = filterToChangedFiles(result.Findings, changed)
+	}
+
+	log.Printf("push on %s/%s: %d findings (in changed files)", req.owner, req.repo, len(result.Findings))
 }
 
 // cloneRepo does a shallow clone at the given SHA using the installation token.
@@ -216,6 +226,51 @@ func runBrolyScan(ctx context.Context, dir string, changedFiles []string) (*core
 
 	result.Duration = time.Since(start)
 	return result, nil
+}
+
+// getCommitFiles returns the list of code files changed in a push commit.
+func getCommitFiles(ctx context.Context, client *github.Client, req scanRequest) []string {
+	if req.headSHA == "" {
+		return nil
+	}
+
+	commit, _, err := client.Repositories.GetCommit(ctx, req.owner, req.repo, req.headSHA, nil)
+	if err != nil {
+		log.Printf("get commit files: %v", err)
+		return nil
+	}
+
+	codeExts := map[string]bool{
+		".go": true, ".py": true, ".js": true, ".ts": true, ".jsx": true, ".tsx": true,
+		".java": true, ".rb": true, ".php": true, ".cs": true, ".rs": true,
+		".c": true, ".cpp": true, ".h": true, ".hpp": true, ".kt": true,
+		".swift": true, ".sh": true, ".bash": true,
+	}
+
+	var changed []string
+	for _, f := range commit.Files {
+		ext := strings.ToLower(filepath.Ext(f.GetFilename()))
+		if codeExts[ext] {
+			changed = append(changed, f.GetFilename())
+		}
+	}
+	return changed
+}
+
+// filterToChangedFiles keeps only findings whose FilePath matches a changed file.
+func filterToChangedFiles(findings []core.Finding, changed []string) []core.Finding {
+	changedSet := make(map[string]bool, len(changed))
+	for _, f := range changed {
+		changedSet[f] = true
+	}
+
+	var filtered []core.Finding
+	for _, f := range findings {
+		if changedSet[f.FilePath] {
+			filtered = append(filtered, f)
+		}
+	}
+	return filtered
 }
 
 func stripPrefix(result *core.ScanResult, dir string) {
