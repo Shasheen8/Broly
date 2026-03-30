@@ -44,9 +44,11 @@ func (a *App) scanPR(ctx context.Context, client *github.Client, req scanRequest
 		return
 	}
 
+	// Strip temp dir prefix from file paths so they're repo-relative.
+	stripPrefix(result, dir)
+
 	log.Printf("PR #%d on %s/%s: %d findings", req.prNumber, req.owner, req.repo, len(result.Findings))
 
-	// Post results back to GitHub.
 	postCheckRun(ctx, client, req, result)
 	postPRComment(ctx, client, req, result)
 }
@@ -69,6 +71,8 @@ func (a *App) scanPush(ctx context.Context, client *github.Client, req scanReque
 		log.Printf("scan failed on %s/%s push %s: %v", req.owner, req.repo, req.headSHA, err)
 		return
 	}
+
+	stripPrefix(result, dir)
 
 	log.Printf("push on %s/%s: %d findings", req.owner, req.repo, len(result.Findings))
 }
@@ -162,37 +166,63 @@ func getChangedFiles(ctx context.Context, client *github.Client, req scanRequest
 // runBrolyScan runs the Broly orchestrator on the given directory.
 // If changedFiles is non-nil, SAST is limited to those files.
 func runBrolyScan(ctx context.Context, dir string, changedFiles []string) (*core.ScanResult, error) {
+	hasAI := os.Getenv("TOGETHER_API_KEY") != ""
+
+	// Secrets + SCA: scan full repo.
 	cfg := &core.Config{
 		Targets:       []string{dir},
 		EnableSecrets: true,
 		EnableSCA:     true,
-		EnableSAST:    os.Getenv("TOGETHER_API_KEY") != "",
+		AITriage:      hasAI,
+		Explain:       hasAI,
 		Workers:       4,
 		Quiet:         true,
-	}
-
-	// If we have changed files, scan only those for SAST (cost control).
-	if len(changedFiles) > 0 && cfg.EnableSAST {
-		targets := make([]string, 0, len(changedFiles)+1)
-		targets = append(targets, dir) // secrets + SCA scan full repo
-		for _, f := range changedFiles {
-			targets = append(targets, filepath.Join(dir, f))
-		}
-		cfg.Targets = targets
 	}
 
 	orch := orchestrator.New(cfg)
 	orch.Register(secrets.NewSecretsScanner())
 	orch.Register(sca.NewSCAScanner())
-	if cfg.EnableSAST {
-		orch.Register(sast.NewSASTScanner())
-	}
 
 	start := time.Now()
 	result, err := orch.Run(ctx)
 	if err != nil {
 		return nil, err
 	}
+
+	// SAST: scan only changed files (or full repo if no diff).
+	if hasAI {
+		sastTargets := []string{dir}
+		if len(changedFiles) > 0 {
+			sastTargets = make([]string, 0, len(changedFiles))
+			for _, f := range changedFiles {
+				sastTargets = append(sastTargets, filepath.Join(dir, f))
+			}
+		}
+		sastCfg := &core.Config{
+			Targets:    sastTargets,
+			EnableSAST: true,
+			AITriage:   true,
+			Explain:    true,
+			Workers:    4,
+			Quiet:      true,
+		}
+		sastOrch := orchestrator.New(sastCfg)
+		sastOrch.Register(sast.NewSASTScanner())
+		sastResult, err := sastOrch.Run(ctx)
+		if err == nil {
+			result.Findings = append(result.Findings, sastResult.Findings...)
+		}
+	}
+
 	result.Duration = time.Since(start)
 	return result, nil
+}
+
+func stripPrefix(result *core.ScanResult, dir string) {
+	prefix := dir + "/"
+	for i := range result.Findings {
+		if strings.HasPrefix(result.Findings[i].FilePath, prefix) {
+			result.Findings[i].FilePath = strings.TrimPrefix(result.Findings[i].FilePath, prefix)
+		}
+	}
 }
