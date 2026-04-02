@@ -29,7 +29,7 @@ AI-powered. No rule files. No rule engine.
 |---------|--------|----------|
 | **Secrets** | [Titus](https://github.com/praetorian-inc/titus) · 487 rules · Hyperscan | `--ai-filter-secrets` eliminates false positives |
 | **SCA** | [osv-scalibr](https://github.com/google/osv-scalibr) + [osv.dev](https://osv.dev) · 19 ecosystems | `--ai-sca-reachability` checks if the vuln is actually called |
-| **SAST** | [Together AI](https://together.ai) · `Qwen/Qwen3-Coder-Next-FP8` | Source-to-sink data flow · CVSS scoring |
+| **SAST** | [Together AI](https://together.ai) · `Qwen/Qwen3-Coder-Next-FP8` + regex pre-filter | Source-to-sink data flow · 18 deterministic patterns · priority scoring |
 | **Dockerfile** | AI-powered · Dockerfile, Containerfile, Compose | Privilege escalation, secret exposure, dangerous mounts |
 | **Container** | [go-containerregistry](https://github.com/google/go-containerregistry) + [osv.dev](https://osv.dev) · Alpine, Debian, Ubuntu, RHEL | OS package CVEs with layer attribution |
 
@@ -82,6 +82,11 @@ broly scan -f sarif -o results.sarif               # SARIF 2.1.0 for GitHub Code
 broly scan --min-severity high                     # only high and critical
 
 
+# SBOM generation
+broly sbom                                         # CycloneDX 1.5 to stdout
+broly sbom -f spdx -o sbom.spdx.json              # SPDX 2.3 to file
+
+
 # config
 broly scan --config .broly.yaml                    # load project config file
 broly scan --baseline .broly-baseline.yaml         # suppress known FPs / require specific findings
@@ -94,7 +99,7 @@ broly scan --incremental                           # skip unchanged files (uses 
 
 ### SAST
 
-Each file is sent to the LLM with a structured security prompt. The model traces data flow from source to sink, infers CVSS scores, and finds what static rules miss.
+A fast regex pre-filter catches 18 known vulnerability patterns instantly (SQL injection, hardcoded secrets, XSS sinks, weak crypto, etc.). Then the LLM traces data flow from source to sink and finds what static rules miss.
 
 ```
   ▸ SAST (4 findings)
