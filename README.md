@@ -82,7 +82,7 @@ broly scan -f sarif -o results.sarif               # SARIF 2.1.0 for GitHub Code
 broly scan --min-severity high                     # only high and critical
 
 
-# SBOM generation
+# sbom generation
 broly sbom                                         # CycloneDX 1.5 to stdout
 broly sbom -f spdx -o sbom.spdx.json              # SPDX 2.3 to file
 
