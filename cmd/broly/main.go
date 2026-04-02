@@ -17,6 +17,7 @@ import (
 	"github.com/Shasheen8/Broly/pkg/core"
 	"github.com/Shasheen8/Broly/pkg/orchestrator"
 	"github.com/Shasheen8/Broly/pkg/report"
+	"github.com/Shasheen8/Broly/pkg/sbom"
 	"github.com/Shasheen8/Broly/pkg/sast"
 	"github.com/Shasheen8/Broly/pkg/sca"
 	"github.com/Shasheen8/Broly/pkg/secrets"
@@ -39,6 +40,7 @@ Secrets scanning into a single fast binary. Built in Go for speed.`,
 	}
 
 	root.AddCommand(scanCmd())
+	root.AddCommand(sbomCmd())
 	root.AddCommand(versionCmd())
 	root.AddCommand(validateCmd())
 
@@ -302,6 +304,53 @@ func runScan(cfg *core.Config) error {
 		return errFindings
 	}
 	return nil
+}
+
+func sbomCmd() *cobra.Command {
+	var (
+		outputFormat string
+		outputFile   string
+	)
+
+	cmd := &cobra.Command{
+		Use:   "sbom [paths...]",
+		Short: "Generate a Software Bill of Materials",
+		Long:  `Extract all packages from the specified paths and output a CycloneDX or SPDX SBOM.`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 0 {
+				args = []string{"."}
+			}
+
+			result, err := sbom.Generate(cmd.Context(), args, version)
+			if err != nil {
+				return err
+			}
+
+			var w *os.File
+			if outputFile != "" {
+				w, err = os.OpenFile(outputFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
+				if err != nil {
+					return fmt.Errorf("create output file: %w", err)
+				}
+				defer w.Close()
+			} else {
+				w = os.Stdout
+			}
+
+			switch outputFormat {
+			case "cyclonedx", "cdx":
+				return sbom.FormatCycloneDX(w, result)
+			case "spdx":
+				return sbom.FormatSPDX(w, result)
+			default:
+				return fmt.Errorf("unknown sbom format %q (use: cyclonedx, spdx)", outputFormat)
+			}
+		},
+	}
+
+	cmd.Flags().StringVarP(&outputFormat, "format", "f", "cyclonedx", "SBOM format: cyclonedx, spdx")
+	cmd.Flags().StringVarP(&outputFile, "output", "o", "", "Write output to file (default: stdout)")
+	return cmd
 }
 
 func versionCmd() *cobra.Command {
