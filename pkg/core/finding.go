@@ -23,8 +23,9 @@ type Finding struct {
 	Type        ScanType `json:"type"`
 	RuleID      string   `json:"rule_id"`
 	RuleName    string   `json:"rule_name"`
-	Severity    Severity `json:"severity"`
-	Confidence  string   `json:"confidence,omitempty"`
+	Severity      Severity `json:"severity"`
+	PriorityScore int      `json:"priority_score,omitempty"`
+	Confidence    string   `json:"confidence,omitempty"`
 	Title       string   `json:"title"`
 	Description string   `json:"description"`
 
@@ -114,6 +115,58 @@ func FileContextSafe(path string, startLine, endLine, radius int) string {
 		fmt.Fprintf(&sb, "%4d  %s\n", lineNum, content)
 	}
 	return sb.String()
+}
+
+// ComputePriorityScore sets a weighted priority score based on sec-context research.
+// Formula: (Frequency × 2) + (Severity × 2) + Detectability
+// Higher score = higher priority to fix.
+func (f *Finding) ComputePriorityScore() {
+	// Severity: map to 1-10 scale.
+	var sevScore int
+	switch f.Severity {
+	case SeverityCritical:
+		sevScore = 10
+	case SeverityHigh:
+		sevScore = 8
+	case SeverityMedium:
+		sevScore = 5
+	case SeverityLow:
+		sevScore = 3
+	default:
+		sevScore = 1
+	}
+
+	// Frequency: based on vulnerability class, not detection method.
+	freqScore := 5
+	for _, tag := range f.Tags {
+		switch tag {
+		case "injection":
+			freqScore = 9
+		case "xss":
+			freqScore = 9
+		case "secrets":
+			freqScore = 8
+		case "crypto":
+			freqScore = 6
+		case "config":
+			freqScore = 4
+		}
+	}
+
+	// Detectability: prefilter findings are easy to detect, AI findings harder.
+	detectScore := 5
+	for _, tag := range f.Tags {
+		if tag == "prefilter" {
+			detectScore = 8
+			break
+		}
+		if tag == "ai" {
+			detectScore = 4
+			break
+		}
+	}
+
+	f.PriorityScore = (freqScore * 2) + (sevScore * 2) + detectScore
 }
 
 // ComputeFingerprint sets a deduplication hash. Changes when file path or line changes.

@@ -200,8 +200,33 @@ func (s *SASTScanner) scanFile(ctx context.Context, path, lang string, findings 
 	if err != nil {
 		return false
 	}
+	content := string(src)
 
-	prompt := buildPrompt(path, lang, string(src))
+	// Fast regex pre-filter: deterministic pattern matching (runs instantly).
+	for _, hit := range runPrefilter(content) {
+		f := core.Finding{
+			Type:        core.ScanTypeSAST,
+			RuleID:      "broly.prefilter." + slugify(hit.Pattern.Name),
+			RuleName:    hit.Pattern.Name,
+			Severity:    hit.Pattern.Severity,
+			Title:       hit.Pattern.Name,
+			Description: hit.Pattern.Name + " (" + hit.Pattern.CWE + ")",
+			FilePath:    path,
+			StartLine:   hit.Line,
+			CWE:         []string{hit.Pattern.CWE},
+			Tags:        []string{"sast", "prefilter", hit.Pattern.Category},
+			Timestamp:   time.Now(),
+		}
+		f.ComputeFingerprint()
+		select {
+		case findings <- f:
+		case <-ctx.Done():
+			return false
+		}
+	}
+
+	// AI scan: LLM-based deep analysis.
+	prompt := buildPrompt(path, lang, content)
 
 	response, err := s.client.complete(ctx, prompt)
 	if err != nil {
@@ -213,7 +238,7 @@ func (s *SASTScanner) scanFile(ctx context.Context, path, lang string, findings 
 
 	parsed := parseLLMResponse(path, response)
 	if len(parsed) == 0 && len(strings.TrimSpace(response)) > 0 && !strings.Contains(response, "NO_FINDINGS") {
-		return false // unparsable response, don't cache
+		return false
 	}
 	for _, pf := range parsed {
 		f := pf.toFinding(path, lang)

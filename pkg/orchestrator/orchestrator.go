@@ -97,6 +97,11 @@ func (o *Orchestrator) Run(ctx context.Context) (*core.ScanResult, error) {
 	// Post-processing pipeline.
 	findings = deduplicateFindings(findings)
 
+	// Compute priority scores.
+	for i := range findings {
+		findings[i].ComputePriorityScore()
+	}
+
 	// Baseline: check required findings against full deduplicated set (before any filtering).
 	// Suppression is applied after other filters.
 	var (
