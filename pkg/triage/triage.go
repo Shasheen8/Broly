@@ -10,56 +10,140 @@ import (
 	"github.com/Shasheen8/Broly/pkg/core"
 )
 
-const triagePromptBase = `You are a security expert triaging a code vulnerability finding.
+// vulnExample holds a BAD/GOOD code pair for a vulnerability class.
+// Sourced from sec-context anti-pattern research.
+type vulnExample struct {
+	keywords []string
+	bad      string
+	good     string
+}
 
-Scanner:     %s
-Rule:        %s
-Severity:    %s
-Description: %s
-File:        %s:%d
+var vulnExamples = []vulnExample{
+	{
+		keywords: []string{"sql injection", "sql string", "sql format", "sql concat", "sql concatenation"},
+		bad:      `query = "SELECT * FROM users WHERE id = " + user_id`,
+		good:     `cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))`,
+	},
+	{
+		keywords: []string{"command injection", "shell command", "os.system", "exec.command", "os command"},
+		bad:      `os.system("ping " + host)`,
+		good:     `subprocess.run(["ping", host], shell=False)`,
+	},
+	{
+		keywords: []string{"xss", "cross-site scripting"},
+		bad:      `element.innerHTML = userInput`,
+		good:     `element.textContent = userInput`,
+	},
+	{
+		keywords: []string{"hardcoded secret", "hardcoded password", "hardcoded credential", "hardcoded api key", "hardcoded token"},
+		bad:      `password = "mysecret123"`,
+		good:     `password = os.environ["DB_PASSWORD"]`,
+	},
+	{
+		keywords: []string{"path traversal", "path concatenation", "directory traversal"},
+		bad:      `open("/uploads/" + filename)`,
+		good:     `safe = os.path.realpath(os.path.join("/uploads", filename))\nassert safe.startswith("/uploads")`,
+	},
+	{
+		keywords: []string{"weak hash", "md5", "sha-1", "sha1", "insecure hash"},
+		bad:      `hashlib.md5(password.encode()).hexdigest()`,
+		good:     `hashlib.pbkdf2_hmac("sha256", password.encode(), salt, 100_000)`,
+	},
+	{
+		keywords: []string{"insecure deserialization", "unsafe deserialization", "pickle", "yaml.load"},
+		bad:      `data = pickle.loads(user_input)`,
+		good:     `data = json.loads(user_input)`,
+	},
+	{
+		keywords: []string{"open redirect", "url redirect", "unvalidated redirect"},
+		bad:      `return redirect(request.args.get("next"))`,
+		good:     `next_url = request.args.get("next")\nif next_url and is_safe_url(next_url):\n    return redirect(next_url)`,
+	},
+	{
+		keywords: []string{"debug mode", "debug enabled"},
+		bad:      `app.run(debug=True)`,
+		good:     `app.run(debug=os.environ.get("DEBUG", "false").lower() == "true")`,
+	},
+	{
+		keywords: []string{"cors", "access-control-allow-origin"},
+		bad:      `response.headers["Access-Control-Allow-Origin"] = "*"`,
+		good:     `response.headers["Access-Control-Allow-Origin"] = "https://trusted.example.com"`,
+	},
+	{
+		keywords: []string{"ecb mode", "aes ecb", "cipher ecb"},
+		bad:      `cipher = AES.new(key, AES.MODE_ECB)`,
+		good:     `cipher = AES.new(key, AES.MODE_GCM)`,
+	},
+	{
+		keywords: []string{"math.random", "weak random", "insecure random"},
+		bad:      `token = Math.random().toString(36)`,
+		good:     `token = crypto.randomBytes(32).toString("hex")`,
+	},
+	{
+		keywords: []string{"ssrf", "server-side request forgery", "unvalidated url"},
+		bad:      `resp = requests.get(request.args["url"])`,
+		good:     `url = request.args["url"]\nif not is_allowed_host(url):\n    abort(400)\nresp = requests.get(url)`,
+	},
+	{
+		keywords: []string{"xxe", "xml external entity", "xml injection"},
+		bad:      `tree = lxml.etree.parse(user_file)`,
+		good:     `parser = lxml.etree.XMLParser(resolve_entities=False, no_network=True)\ntree = lxml.etree.parse(user_file, parser)`,
+	},
+}
 
-Code context:
-` + "```" + `
-%s
-` + "```" + `
+// pickBadGoodExample returns a formatted BAD/GOOD example block for the finding,
+// or an empty string if no matching example exists.
+func pickBadGoodExample(f *core.Finding) string {
+	needle := strings.ToLower(f.RuleName + " " + f.Description)
+	for _, ex := range vulnExamples {
+		for _, kw := range ex.keywords {
+			if strings.Contains(needle, kw) {
+				return fmt.Sprintf(
+					"\nVulnerability pattern example:\nBAD:  %s\nGOOD: %s\n",
+					ex.bad, ex.good,
+				)
+			}
+		}
+	}
+	return ""
+}
 
+// buildSASTTriagePrompt constructs the triage prompt for SAST/secrets/dockerfile findings.
+func buildSASTTriagePrompt(f *core.Finding, codeCtx string, explain bool) string {
+	var sb strings.Builder
+
+	sb.WriteString("You are a security expert triaging a code vulnerability finding.\n\n")
+	fmt.Fprintf(&sb, "Scanner:     %s\n", f.Type)
+	fmt.Fprintf(&sb, "Rule:        %s\n", f.RuleName)
+	fmt.Fprintf(&sb, "Severity:    %s\n", f.Severity.String())
+	fmt.Fprintf(&sb, "Description: %s\n", f.Description)
+	fmt.Fprintf(&sb, "File:        %s:%d\n\n", f.FilePath, f.StartLine)
+	sb.WriteString("Code context:\n```\n")
+	sb.WriteString(codeCtx)
+	sb.WriteString("\n```\n")
+
+	if example := pickBadGoodExample(f); example != "" {
+		sb.WriteString(example)
+	}
+
+	sb.WriteString(`
 Determine:
 1. Is this a TRUE_POSITIVE (real, exploitable vulnerability) or FALSE_POSITIVE (test/placeholder/safe pattern)?
 2. Your confidence in that verdict.
-3. If TRUE_POSITIVE, provide a concrete code fix — actual code, not advice.
+3. If TRUE_POSITIVE, provide a concrete code fix -- actual code, not advice.
 
 Respond with exactly:
 VERDICT: TRUE_POSITIVE or FALSE_POSITIVE
 CONFIDENCE: HIGH or MEDIUM or LOW
-REASON: One sentence.
-FIX:
-<2-5 lines of corrected code, or N/A if false positive>`
+REASON: One sentence.`)
 
-const triagePromptExplain = `You are a security expert triaging a code vulnerability finding.
+	if explain {
+		sb.WriteString("\nEXPLANATION: One sentence. Concrete attack vector and real-world impact specific to this code -- not generic advice.")
+	}
+	sb.WriteString("\nFIX:\n<2-5 lines of corrected code, or N/A if false positive>")
 
-Scanner:     %s
-Rule:        %s
-Severity:    %s
-Description: %s
-File:        %s:%d
-
-Code context:
-` + "```" + `
-%s
-` + "```" + `
-
-Determine:
-1. Is this a TRUE_POSITIVE (real, exploitable vulnerability) or FALSE_POSITIVE (test/placeholder/safe pattern)?
-2. Your confidence in that verdict.
-3. If TRUE_POSITIVE, provide a concrete code fix — actual code, not advice.
-
-Respond with exactly:
-VERDICT: TRUE_POSITIVE or FALSE_POSITIVE
-CONFIDENCE: HIGH or MEDIUM or LOW
-REASON: One sentence.
-EXPLANATION: One sentence. Concrete attack vector and real-world impact specific to this code — not generic advice.
-FIX:
-<2-5 lines of corrected code, or N/A if false positive>`
+	return sb.String()
+}
 
 type Triager struct {
 	client  *ai.Client
@@ -115,19 +199,7 @@ func triageFinding(ctx context.Context, client *ai.Client, f *core.Finding, expl
 		} else {
 			codeCtx = core.FileContext(f.FilePath, f.StartLine, 8)
 		}
-
-		tmpl := triagePromptBase
-		if explain {
-			tmpl = triagePromptExplain
-		}
-		prompt = fmt.Sprintf(tmpl,
-			f.Type,
-			f.RuleName,
-			f.Severity.String(),
-			f.Description,
-			f.FilePath, f.StartLine,
-			codeCtx,
-		)
+		prompt = buildSASTTriagePrompt(f, codeCtx, explain)
 	}
 
 	resp, err := client.Complete(ctx, prompt, 768)
