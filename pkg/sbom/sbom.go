@@ -19,7 +19,8 @@ import (
 
 var ecosystems = []string{
 	"go", "python", "javascript", "ruby", "rust", "java", "php",
-	"dotnet", "dart", "haskell", "elixir",
+	"dotnet", "dart", "cpp", "haskell", "elixir", "erlang", "r",
+	"swift", "lua", "nim", "ocaml", "julia",
 }
 
 // Component represents a single package in the SBOM.
