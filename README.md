@@ -28,12 +28,12 @@ AI-powered. No rule files. No rule engine.
 | Scanner | Engine | AI Layer |
 |---------|--------|----------|
 | **Secrets** | [Titus](https://github.com/praetorian-inc/titus) · 487 rules · Hyperscan | `--ai-filter-secrets` eliminates false positives |
-| **SCA** | [osv-scalibr](https://github.com/google/osv-scalibr) + [osv.dev](https://osv.dev) · 19 ecosystems | `--ai-sca-reachability` checks if the vuln is actually called |
-| **SAST** | [Together AI](https://together.ai) · `Qwen/Qwen3-Coder-Next-FP8` + regex pre-filter | Source-to-sink data flow · 18 deterministic patterns · priority scoring |
+| **SCA** | [osv-scalibr](https://github.com/google/osv-scalibr) + [osv.dev](https://osv.dev) · 20 ecosystems | `--ai-sca-reachability` checks if the vuln is actually called |
+| **SAST** | [Together AI](https://together.ai) · `Qwen/Qwen3-Coder-Next-FP8` + regex pre-filter | Source-to-sink data flow · 17 deterministic patterns · priority scoring |
 | **Dockerfile** | AI-powered · Dockerfile, Containerfile, Compose | Privilege escalation, secret exposure, dangerous mounts |
 | **Container** | [go-containerregistry](https://github.com/google/go-containerregistry) + [osv.dev](https://osv.dev) · Alpine, Debian, Ubuntu, RHEL | OS package CVEs with layer attribution |
 | **License** | File-based detection · 13 license types | Policy engine: `allowed_licenses` / `denied_licenses` in `.broly.yaml` |
-| **SBOM** | [osv-scalibr](https://github.com/google/osv-scalibr) · 19 ecosystems | `broly sbom` generates CycloneDX 1.5 or SPDX 2.3 with PURLs |
+| **SBOM** | [osv-scalibr](https://github.com/google/osv-scalibr) · 20 ecosystems | `broly sbom` generates CycloneDX 1.5 or SPDX 2.3 with PURLs |
 
 ---
 
