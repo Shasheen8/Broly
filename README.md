@@ -86,7 +86,11 @@ broly scan --min-severity high                     # only high and critical
 
 # SBOM Generation
 broly sbom                                         # CycloneDX 1.5 to stdout
-broly sbom -f spdx -o sbom.spdx.json              # SPDX 2.3 to file
+broly sbom -f spdx -o sbom.json                    # SPDX 2.3 to file
+
+
+# License Policy
+broly scan --config .broly.yaml                    # license findings emitted when allowed_licenses / denied_licenses set
 
 
 # Config
