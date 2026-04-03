@@ -32,6 +32,7 @@ AI-powered. No rule files. No rule engine.
 | **SAST** | [Together AI](https://together.ai) · `Qwen/Qwen3-Coder-Next-FP8` + regex pre-filter | Source-to-sink data flow · 18 deterministic patterns · priority scoring |
 | **Dockerfile** | AI-powered · Dockerfile, Containerfile, Compose | Privilege escalation, secret exposure, dangerous mounts |
 | **Container** | [go-containerregistry](https://github.com/google/go-containerregistry) + [osv.dev](https://osv.dev) · Alpine, Debian, Ubuntu, RHEL | OS package CVEs with layer attribution |
+| **License** | File-based detection · 13 license types | Policy engine: `allowed_licenses` / `denied_licenses` in `.broly.yaml` |
 
 ---
 
@@ -224,6 +225,17 @@ exclude_paths:
   - vendor
   - .git
 workers: 8
+
+# License policy (findings only emitted when configured)
+allowed_licenses:
+  - MIT
+  - Apache-2.0
+  - BSD-2-Clause
+  - BSD-3-Clause
+  - ISC
+denied_licenses:
+  - GPL-3.0
+  - AGPL-3.0
 ```
 
 ### Baseline

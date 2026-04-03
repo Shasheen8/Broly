@@ -16,6 +16,7 @@ const (
 	ScanTypeSecrets    ScanType = "secrets"
 	ScanTypeDockerfile ScanType = "dockerfile"
 	ScanTypeContainer  ScanType = "container"
+	ScanTypeLicense    ScanType = "license"
 )
 
 type Finding struct {

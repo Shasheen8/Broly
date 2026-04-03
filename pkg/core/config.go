@@ -32,5 +32,7 @@ type Config struct {
 	Incremental  bool   `yaml:"incremental" json:"incremental"`
 	CachePath    string `yaml:"cache_path" json:"cache_path"`
 	Quiet          bool   `yaml:"quiet" json:"quiet"`
-	ContainerImage string `yaml:"container_image" json:"container_image"`
+	ContainerImage  string   `yaml:"container_image" json:"container_image"`
+	AllowedLicenses []string `yaml:"allowed_licenses" json:"allowed_licenses"`
+	DeniedLicenses  []string `yaml:"denied_licenses" json:"denied_licenses"`
 }

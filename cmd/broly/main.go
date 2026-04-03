@@ -15,6 +15,7 @@ import (
 
 	"github.com/Shasheen8/Broly/pkg/container"
 	"github.com/Shasheen8/Broly/pkg/core"
+	"github.com/Shasheen8/Broly/pkg/license"
 	"github.com/Shasheen8/Broly/pkg/orchestrator"
 	"github.com/Shasheen8/Broly/pkg/report"
 	"github.com/Shasheen8/Broly/pkg/sbom"
@@ -271,6 +272,9 @@ func runScan(cfg *core.Config) error {
 	}
 	if cfg.ContainerImage != "" {
 		orch.Register(container.NewContainerScanner())
+	}
+	if len(cfg.AllowedLicenses) > 0 || len(cfg.DeniedLicenses) > 0 {
+		orch.Register(license.NewLicenseScanner())
 	}
 
 	start := time.Now()

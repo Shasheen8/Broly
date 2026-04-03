@@ -77,7 +77,7 @@ func (f *TableFormatter) Format(w io.Writer, result *core.ScanResult) error {
 
 	printBanner(w, clr)
 
-	for _, scanType := range []core.ScanType{core.ScanTypeSecrets, core.ScanTypeSCA, core.ScanTypeSAST, core.ScanTypeDockerfile, core.ScanTypeContainer} {
+	for _, scanType := range []core.ScanType{core.ScanTypeSecrets, core.ScanTypeSCA, core.ScanTypeSAST, core.ScanTypeDockerfile, core.ScanTypeContainer, core.ScanTypeLicense} {
 		findings, ok := byScanType[scanType]
 		if !ok {
 			continue
@@ -106,6 +106,8 @@ func scanTypeLabel(t core.ScanType) string {
 		return "DOCKERFILE"
 	case core.ScanTypeContainer:
 		return "CONTAINER"
+	case core.ScanTypeLicense:
+		return "LICENSE"
 	default:
 		return strings.ToUpper(string(t))
 	}
@@ -215,7 +217,9 @@ func printScanTypeTable(w io.Writer, clr color, scanType core.ScanType, findings
 	case core.ScanTypeSAST:
 		printSASTTable(w, clr, findings)
 	case core.ScanTypeDockerfile:
-		printSASTTable(w, clr, findings) // same columns: severity, issue, file, description
+		printSASTTable(w, clr, findings)
+	case core.ScanTypeLicense:
+		printSASTTable(w, clr, findings)
 	}
 }
 
