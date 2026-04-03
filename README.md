@@ -33,6 +33,7 @@ AI-powered. No rule files. No rule engine.
 | **Dockerfile** | AI-powered · Dockerfile, Containerfile, Compose | Privilege escalation, secret exposure, dangerous mounts |
 | **Container** | [go-containerregistry](https://github.com/google/go-containerregistry) + [osv.dev](https://osv.dev) · Alpine, Debian, Ubuntu, RHEL | OS package CVEs with layer attribution |
 | **License** | File-based detection · 13 license types | Policy engine: `allowed_licenses` / `denied_licenses` in `.broly.yaml` |
+| **SBOM** | [osv-scalibr](https://github.com/google/osv-scalibr) · 19 ecosystems | `broly sbom` generates CycloneDX 1.5 or SPDX 2.3 with PURLs |
 
 ---
 
