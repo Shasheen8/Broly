@@ -27,7 +27,7 @@ import (
 var ecosystems = []string{
 	"go", "python", "javascript", "ruby", "rust", "java", "php",
 	"dotnet", "dart", "cpp", "haskell", "elixir", "erlang", "r",
-	"swift", "lua", "nim", "ocaml", "julia",
+	"swift", "lua", "nim", "ocaml", "julia", "perl",
 }
 
 type SCAScanner struct {

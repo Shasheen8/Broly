@@ -20,7 +20,7 @@ import (
 var ecosystems = []string{
 	"go", "python", "javascript", "ruby", "rust", "java", "php",
 	"dotnet", "dart", "cpp", "haskell", "elixir", "erlang", "r",
-	"swift", "lua", "nim", "ocaml", "julia",
+	"swift", "lua", "nim", "ocaml", "julia", "perl",
 }
 
 // Component represents a single package in the SBOM.
@@ -114,6 +114,8 @@ func buildPURL(name, version, ecosystem string) string {
 		return fmt.Sprintf("pkg:composer/%s@%s", name, version)
 	case strings.Contains(eco, "nuget") || strings.Contains(eco, "dotnet"):
 		return fmt.Sprintf("pkg:nuget/%s@%s", name, version)
+	case strings.Contains(eco, "cpan") || strings.Contains(eco, "perl"):
+		return fmt.Sprintf("pkg:cpan/%s@%s", name, version)
 	default:
 		return fmt.Sprintf("pkg:generic/%s@%s", name, version)
 	}
