@@ -79,7 +79,7 @@ func (s *LicenseScanner) Scan(ctx context.Context, paths []string, findings chan
 				RuleID:      ruleID,
 				RuleName:    status + " license: " + d.license,
 				Severity:    sev,
-				Title:       fmt.Sprintf("%s license %s in %s", strings.Title(status), d.license, d.pkg),
+				Title:       fmt.Sprintf("%s license %s in %s", capitalize(status), d.license, d.pkg),
 				Description: fmt.Sprintf("Package %s uses license %s which is %s by policy", d.pkg, d.license, status),
 				FilePath:    d.filePath,
 				StartLine:   1,
@@ -98,6 +98,13 @@ func (s *LicenseScanner) Scan(ctx context.Context, paths []string, findings chan
 }
 
 func (s *LicenseScanner) Close() error { return nil }
+
+func capitalize(s string) string {
+	if s == "" {
+		return ""
+	}
+	return strings.ToUpper(s[:1]) + s[1:]
+}
 
 func (s *LicenseScanner) checkPolicy(lic string) string {
 	for _, d := range s.policy.denied {

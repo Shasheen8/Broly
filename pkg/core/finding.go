@@ -137,13 +137,12 @@ func (f *Finding) ComputePriorityScore() {
 		sevScore = 1
 	}
 
-	// Frequency: based on vulnerability class, not detection method.
+	// Frequency and detectability: derived from vulnerability class and detection method tags.
 	freqScore := 5
+	detectScore := 5
 	for _, tag := range f.Tags {
 		switch tag {
-		case "injection":
-			freqScore = 9
-		case "xss":
+		case "injection", "xss":
 			freqScore = 9
 		case "secrets":
 			freqScore = 8
@@ -151,19 +150,10 @@ func (f *Finding) ComputePriorityScore() {
 			freqScore = 6
 		case "config":
 			freqScore = 4
-		}
-	}
-
-	// Detectability: prefilter findings are easy to detect, AI findings harder.
-	detectScore := 5
-	for _, tag := range f.Tags {
-		if tag == "prefilter" {
+		case "prefilter":
 			detectScore = 8
-			break
-		}
-		if tag == "ai" {
+		case "ai":
 			detectScore = 4
-			break
 		}
 	}
 

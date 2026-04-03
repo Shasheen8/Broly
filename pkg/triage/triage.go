@@ -19,23 +19,26 @@ type vulnExample struct {
 }
 
 var vulnExamples = []vulnExample{
+	// Keywords match both prefilter rule names and LLM finding descriptions.
+	// Kept specific to avoid injecting misleading examples on legitimate use
+	// (e.g. bare "md5" would match SHA1 cert fingerprinting or git object hashing).
 	{
-		keywords: []string{"sql injection", "sql string", "sql format", "sql concat", "sql concatenation"},
+		keywords: []string{"sql injection", "sql string concatenation", "sql f-string", "sql format", "sql concat"},
 		bad:      `query = "SELECT * FROM users WHERE id = " + user_id`,
 		good:     `cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))`,
 	},
 	{
-		keywords: []string{"command injection", "shell command", "os.system", "exec.command", "os command"},
+		keywords: []string{"command injection", "shell command with concat", "os command injection", "shell=true"},
 		bad:      `os.system("ping " + host)`,
 		good:     `subprocess.run(["ping", host], shell=False)`,
 	},
 	{
-		keywords: []string{"xss", "cross-site scripting"},
+		keywords: []string{"xss", "cross-site scripting", "innerhtml assignment"},
 		bad:      `element.innerHTML = userInput`,
 		good:     `element.textContent = userInput`,
 	},
 	{
-		keywords: []string{"hardcoded secret", "hardcoded password", "hardcoded credential", "hardcoded api key", "hardcoded token"},
+		keywords: []string{"hardcoded secret", "hardcoded password", "hardcoded credential", "hardcoded api key", "hardcoded token", "aws access key", "private key block", "jwt secret"},
 		bad:      `password = "mysecret123"`,
 		good:     `password = os.environ["DB_PASSWORD"]`,
 	},
@@ -45,12 +48,12 @@ var vulnExamples = []vulnExample{
 		good:     `safe = os.path.realpath(os.path.join("/uploads", filename))\nassert safe.startswith("/uploads")`,
 	},
 	{
-		keywords: []string{"weak hash", "md5", "sha-1", "sha1", "insecure hash"},
+		keywords: []string{"weak hash", "weak hash (md5)", "weak hash (sha1)", "insecure hash"},
 		bad:      `hashlib.md5(password.encode()).hexdigest()`,
 		good:     `hashlib.pbkdf2_hmac("sha256", password.encode(), salt, 100_000)`,
 	},
 	{
-		keywords: []string{"insecure deserialization", "unsafe deserialization", "pickle", "yaml.load"},
+		keywords: []string{"insecure deserialization", "unsafe deserialization"},
 		bad:      `data = pickle.loads(user_input)`,
 		good:     `data = json.loads(user_input)`,
 	},
@@ -60,12 +63,12 @@ var vulnExamples = []vulnExample{
 		good:     `next_url = request.args.get("next")\nif next_url and is_safe_url(next_url):\n    return redirect(next_url)`,
 	},
 	{
-		keywords: []string{"debug mode", "debug enabled"},
+		keywords: []string{"debug mode enabled"},
 		bad:      `app.run(debug=True)`,
 		good:     `app.run(debug=os.environ.get("DEBUG", "false").lower() == "true")`,
 	},
 	{
-		keywords: []string{"cors", "access-control-allow-origin"},
+		keywords: []string{"cors allow all"},
 		bad:      `response.headers["Access-Control-Allow-Origin"] = "*"`,
 		good:     `response.headers["Access-Control-Allow-Origin"] = "https://trusted.example.com"`,
 	},
@@ -75,7 +78,7 @@ var vulnExamples = []vulnExample{
 		good:     `cipher = AES.new(key, AES.MODE_GCM)`,
 	},
 	{
-		keywords: []string{"math.random", "weak random", "insecure random"},
+		keywords: []string{"math.random for security", "weak random", "insecure random"},
 		bad:      `token = Math.random().toString(36)`,
 		good:     `token = crypto.randomBytes(32).toString("hex")`,
 	},
@@ -130,7 +133,7 @@ func buildSASTTriagePrompt(f *core.Finding, codeCtx string, explain bool) string
 Determine:
 1. Is this a TRUE_POSITIVE (real, exploitable vulnerability) or FALSE_POSITIVE (test/placeholder/safe pattern)?
 2. Your confidence in that verdict.
-3. If TRUE_POSITIVE, provide a concrete code fix -- actual code, not advice.
+3. If TRUE_POSITIVE, provide a concrete code fix — actual code, not advice.
 
 Respond with exactly:
 VERDICT: TRUE_POSITIVE or FALSE_POSITIVE
@@ -138,7 +141,7 @@ CONFIDENCE: HIGH or MEDIUM or LOW
 REASON: One sentence.`)
 
 	if explain {
-		sb.WriteString("\nEXPLANATION: One sentence. Concrete attack vector and real-world impact specific to this code -- not generic advice.")
+		sb.WriteString("\nEXPLANATION: One sentence. Concrete attack vector and real-world impact specific to this code — not generic advice.")
 	}
 	sb.WriteString("\nFIX:\n<2-5 lines of corrected code, or N/A if false positive>")
 

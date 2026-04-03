@@ -78,7 +78,7 @@ func FormatSPDX(w io.Writer, result *Result) error {
 		DataLicense:       "CC0-1.0",
 		SPDXID:            "SPDXRef-DOCUMENT",
 		Name:              "broly-sbom",
-		DocumentNamespace: fmt.Sprintf("https://broly.dev/sbom/%s", uuid()),
+		DocumentNamespace: fmt.Sprintf("https://github.com/Shasheen8/Broly/sbom/%s", uuid()),
 		CreationInfo: spdxCreation{
 			Created:  result.Timestamp.UTC().Format(time.RFC3339),
 			Creators: []string{fmt.Sprintf("Tool: %s-%s", result.Tool, result.Version)},

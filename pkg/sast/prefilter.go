@@ -59,7 +59,7 @@ var prefilterPatterns = []pattern{
 
 	// Path Traversal
 	{Name: "Path concatenation", CWE: "CWE-22", Severity: core.SeverityHigh, Category: "input",
-		Regex: regexp.MustCompile(`(?i)(open|read_?file|write_?file)\s*\(.*\+`)},
+		Regex: regexp.MustCompile(`(?i)(?:read_?file|write_?file)\s*\(.*\+|open\s*\([^)]*["'/][^)]*\+`)},
 
 	// Debug/Config
 	{Name: "Debug mode enabled", CWE: "CWE-215", Severity: core.SeverityMedium, Category: "config",
@@ -81,7 +81,7 @@ func runPrefilter(content string) []prefilterHit {
 
 	for lineNum, line := range lines {
 		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "#") || strings.HasPrefix(trimmed, "*") {
+		if strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "#") || trimmed == "*" || strings.HasPrefix(trimmed, "* ") {
 			continue
 		}
 
