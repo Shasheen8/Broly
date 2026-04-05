@@ -323,7 +323,7 @@ Broly/
 - [x] ANSI color output with TTY detection (no color when piped)
 - [x] Wide character alignment (`runeWidth`, `visibleLen`) for correct emoji/CJK rendering in banners
 
-### Phase 3 - Distribution (Complete - 2026-03-08)
+### Phase 3 - Distribution (Partial — remaining items in Phase 11D)
 
 - [x] **`go install`** - `go install github.com/Shasheen8/Broly/cmd/broly@latest` works when public (pure Go regex; Hyperscan via source build)
 - [x] **Self-scan workflow** - `.github/workflows/scan.yml` — Broly scans itself on every PR and push to main
@@ -600,44 +600,6 @@ Integrates patterns from 150+ security research sources into the scan engine. Ad
 
 *Terraform, CloudFormation, and Kubernetes manifest scanning moved to Phase 11C.*
 
-### Phase 11 - Remaining Work (Consolidated Backlog)
-
-All pending items from earlier phases collected in one place.
-
-#### 11A - GitHub App Completion
-
-*(items from Phase 7C/7D)*
-
-- [ ] **SARIF upload** — upload scan results to GitHub Security tab via code-scanning API; enables findings in the Security tab alongside Dependabot and CodeQL
-- [ ] **AWS deployment** — ECS Fargate or Lambda+SQS; ALB for HTTPS; auto-scaling; IAM role for GitHub App service
-- [ ] **External monitoring** — `/healthz` endpoint already implemented; wire up uptime check (e.g. UptimeRobot, Fly.io health checks)
-
-#### 11B - AI Depth
-
-*(items from Phase 5 and Phase 8C)*
-
-- [ ] **Multi-file SAST** — send cross-file context for inter-procedural taint analysis; improves accuracy on source/sink patterns that span files
-- [ ] **Hallucinated package detection** — detect AI-generated package names that don't exist in registries; needs registry API calls (npm, PyPI, crates.io), not just OSV
-
-#### 11C - IaC Scanning
-
-*(items from Phase 8D)*
-
-- [ ] **Terraform** — misconfigurations in `.tf` files (open security groups, public S3, no encryption); AI-powered like SAST
-- [ ] **CloudFormation** — similar checks on CF templates
-- [ ] **Kubernetes** — privileged pods, host networking, missing resource limits in manifests
-
-#### 11D - Distribution (unblocked when repo goes public)
-
-*(items from Phase 3)*
-
-- [ ] **Make repo public** — unblocks everything below; required for `go install`, SARIF tab, Homebrew
-- [ ] **Go proxy seeding** — hit `proxy.golang.org` and `sum.golang.org` after each release so `go install` works without env vars
-- [ ] **Reusable scan workflow** — standalone `.github/workflows/broly.yml` users drop into any repo; no app install required
-- [ ] **Homebrew tap** — `Shasheen8/homebrew-tap`; `brew install Shasheen8/tap/broly`
-- [ ] **curl install script** — `curl -fsSL .../install.sh | bash`
-
----
 
 ### Phase 9 - Centralized Storage (Deferred — requires company AWS access)
 
@@ -926,3 +888,43 @@ cd Broly && make build
 
 - `linux/amd64`, `linux/arm64` (pre-built binaries)
 - `darwin/*` - build from source (CGO dependency on Vectorscan)
+
+### Phase 11 - Remaining Work (Consolidated Backlog)
+
+All pending items from earlier phases collected in one place.
+
+#### 11A - GitHub App Completion
+
+*(items from Phase 7C/7D)*
+
+- [ ] **SARIF upload** — upload scan results to GitHub Security tab via code-scanning API; enables findings in the Security tab alongside Dependabot and CodeQL
+- [ ] **AWS deployment** — ECS Fargate or Lambda+SQS; ALB for HTTPS; auto-scaling; IAM role for GitHub App service
+- [ ] **External monitoring** — `/healthz` endpoint already implemented; wire up uptime check (e.g. UptimeRobot, Fly.io health checks)
+
+#### 11B - AI Depth
+
+*(items from Phase 5 and Phase 8C)*
+
+- [ ] **Multi-file SAST** — send cross-file context for inter-procedural taint analysis; improves accuracy on source/sink patterns that span files
+- [ ] **Hallucinated package detection** — detect AI-generated package names that don't exist in registries; needs registry API calls (npm, PyPI, crates.io), not just OSV
+
+#### 11C - IaC Scanning
+
+*(items from Phase 8D)*
+
+- [ ] **Terraform** — misconfigurations in `.tf` files (open security groups, public S3, no encryption); AI-powered like SAST
+- [ ] **CloudFormation** — similar checks on CF templates
+- [ ] **Kubernetes** — privileged pods, host networking, missing resource limits in manifests
+
+#### 11D - Distribution (unblocked when repo goes public)
+
+*(items from Phase 3)*
+
+- [ ] **Make repo public** — unblocks everything below; required for `go install`, SARIF tab, Homebrew
+- [ ] **Go proxy seeding** — hit `proxy.golang.org` and `sum.golang.org` after each release so `go install` works without env vars
+- [ ] **Reusable scan workflow** — standalone `.github/workflows/broly.yml` users drop into any repo; no app install required
+- [ ] **Homebrew tap** — `Shasheen8/homebrew-tap`; `brew install Shasheen8/tap/broly`
+- [ ] **curl install script** — `curl -fsSL .../install.sh | bash`
+
+---
+
