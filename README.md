@@ -105,7 +105,7 @@ broly scan --incremental                           # skip unchanged files (uses 
 
 ### SAST
 
-A fast regex pre-filter catches 18 known vulnerability patterns instantly (SQL injection, hardcoded secrets, XSS sinks, weak crypto, etc.). Then the LLM traces data flow from source to sink and finds what static rules miss.
+A fast regex pre-filter catches 17 known vulnerability patterns instantly (SQL injection, hardcoded secrets, XSS sinks, weak crypto, etc.). Then the LLM traces data flow from source to sink and finds what static rules miss.
 
 ```
   ▸ SAST (4 findings)
@@ -149,7 +149,7 @@ Auto-detected during normal scans. Specialized prompts cover privilege escalatio
 
 ### SCA
 
-19 ecosystems, 50+ lockfile formats. `--ai-sca-reachability` checks if the vulnerable function is actually called:
+20 ecosystems, 50+ lockfile formats. `--ai-sca-reachability` checks if the vulnerable function is actually called:
 
 ```
   ▸ SCA (3 findings)
@@ -213,6 +213,28 @@ The app clones the repo at the PR head, runs Broly with AI triage, and posts fin
 ```bash
 # run the app server locally
 APP_ID=123456 PRIVATE_KEY_PATH=./app.pem WEBHOOK_SECRET=your_secret go run ./cmd/broly-app
+```
+
+### Deployment
+
+Multi-stage Dockerfile at `cmd/broly-app/Dockerfile`. Uses Chainguard hardened images — minimal attack surface, non-root by default.
+
+```bash
+docker build -f cmd/broly-app/Dockerfile -t broly-app .
+
+docker run -p 8080:8080 \
+  -e APP_ID=123456 \
+  -e PRIVATE_KEY_PATH=/secrets/app.pem \
+  -e WEBHOOK_SECRET=your_secret \
+  -e TOGETHER_API_KEY=your_key \
+  -v /path/to/app.pem:/secrets/app.pem:ro \
+  broly-app
+```
+
+Every scan emits a structured JSON log line:
+
+```json
+{"time":"2026-04-04T10:00:00Z","level":"INFO","msg":"scan complete","event":"pull_request","repo":"acme/api","pr":42,"sha":"abc123","findings":3,"duration_ms":8241}
 ```
 
 ---
