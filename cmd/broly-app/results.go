@@ -103,10 +103,10 @@ func buildSummary(result *core.ScanResult) string {
 		len(result.Findings), strings.Join(parts, ", "), result.Duration.Round(time.Millisecond))
 }
 
-func buildAnnotations(result *core.ScanResult, max int) []*github.CheckRunAnnotation {
+func buildAnnotations(result *core.ScanResult, limit int) []*github.CheckRunAnnotation {
 	var annotations []*github.CheckRunAnnotation
 	for _, f := range result.Findings {
-		if len(annotations) >= max {
+		if len(annotations) >= limit {
 			break
 		}
 		if f.FilePath == "" || f.StartLine < 1 {
@@ -128,7 +128,7 @@ func buildAnnotations(result *core.ScanResult, max int) []*github.CheckRunAnnota
 		annotations = append(annotations, &github.CheckRunAnnotation{
 			Path:            github.Ptr(f.FilePath),
 			StartLine:       github.Ptr(f.StartLine),
-			EndLine:         github.Ptr(max1(f.EndLine, f.StartLine)),
+			EndLine:         github.Ptr(max(f.EndLine, f.StartLine)),
 			AnnotationLevel: github.Ptr(level),
 			Message:         github.Ptr(msg),
 			Title:           github.Ptr(fmt.Sprintf("[%s] %s", f.Severity, f.RuleName)),
@@ -137,12 +137,6 @@ func buildAnnotations(result *core.ScanResult, max int) []*github.CheckRunAnnota
 	return annotations
 }
 
-func max1(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
 
 func buildCommentBody(result *core.ScanResult) string {
 	var b strings.Builder
@@ -201,7 +195,7 @@ func buildCommentBody(result *core.ScanResult) string {
 		icon := sevIcon[f.Severity.String()]
 		issue := f.RuleName
 		if len(issue) > 55 {
-			issue = issue[:55]
+			issue = issue[:52] + "..."
 		}
 		loc := ""
 		if f.FilePath != "" {
@@ -274,7 +268,7 @@ func buildCommentBody(result *core.ScanResult) string {
 			icon := sevIcon[f.Severity.String()]
 			rule := f.RuleName
 			if len(rule) > 50 {
-				rule = rule[:50]
+				rule = rule[:47] + "..."
 			}
 			loc := ""
 			if f.FilePath != "" {

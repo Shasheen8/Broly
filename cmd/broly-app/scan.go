@@ -117,7 +117,7 @@ func cloneRepo(ctx context.Context, client *github.Client, req scanRequest) (str
 	cleanup := func() { os.RemoveAll(dir) }
 
 	// Get installation token for authenticated clone.
-	token, err := installationToken(client)
+	token, err := installationToken(ctx, client)
 	if err != nil {
 		cleanup()
 		return "", nil, fmt.Errorf("get token: %w", err)
@@ -125,11 +125,8 @@ func cloneRepo(ctx context.Context, client *github.Client, req scanRequest) (str
 
 	cloneURL := fmt.Sprintf("https://x-access-token:%s@github.com/%s/%s.git", token, req.owner, req.repo)
 
-	cmd := exec.CommandContext(ctx, "git", "clone", "--depth=1", "--branch", req.headSHA, cloneURL, dir)
-	cmd.Stderr = os.Stderr
-
-	// --branch doesn't work with SHAs on shallow clone. Use fetch instead.
-	cmd = exec.CommandContext(ctx, "git", "init", dir)
+	// Shallow clone at a specific SHA: git init + fetch + checkout (--branch doesn't accept SHAs).
+	cmd := exec.CommandContext(ctx, "git", "init", dir)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		cleanup()
 		return "", nil, fmt.Errorf("git init: %s: %w", out, err)
@@ -156,12 +153,20 @@ func cloneRepo(ctx context.Context, client *github.Client, req scanRequest) (str
 	return dir, cleanup, nil
 }
 
-func installationToken(client *github.Client) (string, error) {
+func installationToken(ctx context.Context, client *github.Client) (string, error) {
 	transport, ok := client.Client().Transport.(*ghinstallation.Transport)
 	if !ok {
 		return "", fmt.Errorf("could not extract installation token from transport")
 	}
-	return transport.Token(context.Background())
+	return transport.Token(ctx)
+}
+
+// codeExts is the set of file extensions SAST will scan.
+var codeExts = map[string]bool{
+	".go": true, ".py": true, ".js": true, ".ts": true, ".jsx": true, ".tsx": true,
+	".java": true, ".rb": true, ".php": true, ".cs": true, ".rs": true,
+	".c": true, ".cpp": true, ".h": true, ".hpp": true, ".kt": true,
+	".swift": true, ".sh": true, ".bash": true,
 }
 
 // getChangedFiles returns the list of code files changed in a PR.
@@ -175,13 +180,6 @@ func getChangedFiles(ctx context.Context, client *github.Client, req scanRequest
 	if err != nil {
 		slog.Error("list PR files", "err", err)
 		return nil
-	}
-
-	codeExts := map[string]bool{
-		".go": true, ".py": true, ".js": true, ".ts": true, ".jsx": true, ".tsx": true,
-		".java": true, ".rb": true, ".php": true, ".cs": true, ".rs": true,
-		".c": true, ".cpp": true, ".h": true, ".hpp": true, ".kt": true,
-		".swift": true, ".sh": true, ".bash": true,
 	}
 
 	var changed []string
@@ -259,13 +257,6 @@ func getCommitFiles(ctx context.Context, client *github.Client, req scanRequest)
 	if err != nil {
 		slog.Error("get commit files", "err", err)
 		return nil
-	}
-
-	codeExts := map[string]bool{
-		".go": true, ".py": true, ".js": true, ".ts": true, ".jsx": true, ".tsx": true,
-		".java": true, ".rb": true, ".php": true, ".cs": true, ".rs": true,
-		".c": true, ".cpp": true, ".h": true, ".hpp": true, ".kt": true,
-		".swift": true, ".sh": true, ".bash": true,
 	}
 
 	var changed []string
