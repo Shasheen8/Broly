@@ -323,7 +323,7 @@ Broly/
 - [x] ANSI color output with TTY detection (no color when piped)
 - [x] Wide character alignment (`runeWidth`, `visibleLen`) for correct emoji/CJK rendering in banners
 
-### Phase 3 - Distribution (Partial - resuming after Phase 5)
+### Phase 3 - Distribution (Complete - 2026-03-08)
 
 - [x] **`go install`** - `go install github.com/Shasheen8/Broly/cmd/broly@latest` works when public (pure Go regex; Hyperscan via source build)
 - [x] **Self-scan workflow** - `.github/workflows/scan.yml` — Broly scans itself on every PR and push to main
@@ -332,11 +332,8 @@ Broly/
   - Uploads SARIF to GitHub Security tab
   - Full scan on push to main / `workflow_dispatch`
   - `continue-on-error: true` — findings never block merges
-- [ ] **Go proxy seeding** - add step to `release.yml` that hits `proxy.golang.org` and `sum.golang.org` after each release so `go install` works for everyone with no env vars (requires repo to be public)
-- [ ] **Make repo public** - unblocks: `go install`, release badge auto-detection, SARIF uploads to Security tab, Homebrew tap
-- [ ] **Reusable scan workflow** - standalone workflow users drop into any repo (after Phase 5)
-- [ ] **Homebrew tap** - `Shasheen8/homebrew-tap` (after Phase 5)
-- [ ] **curl install script** - `curl -fsSL .../install.sh | bash` (after Phase 5)
+
+*Remaining distribution tasks (proxy seeding, public repo, Homebrew, curl install, reusable workflow) moved to Phase 11D.*
 
 ### Phase 4 - Developer Experience (Complete - 2026-03-10)
 
@@ -374,16 +371,17 @@ Broly/
 - [x] **`duration_ms` mislabeled** - `time.Duration` encodes as nanoseconds; JSON tag renamed to `duration_ns`
 - [x] **Dead code removed** - `SCAScanner.scanPaths`, `parsedFinding.cvssVector`, `reachabilityResult.confidence`, `bannerLine`, unused `ScanMetrics` fields
 
-### Phase 5 - AI Depth + Developer Feedback Loop (Next)
+### Phase 5 - AI Depth + Developer Feedback Loop (Complete - 2026-03-10)
 
 The feedback loop is the feature that makes Broly self-improving. Every verdict a developer makes teaches the scanner what to ignore and what to catch — automatically, per repo, over time.
 
 **AI Depth:**
 - [x] **TP/FP verdict in PR comment** - AI labels each finding TRUE_POSITIVE or FALSE_POSITIVE before posting
 - [x] **AI fix suggestions** - per-finding remediation code from LLM attached to PR comment; collapsible blocks in PR comment, inline in terminal for all scanner types
-- [ ] **Multi-file SAST** - send cross-file context for inter-procedural taint analysis
 - [x] **Confidence scoring** - surfaced in output and PR comment per finding
 - [x] **Explain mode** - `--explain` flag for concise attack-scenario sentence per finding
+
+*Multi-file SAST (cross-file inter-procedural taint analysis) moved to Phase 11B.*
 
 **Developer Feedback Loop (via CI/CD — no infra required):**
 - [x] **Checkboxes in PR comment** - each finding has a [ ] checkbox; dev checks = false positive / accepted risk
@@ -583,7 +581,7 @@ Integrates patterns from 150+ security research sources into the scan engine. Ad
 - [x] **Regex pre-filter** — 17 patterns covering secrets, SQL injection, command injection, XSS, weak crypto, path traversal, debug mode, CORS. Runs instantly per file before LLM. Findings tagged `prefilter` for distinction. Comment lines skipped.
 - [x] **Enriched SAST prompts** — "Common AI Anti-Patterns" section added to code analysis prompt: 8 vulnerability classes the model should watch for, sourced from sec-context research
 - [x] **Priority scoring** — `(Frequency × 2) + (Severity × 2) + Detectability` per finding via `ComputePriorityScore()`. Frequency based on vuln class (injection=9, secrets=8, crypto=6). Detectability: prefilter=8, AI=4. Available in JSON/SARIF.
-- [ ] **Hallucinated package detection** — deferred; needs registry API calls, not just OSV. Will revisit.
+*Hallucinated package detection moved to Phase 11B — needs registry API calls, not just OSV.*
 - [x] **BAD/GOOD pattern pairs in triage** — 14 BAD/GOOD code pairs (SQL injection, command injection, XSS, hardcoded secrets, path traversal, weak hash, insecure deserialization, open redirect, debug mode, CORS, ECB mode, weak random, SSRF, XXE); matched by keyword from rule name + description; injected into SAST triage prompt before "Determine:" section
 
 #### 8C.1 - Security Audit + Dependency Refresh (Complete - 2026-04-03)
@@ -598,12 +596,9 @@ Integrates patterns from 150+ security research sources into the scan engine. Ad
 - [x] **osv-scalibr bumped to v0.4.5** — adds Perl/CPAN extractor, `.csproj` extractor, NuGet Central Package Management (`Directory.Packages.props`)
 - [x] **Perl/CPAN ecosystem** — added to SCA and SBOM ecosystem lists; `pkg:cpan/` PURL added to SBOM formatter
 
-#### 8D - IaC Scanning (Optional)
+#### 8D - IaC Scanning (Moved to Phase 11C)
 
-- [ ] **Terraform** - misconfigurations in `.tf` files (open security groups, public S3, no encryption)
-- [ ] **CloudFormation** - similar checks on CF templates
-- [ ] **Kubernetes** - privileged pods, host networking, missing resource limits in manifests
-- [ ] **Approach** - AI-powered like SAST (send config to model with IaC security prompt); no rule engine
+*Terraform, CloudFormation, and Kubernetes manifest scanning moved to Phase 11C.*
 
 ### Phase 11 - Remaining Work (Consolidated Backlog)
 
@@ -611,22 +606,30 @@ All pending items from earlier phases collected in one place.
 
 #### 11A - GitHub App Completion
 
+*(items from Phase 7C/7D)*
+
 - [ ] **SARIF upload** — upload scan results to GitHub Security tab via code-scanning API; enables findings in the Security tab alongside Dependabot and CodeQL
 - [ ] **AWS deployment** — ECS Fargate or Lambda+SQS; ALB for HTTPS; auto-scaling; IAM role for GitHub App service
 - [ ] **External monitoring** — `/healthz` endpoint already implemented; wire up uptime check (e.g. UptimeRobot, Fly.io health checks)
 
 #### 11B - AI Depth
 
+*(items from Phase 5 and Phase 8C)*
+
 - [ ] **Multi-file SAST** — send cross-file context for inter-procedural taint analysis; improves accuracy on source/sink patterns that span files
 - [ ] **Hallucinated package detection** — detect AI-generated package names that don't exist in registries; needs registry API calls (npm, PyPI, crates.io), not just OSV
 
 #### 11C - IaC Scanning
+
+*(items from Phase 8D)*
 
 - [ ] **Terraform** — misconfigurations in `.tf` files (open security groups, public S3, no encryption); AI-powered like SAST
 - [ ] **CloudFormation** — similar checks on CF templates
 - [ ] **Kubernetes** — privileged pods, host networking, missing resource limits in manifests
 
 #### 11D - Distribution (unblocked when repo goes public)
+
+*(items from Phase 3)*
 
 - [ ] **Make repo public** — unblocks everything below; required for `go install`, SARIF tab, Homebrew
 - [ ] **Go proxy seeding** — hit `proxy.golang.org` and `sum.golang.org` after each release so `go install` works without env vars
