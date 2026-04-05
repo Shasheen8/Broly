@@ -43,9 +43,14 @@ AI-powered. No rule files. No rule engine.
 go install github.com/Shasheen8/Broly/cmd/broly@latest
 ```
 
-Pre-built Linux binaries on [Releases](https://github.com/Shasheen8/Broly/releases). macOS: build from source with `brew install vectorscan && make build` for Hyperscan support.
+Requires [Vectorscan](https://github.com/VectorCamp/vectorscan) for Hyperscan support (secrets engine):
 
-SAST and AI features are powered by [Together AI](https://together.ai) and require an API key:
+```bash
+brew install vectorscan   # macOS
+make build
+```
+
+SAST and AI features require a [Together AI](https://together.ai) API key:
 
 ```bash
 export TOGETHER_API_KEY=your_key_here
@@ -56,127 +61,50 @@ export TOGETHER_API_KEY=your_key_here
 ## Usage
 
 ```bash
-broly scan                                         # all scanners, current directory
-broly scan /path/to/project                        # specific path
+broly scan                                        # all scanners, current directory
+broly scan /path/to/project                       # specific path
 
+# Individual scanners
+broly scan --secrets                              # secrets only
+broly scan --sca                                  # SCA only
+broly scan --sast                                 # SAST only (requires TOGETHER_API_KEY)
 
-# Individual Scanners
-broly scan --secrets                               # secrets only
-broly scan --sca                                   # SCA only
-broly scan --sast                                  # SAST only (requires TOGETHER_API_KEY)
+# AI enhancements
+broly scan --ai-filter-secrets                    # filter secrets false positives with AI
+broly scan --ai-sca-reachability                  # check if vulnerable deps are actually called
+broly scan --ai-triage                            # verdict (TP/FP) + fix suggestion per finding
+broly scan --ai-triage --explain                  # + one-sentence attack scenario per finding
 
-
-# AI Enhancements
-broly scan --ai-filter-secrets                     # filter secrets false positives with AI
-broly scan --ai-sca-reachability                   # check if vulnerable deps are actually called
-broly scan --ai-triage                             # verdict (TP/FP) + fix suggestion per finding
-broly scan --ai-triage --explain                   # + concise attack-scenario sentence per finding
-
-
-# Container Scanning
-broly scan --container alpine:3.19                 # scan a container image for vulnerabilities
-broly scan --container ./image.tar                 # scan from tarball
-
+# Container scanning
+broly scan --container alpine:3.19                # pull and scan a registry image
+broly scan --container ./image.tar                # scan from a local tarball
 
 # Output
-broly scan -f json                                 # JSON output
-broly scan -f sarif -o results.sarif               # SARIF 2.1.0 for GitHub Code Scanning
-broly scan --min-severity high                     # only high and critical
+broly scan -f json                                # JSON output
+broly scan -f sarif -o results.sarif              # SARIF 2.1.0 for GitHub Code Scanning
+broly scan --min-severity high                    # only high and critical
 
+# SBOM
+broly sbom                                        # CycloneDX 1.5 to stdout
+broly sbom -f spdx -o sbom.json                   # SPDX 2.3 to file
 
-# SBOM Generation
-broly sbom                                         # CycloneDX 1.5 to stdout
-broly sbom -f spdx -o sbom.json                    # SPDX 2.3 to file
-
-
-# License Policy
-broly scan --config .broly.yaml                    # license findings emitted when allowed_licenses / denied_licenses set
-
-
-# Config
-broly scan --config .broly.yaml                    # load project config file
-broly scan --baseline .broly-baseline.yaml         # suppress known FPs / require specific findings
-broly scan --incremental                           # skip unchanged files (uses .broly-cache.json)
+# Config and suppression
+broly scan --config .broly.yaml                   # project config; also activates license policy
+broly scan --baseline .broly-baseline.yaml        # suppress known FPs / require specific findings
+broly scan --incremental                          # skip unchanged files
 ```
 
 ---
 
 ## Scanner Output
 
-### SAST
+*Demo videos coming soon.*
 
-A fast regex pre-filter catches 17 known vulnerability patterns instantly (SQL injection, hardcoded secrets, XSS sinks, weak crypto, etc.). Then the LLM traces data flow from source to sink and finds what static rules miss.
-
-```
-  ▸ SAST (4 findings)
-
-  SEVERITY     ISSUE                            FILE                      DESCRIPTION
-  ──────────────────────────────────────────────────────────────────────────────────────────────────
-  CRITICAL     SQL injection via unsanitize..   api/handlers.py:10        User input flows directly ..
-  CRITICAL     OS command injection via uns..   api/handlers.py:15        OS command injection via u..
-  HIGH         Path traversal in read_file      api/handlers.py:20        Path traversal in read_fil..
-  HIGH         Insecure deserialization via..   api/handlers.py:25        Insecure deserialization v..
-```
-
-### Dockerfile and Compose
-
-Auto-detected during normal scans. Specialized prompts cover privilege escalation, hardcoded secrets, dangerous mounts, unpinned base images, and more.
-
-```
-  ▸ DOCKERFILE (4 findings)
-
-  SEVERITY     ISSUE                            FILE                                DESCRIPTION
-  ──────────────────────────────────────────────────────────────────────────────────────────────────
-  CRITICAL     Hardcoded secrets in ENV/ARG     Dockerfile:3                        Secrets visible in image hi..
-  CRITICAL     Docker socket mounted            docker-compose.yml:14               Full control over Docker da..
-  HIGH         curl piped to bash               Dockerfile:10                       Compromised script runs as ..
-  MEDIUM       Running as root (no USER)        Dockerfile:1                        Increases blast radius of a..
-```
-
-### Secrets
-
-487 rules. `--ai-filter-secrets` reads surrounding code context and eliminates placeholders and test values:
-
-```
-  ▸ SECRETS (3 findings)
-
-  SEVERITY     RULE                             FILE                      REDACTED
-  ──────────────────────────────────────────────────────────────────────────────────
-  HIGH         AWS API Key                      config/example.py:6       AKIA****MPLE
-  HIGH         AWS API Credentials              config/example.py:6       AKIA****KEY"
-  HIGH         GitHub Personal Access Token     config/example.py:9       ghp_****8B4a
-```
-
-### SCA
-
-20 ecosystems, 50+ lockfile formats. `--ai-sca-reachability` checks if the vulnerable function is actually called:
-
-```
-  ▸ SCA (3 findings)
-
-  SEVERITY     VULN ID                PACKAGE            VERSION        FIXED            ECOSYSTEM
-  ──────────────────────────────────────────────────────────────────────────────────────────────────
-  MEDIUM       GHSA-9hjg-9r4m-mvj7    requests           2.31.0         no patch         PyPI
-  MEDIUM       GHSA-496j-2rq6-j6cc    grpcio             1.54.0         no patch         PyPI
-  MEDIUM       GHSA-cfgp-2977-2fmm    grpcio             1.54.0         no patch         PyPI
-```
-
-### Container
-
-`--container` pulls an image, extracts OS packages, and matches against OSV. Each finding shows which layer introduced it:
-
-```
-  ▸ CONTAINER (5 findings)
-
-  SEVERITY     VULN ID                PACKAGE            VERSION        FIXED            ECOSYSTEM          LAYER
-  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-  MEDIUM       ALPINE-CVE-2023-42..   busybox            1.36.1-r2      no patch         Alpine:v3.18       #1
-  MEDIUM       ALPINE-CVE-2025-26..   musl               1.2.4-r1       no patch         Alpine:v3.18       #1
-```
+Each scanner outputs an aligned table in the terminal. Supports JSON (`-f json`), SARIF (`-f sarif`), and table (default).
 
 ### AI Triage
 
-`--ai-triage` labels each finding TRUE/FALSE positive with a confidence score and a fix. For container/SCA findings with no patch, it suggests mitigations. `--explain` adds a one-sentence attack scenario:
+`--ai-triage` adds a verdict, confidence score, and fix suggestion to every finding. `--explain` adds a one-sentence attack scenario:
 
 ```
   CRITICAL     SQL injection via unsanitize..   api/handlers.py:10        User input flows directly ..
@@ -192,32 +120,20 @@ Auto-detected during normal scans. Specialized prompts cover privilege escalatio
 
 ---
 
-## Developer Feedback Loop
-
-Check a box in the PR comment to mark a finding as a false positive. Broly verifies write access, commits the fingerprint to `.broly-baseline.yaml`, and the finding never surfaces again.
-
-```
-- [ ] 🔴 CRITICAL · SQL injection in get_user() · api/handlers.py:7
-```
-
-Suppressions accumulate over time; each repo builds its own false positive memory.
-
----
-
 ## GitHub App
 
-Install once, scans every PR automatically. No per-repo workflow setup.
+Install once on your org, scans every PR automatically. No per-repo workflow setup. Only findings in changed files are reported — no historic noise.
 
-The app clones the repo at the PR head, runs Broly with AI triage, and posts findings as a check run + PR comment. Only findings in changed files are reported — no historic noise.
+Check a box in the PR comment to mark a finding as a false positive. Broly commits the fingerprint to `.broly-baseline.yaml` and the finding never surfaces again. Suppressions accumulate over time — each repo builds its own false positive memory.
 
 ```bash
-# run the app server locally
+# run locally
 APP_ID=123456 PRIVATE_KEY_PATH=./app.pem WEBHOOK_SECRET=your_secret go run ./cmd/broly-app
 ```
 
 ### Deployment
 
-Multi-stage Dockerfile at `cmd/broly-app/Dockerfile`. Uses Chainguard hardened images — minimal attack surface, non-root by default.
+Multi-stage Dockerfile at `cmd/broly-app/Dockerfile`. Uses Chainguard hardened images — non-root, no shell, minimal attack surface.
 
 ```bash
 docker build -f cmd/broly-app/Dockerfile -t broly-app .
@@ -229,12 +145,6 @@ docker run -p 8080:8080 \
   -e TOGETHER_API_KEY=your_key \
   -v /path/to/app.pem:/secrets/app.pem:ro \
   broly-app
-```
-
-Every scan emits a structured JSON log line:
-
-```json
-{"time":"2026-04-04T10:00:00Z","level":"INFO","msg":"scan complete","event":"pull_request","repo":"acme/api","pr":42,"sha":"abc123","findings":3,"duration_ms":8241}
 ```
 
 ---
@@ -268,7 +178,7 @@ denied_licenses:
 ### Baseline
 
 > [!NOTE]
-> `suppress` silences known false positives. `require` asserts specific findings must be detected every scan; missing entries cause a non-zero exit.
+> `suppress` silences known false positives. `require` asserts specific findings must be detected every scan — missing entries cause a non-zero exit.
 
 ```yaml
 suppress:
@@ -287,19 +197,6 @@ require:
 query = "SELECT * FROM users WHERE id = " + user_id  # broly:ignore
 query = f"SELECT * FROM users WHERE id = {user_id}"  # broly:ignore SQL-INJECTION
 ```
-
----
-
-## Acknowledgments
-
-| Project | Role |
-|---------|------|
-| [Titus](https://github.com/praetorian-inc/titus) | Secrets engine: 487 rules, Hyperscan + Go regex |
-| [osv-scalibr](https://github.com/google/osv-scalibr) | Lockfile extraction across 50+ formats |
-| [osv.dev](https://osv.dev) | Vulnerability database by Google |
-| [go-containerregistry](https://github.com/google/go-containerregistry) | Container image pulling and layer inspection |
-| [go-github](https://github.com/google/go-github) + [ghinstallation](https://github.com/bradleyfalzon/ghinstallation) | GitHub App authentication and API |
-| [Together AI](https://together.ai) | AI inference for SAST, triage, and reachability |
 
 ---
 
