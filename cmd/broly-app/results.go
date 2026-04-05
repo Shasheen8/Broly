@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -42,7 +42,7 @@ func postCheckRun(ctx context.Context, client *github.Client, req scanRequest, r
 		Output:     output,
 	})
 	if err != nil {
-		log.Printf("create check run: %v", err)
+		slog.Error("create check run", "err", err)
 	}
 }
 
@@ -58,7 +58,7 @@ func postPRComment(ctx context.Context, client *github.Client, req scanRequest, 
 		ListOptions: github.ListOptions{PerPage: 50},
 	})
 	if err != nil {
-		log.Printf("list comments: %v", err)
+		slog.Error("list comments", "err", err)
 	}
 
 	var existingID int64
@@ -79,7 +79,7 @@ func postPRComment(ctx context.Context, client *github.Client, req scanRequest, 
 		})
 	}
 	if err != nil {
-		log.Printf("post PR comment: %v", err)
+		slog.Error("post PR comment", "err", err)
 	}
 }
 

@@ -9,7 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -22,11 +22,14 @@ import (
 )
 
 func main() {
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
+
 	cfg := loadConfig()
 
 	transport, err := ghinstallation.NewAppsTransportKeyFromFile(http.DefaultTransport, cfg.AppID, cfg.PrivateKeyPath)
 	if err != nil {
-		log.Fatalf("failed to create app transport: %v", err)
+		slog.Error("failed to create app transport", "err", err)
+		os.Exit(1)
 	}
 
 	app := &App{
@@ -50,9 +53,10 @@ func main() {
 	}
 
 	go func() {
-		log.Printf("broly-app listening on :%s", cfg.Port)
+		slog.Info("broly-app listening", "port", cfg.Port)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("server error: %v", err)
+			slog.Error("server error", "err", err)
+			os.Exit(1)
 		}
 	}()
 
@@ -63,7 +67,7 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	server.Shutdown(ctx)
-	log.Println("broly-app shut down")
+	slog.Info("broly-app shut down")
 }
 
 type Config struct {
@@ -77,7 +81,8 @@ type Config struct {
 func loadConfig() Config {
 	appID, err := strconv.ParseInt(mustEnv("APP_ID"), 10, 64)
 	if err != nil {
-		log.Fatalf("APP_ID must be a number: %v", err)
+		slog.Error("APP_ID must be a number", "err", err)
+		os.Exit(1)
 	}
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -101,7 +106,8 @@ func loadConfig() Config {
 func mustEnv(key string) string {
 	v := os.Getenv(key)
 	if v == "" {
-		log.Fatalf("required env var %s is not set", key)
+		slog.Error("required env var not set", "key", key)
+		os.Exit(1)
 	}
 	return v
 }
@@ -130,7 +136,7 @@ func (a *App) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	eventType := r.Header.Get("X-GitHub-Event")
-	log.Printf("event: %s delivery: %s", eventType, r.Header.Get("X-GitHub-Delivery"))
+	slog.Info("webhook received", "event", eventType, "delivery", r.Header.Get("X-GitHub-Delivery"))
 
 	switch eventType {
 	case "pull_request":
@@ -138,7 +144,7 @@ func (a *App) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	case "push":
 		a.handlePush(body)
 	case "installation":
-		log.Println("app installed/updated")
+		slog.Info("app installed/updated")
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -185,7 +191,7 @@ type inst struct {
 func (a *App) handlePullRequest(body []byte) {
 	var event pullRequestEvent
 	if err := json.Unmarshal(body, &event); err != nil {
-		log.Printf("parse PR event: %v", err)
+		slog.Error("parse PR event", "err", err)
 		return
 	}
 
@@ -193,8 +199,12 @@ func (a *App) handlePullRequest(body []byte) {
 		return
 	}
 
-	log.Printf("PR #%d on %s (action: %s, sha: %s)",
-		event.Number, event.Repository.FullName, event.Action, event.PullRequest.Head.SHA)
+	slog.Info("pull_request received",
+		"repo", event.Repository.FullName,
+		"pr", event.Number,
+		"action", event.Action,
+		"sha", event.PullRequest.Head.SHA,
+	)
 
 	client := a.clientForInstallation(event.Installation.ID)
 
@@ -211,7 +221,7 @@ func (a *App) handlePullRequest(body []byte) {
 func (a *App) handlePush(body []byte) {
 	var event pushEvent
 	if err := json.Unmarshal(body, &event); err != nil {
-		log.Printf("parse push event: %v", err)
+		slog.Error("parse push event", "err", err)
 		return
 	}
 
@@ -220,7 +230,7 @@ func (a *App) handlePush(body []byte) {
 		return
 	}
 
-	log.Printf("push to %s on %s (sha: %s)", event.Ref, event.Repository.FullName, event.After)
+	slog.Info("push received", "repo", event.Repository.FullName, "ref", event.Ref, "sha", event.After)
 
 	client := a.clientForInstallation(event.Installation.ID)
 

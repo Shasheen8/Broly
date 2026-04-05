@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -27,12 +27,13 @@ func (a *App) scanPR(ctx context.Context, client *github.Client, req scanRequest
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 
-	log.Printf("scanning PR #%d on %s/%s at %s", req.prNumber, req.owner, req.repo, req.headSHA)
+	repo := req.owner + "/" + req.repo
+	slog.Info("scan started", "event", "pull_request", "repo", repo, "pr", req.prNumber, "sha", req.headSHA)
 
 	// Clone the repo at the PR head SHA.
 	dir, cleanup, err := cloneRepo(ctx, client, req)
 	if err != nil {
-		log.Printf("clone failed: %v", err)
+		slog.Error("clone failed", "repo", repo, "pr", req.prNumber, "err", err)
 		return
 	}
 	defer cleanup()
@@ -43,7 +44,7 @@ func (a *App) scanPR(ctx context.Context, client *github.Client, req scanRequest
 	// Run scan.
 	result, err := runBrolyScan(ctx, dir, changed)
 	if err != nil {
-		log.Printf("scan failed on %s/%s PR #%d: %v", req.owner, req.repo, req.prNumber, err)
+		slog.Error("scan failed", "repo", repo, "pr", req.prNumber, "err", err)
 		return
 	}
 
@@ -54,7 +55,14 @@ func (a *App) scanPR(ctx context.Context, client *github.Client, req scanRequest
 		result.Findings = filterToChangedFiles(result.Findings, changed)
 	}
 
-	log.Printf("PR #%d on %s/%s: %d findings (in changed files)", req.prNumber, req.owner, req.repo, len(result.Findings))
+	slog.Info("scan complete",
+		"event", "pull_request",
+		"repo", repo,
+		"pr", req.prNumber,
+		"sha", req.headSHA,
+		"findings", len(result.Findings),
+		"duration_ms", result.Duration.Milliseconds(),
+	)
 
 	postCheckRun(ctx, client, req, result)
 	postPRComment(ctx, client, req, result)
@@ -67,11 +75,12 @@ func (a *App) scanPush(ctx context.Context, client *github.Client, req scanReque
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 
-	log.Printf("scanning push on %s/%s at %s", req.owner, req.repo, req.headSHA)
+	repo := req.owner + "/" + req.repo
+	slog.Info("scan started", "event", "push", "repo", repo, "sha", req.headSHA)
 
 	dir, cleanup, err := cloneRepo(ctx, client, req)
 	if err != nil {
-		log.Printf("clone failed: %v", err)
+		slog.Error("clone failed", "repo", repo, "sha", req.headSHA, "err", err)
 		return
 	}
 	defer cleanup()
@@ -80,7 +89,7 @@ func (a *App) scanPush(ctx context.Context, client *github.Client, req scanReque
 
 	result, err := runBrolyScan(ctx, dir, changed)
 	if err != nil {
-		log.Printf("scan failed on %s/%s push %s: %v", req.owner, req.repo, req.headSHA, err)
+		slog.Error("scan failed", "repo", repo, "sha", req.headSHA, "err", err)
 		return
 	}
 
@@ -90,7 +99,13 @@ func (a *App) scanPush(ctx context.Context, client *github.Client, req scanReque
 		result.Findings = filterToChangedFiles(result.Findings, changed)
 	}
 
-	log.Printf("push on %s/%s: %d findings (in changed files)", req.owner, req.repo, len(result.Findings))
+	slog.Info("scan complete",
+		"event", "push",
+		"repo", repo,
+		"sha", req.headSHA,
+		"findings", len(result.Findings),
+		"duration_ms", result.Duration.Milliseconds(),
+	)
 }
 
 // cloneRepo does a shallow clone at the given SHA using the installation token.
@@ -158,7 +173,7 @@ func getChangedFiles(ctx context.Context, client *github.Client, req scanRequest
 	opts := &github.ListOptions{PerPage: 100}
 	files, _, err := client.PullRequests.ListFiles(ctx, req.owner, req.repo, req.prNumber, opts)
 	if err != nil {
-		log.Printf("list PR files: %v", err)
+		slog.Error("list PR files", "err", err)
 		return nil
 	}
 
@@ -242,7 +257,7 @@ func getCommitFiles(ctx context.Context, client *github.Client, req scanRequest)
 
 	commit, _, err := client.Repositories.GetCommit(ctx, req.owner, req.repo, req.headSHA, nil)
 	if err != nil {
-		log.Printf("get commit files: %v", err)
+		slog.Error("get commit files", "err", err)
 		return nil
 	}
 
