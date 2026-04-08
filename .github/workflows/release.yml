@@ -4,11 +4,6 @@ on:
   push:
     tags:
       - "v*"
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: "Tag to release (e.g. v0.1.19)"
-        required: true
 
 permissions:
   contents: write
@@ -18,9 +13,26 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          generate_release_notes: true
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          version: latest
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Seed Go module proxy
+        run: |
+          VERSION="${{ github.ref_name }}"
+          # Module path is case-encoded: Shasheen8 -> !shasheen8, Broly -> !broly
+          curl -sf "https://proxy.golang.org/github.com/!shasheen8/!broly/@v/${VERSION}.info" > /dev/null || true
+          curl -sf "https://sum.golang.org/lookup/github.com/!shasheen8/!broly@${VERSION}" > /dev/null || true
+          echo "Go proxy seeded for ${VERSION}"

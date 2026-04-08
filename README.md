@@ -39,11 +39,19 @@ AI-powered. No rule files. No rule engine.
 
 ## Install
 
+**Pre-built binaries** (Linux/macOS, no dependencies):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Shasheen8/Broly/main/install.sh | sh
+```
+
+**Go install** (pure Go, no CGO required):
+
 ```bash
 go install github.com/Shasheen8/Broly/cmd/broly@latest
 ```
 
-Requires [Vectorscan](https://github.com/VectorCamp/vectorscan) for Hyperscan support (secrets engine):
+**From source** (full Hyperscan support for secrets engine):
 
 ```bash
 brew install vectorscan   # macOS
@@ -120,6 +128,22 @@ Each scanner outputs an aligned table in the terminal. Supports JSON (`-f json`)
 ```
 
 ---
+
+## CI Integration
+
+**GitHub App** — install once on your org, scans every PR automatically. No per-repo setup needed.
+
+**Reusable workflow** — drop one line into any repo's existing CI:
+
+```yaml
+jobs:
+  security:
+    uses: Shasheen8/Broly/.github/workflows/broly-scan.yml@main
+    secrets:
+      together_api_key: ${{ secrets.TOGETHER_API_KEY }}
+```
+
+Supports `min_severity`, `scanners`, and `ai_triage` inputs. Posts findings as a PR comment and uploads SARIF to the GitHub Security tab.
 
 ## GitHub App
 
