@@ -3,7 +3,7 @@
 <td width="300">
 <img src="assets/broly-logo.png" alt="Broly" width="280"/>
 </td>
-<td>
+<td align="center">
 
 # Broly
 
@@ -12,6 +12,7 @@
 Secrets · SCA · SAST · Containers in a single binary.
 AI-powered. No rule files. No rule engine.
 
+<a href="https://github.com/Shasheen8/Broly/actions/workflows/ci.yml"><img src="https://github.com/Shasheen8/Broly/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
 <a href="https://github.com/Shasheen8/Broly"><img src="https://img.shields.io/badge/Go-1.24-00ADD8?style=flat&logo=go" alt="Go"></a>
 <a href="https://github.com/Shasheen8/Broly/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=flat" alt="License"></a>
 <a href="https://github.com/Shasheen8/Broly/releases"><img src="https://img.shields.io/badge/Release-latest-blue?style=flat" alt="Release"></a>
