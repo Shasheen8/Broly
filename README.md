@@ -39,19 +39,13 @@ Secrets · SCA · SAST · Containers. AI-powered intelligent findings. No rules.
 
 ## Install
 
-**Go install:**
+**Pre-built binaries** — easiest, no dependencies. Download from [Releases](https://github.com/Shasheen8/Broly/releases).
 
-```bash
-go install github.com/Shasheen8/Broly/cmd/broly@latest
-```
-
-**Pre-built binaries** (Linux/macOS): [Releases](https://github.com/Shasheen8/Broly/releases).
-
-**From source** (full Hyperscan support for secrets engine):
+**From source** — requires [Vectorscan](https://github.com/VectorCamp/vectorscan) for the secrets engine:
 
 ```bash
 brew install vectorscan   # macOS
-make build
+go install github.com/Shasheen8/Broly/cmd/broly@latest
 ```
 
 SAST and AI features require a [Together AI](https://together.ai) API key:
