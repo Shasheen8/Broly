@@ -55,7 +55,9 @@ jobs:
           cache: false
 
       - name: Install Broly
-        run: go install github.com/Shasheen8/Broly/cmd/broly@latest
+        # CGO_ENABLED=0: pure Go build — no libhyperscan-dev needed on the runner.
+        # Secrets scanning uses the Go regex engine instead of Hyperscan (same rules, slightly slower).
+        run: CGO_ENABLED=0 go install github.com/Shasheen8/Broly/cmd/broly@latest
 
       - name: Get changed files
         if: github.event_name == 'pull_request'
@@ -70,58 +72,85 @@ jobs:
           BASE_REF: ${{ github.base_ref }}
           SHA: ${{ github.sha }}
 
+      - name: Build scan flags
+        id: flags
+        run: |
+          # Resolve scanner flags from inputs.scanners
+          case "${INPUT_SCANNERS}" in
+            sca)     SCAN_FLAGS="--sca" ;;
+            secrets) SCAN_FLAGS="--secrets" ;;
+            sast)    SCAN_FLAGS="--sast" ;;
+            *)       SCAN_FLAGS="--secrets --sca" ;;   # all (SAST added below if key present)
+          esac
+
+          # Add SAST when key is present and scanners=all or scanners=sast
+          SAST_FLAGS=""
+          if [ -n "${TOGETHER_API_KEY}" ]; then
+            if [ "${INPUT_SCANNERS}" = "all" ] || [ "${INPUT_SCANNERS}" = "sast" ]; then
+              SAST_FLAGS="--sast"
+              if [ "${INPUT_AI_TRIAGE}" = "true" ]; then
+                SAST_FLAGS="${SAST_FLAGS} --ai-triage --explain"
+              fi
+            fi
+          fi
+
+          echo "scan=${SCAN_FLAGS}" >> "$GITHUB_OUTPUT"
+          echo "sast=${SAST_FLAGS}" >> "$GITHUB_OUTPUT"
+        env:
+          TOGETHER_API_KEY: ${{ secrets.together_api_key }}
+          INPUT_SCANNERS: ${{ inputs.scanners }}
+          INPUT_AI_TRIAGE: ${{ inputs.ai_triage }}
+
       - name: Scan PR diff
         if: github.event_name == 'pull_request' && steps.diff.outputs.has_code == 'true'
         run: |
           mkdir -p sarif
           MIN_SEV="${INPUT_MIN_SEVERITY}"
-          AI_FLAGS=""
-          if [ -n "${TOGETHER_API_KEY}" ]; then
-            AI_FLAGS="--sast"
-            if [ "${INPUT_AI_TRIAGE}" = "true" ]; then
-              AI_FLAGS="${AI_FLAGS} --ai-triage --explain"
-            fi
-          fi
-          broly scan . --secrets --sca --min-severity "${MIN_SEV}" \
-            -f sarif -o sarif/fast.sarif -q || true
-          broly scan . --secrets --sca --min-severity "${MIN_SEV}" \
-            -f json -o results.json -q || true
-          if [ -n "${AI_FLAGS}" ] && [ -n "${CHANGED_FILES}" ]; then
+          SCAN_FLAGS="${INPUT_SCAN_FLAGS}"
+          SAST_FLAGS="${INPUT_SAST_FLAGS}"
+
+          # Run base scanners on full repo
+          if [ -n "${SCAN_FLAGS}" ]; then
             # shellcheck disable=SC2086
-            broly scan ${CHANGED_FILES} ${AI_FLAGS} --min-severity "${MIN_SEV}" \
+            broly scan . ${SCAN_FLAGS} --min-severity "${MIN_SEV}" \
+              -f sarif -o sarif/fast.sarif -q || true
+            # shellcheck disable=SC2086
+            broly scan . ${SCAN_FLAGS} --min-severity "${MIN_SEV}" \
+              -f json -o results.json -q || true
+          fi
+
+          # Run SAST on changed files only (cost control)
+          if [ -n "${SAST_FLAGS}" ] && [ -n "${CHANGED_FILES}" ]; then
+            # shellcheck disable=SC2086
+            broly scan ${CHANGED_FILES} ${SAST_FLAGS} --min-severity "${MIN_SEV}" \
               -f sarif -o sarif/sast.sarif -q || true
             # shellcheck disable=SC2086
-            broly scan ${CHANGED_FILES} ${AI_FLAGS} --min-severity "${MIN_SEV}" \
+            broly scan ${CHANGED_FILES} ${SAST_FLAGS} --min-severity "${MIN_SEV}" \
               -f json -o sast-results.json -q || true
           fi
         env:
-          TOGETHER_API_KEY: ${{ secrets.together_api_key }}
           CHANGED_FILES: ${{ steps.diff.outputs.files }}
           INPUT_MIN_SEVERITY: ${{ inputs.min_severity }}
-          INPUT_AI_TRIAGE: ${{ inputs.ai_triage }}
+          INPUT_SCAN_FLAGS: ${{ steps.flags.outputs.scan }}
+          INPUT_SAST_FLAGS: ${{ steps.flags.outputs.sast }}
 
       - name: Full scan
         if: github.event_name != 'pull_request'
         run: |
           mkdir -p sarif
           MIN_SEV="${INPUT_MIN_SEVERITY}"
-          AI_FLAGS=""
-          if [ -n "${TOGETHER_API_KEY}" ]; then
-            AI_FLAGS="--sast"
-            if [ "${INPUT_AI_TRIAGE}" = "true" ]; then
-              AI_FLAGS="${AI_FLAGS} --ai-triage --explain"
-            fi
-          fi
+          SCAN_FLAGS="${INPUT_SCAN_FLAGS}"
+          SAST_FLAGS="${INPUT_SAST_FLAGS}"
           # shellcheck disable=SC2086
-          broly scan . --secrets --sca ${AI_FLAGS} --min-severity "${MIN_SEV}" \
+          broly scan . ${SCAN_FLAGS} ${SAST_FLAGS} --min-severity "${MIN_SEV}" \
             -f sarif -o sarif/results.sarif -q || true
           # shellcheck disable=SC2086
-          broly scan . --secrets --sca ${AI_FLAGS} --min-severity "${MIN_SEV}" \
+          broly scan . ${SCAN_FLAGS} ${SAST_FLAGS} --min-severity "${MIN_SEV}" \
             -f json -o results.json -q || true
         env:
-          TOGETHER_API_KEY: ${{ secrets.together_api_key }}
           INPUT_MIN_SEVERITY: ${{ inputs.min_severity }}
-          INPUT_AI_TRIAGE: ${{ inputs.ai_triage }}
+          INPUT_SCAN_FLAGS: ${{ steps.flags.outputs.scan }}
+          INPUT_SAST_FLAGS: ${{ steps.flags.outputs.sast }}
 
       - name: Upload SARIF
         if: always() && hashFiles('sarif/*.sarif') != ''
