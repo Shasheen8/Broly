@@ -28,8 +28,8 @@ AI-powered. No rule files. No rule engine.
 | Scanner | Engine | AI Layer |
 |---------|--------|----------|
 | **Secrets** | [Titus](https://github.com/praetorian-inc/titus) · 487 rules · Hyperscan | `--ai-filter-secrets` eliminates false positives |
-| **SCA** | [osv-scalibr](https://github.com/google/osv-scalibr) + [osv.dev](https://osv.dev) · 20 ecosystems | `--ai-sca-reachability` checks if the vuln is actually called |
-| **SAST** | [Together AI](https://together.ai) · `Qwen/Qwen3-Coder-Next-FP8` + regex pre-filter | Source-to-sink data flow · 17 deterministic patterns · priority scoring |
+| **SCA** | [osv-scalibr](https://github.com/google/osv-scalibr) + [osv.dev](https://osv.dev) · 20 ecosystems | `--ai-sca-reachability` checks if the vuln is actually called · `--package-intelligence` detects hallucinated/non-existent dependencies |
+| **SAST** | [Together AI](https://together.ai) · `Qwen/Qwen3-Coder-Next-FP8` + regex pre-filter | Slice-aware multi-file analysis · source-to-sink data flow · 17 deterministic patterns · priority scoring |
 | **Dockerfile** | AI-powered · Dockerfile, Containerfile, Compose | Privilege escalation, secret exposure, dangerous mounts |
 | **Container** | [go-containerregistry](https://github.com/google/go-containerregistry) + [osv.dev](https://osv.dev) · Alpine, Debian, Ubuntu, RHEL | OS package CVEs with layer attribution |
 | **License** | File-based detection · 13 license types | Policy engine: `allowed_licenses` / `denied_licenses` in `.broly.yaml` |
@@ -72,6 +72,7 @@ broly scan --sast                                 # SAST only (requires TOGETHER
 # AI enhancements
 broly scan --ai-filter-secrets                    # filter secrets false positives with AI
 broly scan --ai-sca-reachability                  # check if vulnerable deps are actually called
+broly scan --package-intelligence                 # detect hallucinated/non-existent packages
 broly scan --ai-triage                            # verdict (TP/FP) + fix suggestion per finding
 broly scan --ai-triage --explain                  # + one-sentence attack scenario per finding
 
