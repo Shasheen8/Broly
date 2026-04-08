@@ -109,18 +109,18 @@ Each scanner outputs an aligned table in the terminal. Supports JSON (`-f json`)
 
 ### AI Triage
 
-`--ai-triage` adds a verdict, confidence score, and fix suggestion to every finding. `--explain` adds a one-sentence attack scenario:
+`--ai-triage` labels every finding TRUE or FALSE positive with a confidence score and a concrete fix. Add `--explain` for a one-sentence attack scenario:
 
 ```
-  CRITICAL     SQL injection via unsanitize..   api/handlers.py:10        User input flows directly ..
-  🔺 TRUE_POSITIVE [HIGH]  User input flows directly into raw SQL query without parameterization
-      An attacker sends id=1 OR 1=1 to dump the entire users table.
-    fix:
-      query = "SELECT * FROM users WHERE id = %s"
-      cursor.execute(query, (user_id,))
+  CRITICAL   SQL injection via unsanitized user input         api/handlers.py:10
+  🔺 TRUE_POSITIVE  confidence: HIGH
+     An attacker can send id=1 OR 1=1-- to dump the entire users table.
+     fix:
+       cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))
 
-  HIGH         Path traversal in read_file      api/handlers.py:20        Path traversal in read_fil..
-  🟢 FALSE_POSITIVE [HIGH]  File path is validated against an allowlist before use
+  HIGH       Path traversal in read_file                      api/handlers.py:20
+  🟢 FALSE_POSITIVE  confidence: HIGH
+     File path is validated against an allowlist before reaching the filesystem.
 ```
 
 ---
