@@ -224,15 +224,15 @@ func printScanTypeTable(w io.Writer, clr color, scanType core.ScanType, findings
 }
 
 func printSecretsTable(w io.Writer, clr color, findings []core.Finding) {
-	hdr := clr.s(bold+gray, fmt.Sprintf("  %-12s %-32s %-42s %s", "SEVERITY", "RULE", "FILE", "REDACTED"))
+	hdr := clr.s(bold+gray, fmt.Sprintf("  %-10s  %-28s  %-40s  %s", "SEVERITY", "RULE", "FILE", "REDACTED"))
 	fmt.Fprintln(w, hdr)
-	fmt.Fprintf(w, "  %s\n", clr.s(gray, strings.Repeat("─", 110)))
+	fmt.Fprintf(w, "  %s\n", clr.s(gray, strings.Repeat("─", 116)))
 	for _, f := range findings {
-		location := fmt.Sprintf("%s:%d", truncPath(f.FilePath, 40), f.StartLine)
-		fmt.Fprintf(w, "  %-12s %-32s %-42s %s\n",
+		location := trunc(formatLocation(f), 38)
+		fmt.Fprintf(w, "  %-10s  %-28s  %-40s  %s\n",
 			severityColor(f.Severity, clr),
-			trunc(f.RuleName, 30),
-			clr.s(dim, trunc(location, 40)),
+			trunc(f.RuleName, 26),
+			clr.s(dim, location),
 			clr.s(gray, trunc(f.Redacted, 30)),
 		)
 		printVerdictAndFix(w, clr, f)
@@ -240,9 +240,9 @@ func printSecretsTable(w io.Writer, clr color, findings []core.Finding) {
 }
 
 func printSCATable(w io.Writer, clr color, findings []core.Finding) {
-	hdr := clr.s(bold+gray, fmt.Sprintf("  %-12s %-22s %-18s %-14s %-16s %s", "SEVERITY", "VULN ID", "PACKAGE", "VERSION", "FIXED", "ECOSYSTEM"))
+	hdr := clr.s(bold+gray, fmt.Sprintf("  %-10s  %-20s  %-20s  %-12s  %-12s  %s", "SEVERITY", "VULN ID", "PACKAGE", "VERSION", "FIXED", "ECOSYSTEM"))
 	fmt.Fprintln(w, hdr)
-	fmt.Fprintf(w, "  %s\n", clr.s(gray, strings.Repeat("─", 110)))
+	fmt.Fprintf(w, "  %s\n", clr.s(gray, strings.Repeat("─", 116)))
 	for _, f := range findings {
 		fixed := f.FixedVersion
 		if fixed == "" {
@@ -250,22 +250,22 @@ func printSCATable(w io.Writer, clr color, findings []core.Finding) {
 		} else {
 			fixed = clr.s(green, fixed)
 		}
-		fmt.Fprintf(w, "  %-12s %-22s %-18s %-14s %-16s %s\n",
+		fmt.Fprintf(w, "  %-10s  %-20s  %-20s  %-12s  %-12s  %s\n",
 			severityColor(f.Severity, clr),
-			clr.s(cyan, trunc(f.RuleID, 20)),
-			clr.s(white, trunc(f.PackageName, 16)),
-			clr.s(gray, trunc(f.PackageVersion, 12)),
+			clr.s(cyan, trunc(f.RuleID, 18)),
+			clr.s(white, trunc(f.PackageName, 18)),
+			clr.s(gray, trunc(f.PackageVersion, 10)),
 			fixed,
-			clr.s(dim, f.Ecosystem),
+			clr.s(dim, trunc(f.Ecosystem, 14)),
 		)
 		printVerdictAndFix(w, clr, f)
 	}
 }
 
 func printContainerTable(w io.Writer, clr color, findings []core.Finding) {
-	hdr := clr.s(bold+gray, fmt.Sprintf("  %-12s %-22s %-18s %-14s %-16s %-18s %s", "SEVERITY", "VULN ID", "PACKAGE", "VERSION", "FIXED", "ECOSYSTEM", "LAYER"))
+	hdr := clr.s(bold+gray, fmt.Sprintf("  %-10s  %-20s  %-20s  %-12s  %-12s  %-14s  %s", "SEVERITY", "VULN ID", "PACKAGE", "VERSION", "FIXED", "ECOSYSTEM", "LAYER"))
 	fmt.Fprintln(w, hdr)
-	fmt.Fprintf(w, "  %s\n", clr.s(gray, strings.Repeat("─", 120)))
+	fmt.Fprintf(w, "  %s\n", clr.s(gray, strings.Repeat("─", 130)))
 	for _, f := range findings {
 		fixed := f.FixedVersion
 		if fixed == "" {
@@ -277,13 +277,13 @@ func printContainerTable(w io.Writer, clr color, findings []core.Finding) {
 		if f.LayerIndex > 0 {
 			layer = clr.s(yellow, fmt.Sprintf("#%d", f.LayerIndex))
 		}
-		fmt.Fprintf(w, "  %-12s %-22s %-18s %-14s %-16s %-18s %s\n",
+		fmt.Fprintf(w, "  %-10s  %-20s  %-20s  %-12s  %-12s  %-14s  %s\n",
 			severityColor(f.Severity, clr),
-			clr.s(cyan, trunc(f.RuleID, 20)),
-			clr.s(white, trunc(f.PackageName, 16)),
-			clr.s(gray, trunc(f.PackageVersion, 12)),
+			clr.s(cyan, trunc(f.RuleID, 18)),
+			clr.s(white, trunc(f.PackageName, 18)),
+			clr.s(gray, trunc(f.PackageVersion, 10)),
 			fixed,
-			clr.s(dim, trunc(f.Ecosystem, 16)),
+			clr.s(dim, trunc(f.Ecosystem, 12)),
 			layer,
 		)
 		printVerdictAndFix(w, clr, f)
@@ -291,16 +291,16 @@ func printContainerTable(w io.Writer, clr color, findings []core.Finding) {
 }
 
 func printSASTTable(w io.Writer, clr color, findings []core.Finding) {
-	hdr := clr.s(bold+gray, fmt.Sprintf("  %-12s %-32s %-42s %s", "SEVERITY", "ISSUE", "FILE", "DESCRIPTION"))
+	hdr := clr.s(bold+gray, fmt.Sprintf("  %-10s  %-28s  %-40s  %s", "SEVERITY", "ISSUE", "FILE", "DESCRIPTION"))
 	fmt.Fprintln(w, hdr)
-	fmt.Fprintf(w, "  %s\n", clr.s(gray, strings.Repeat("─", 110)))
+	fmt.Fprintf(w, "  %s\n", clr.s(gray, strings.Repeat("─", 116)))
 	for _, f := range findings {
-		location := fmt.Sprintf("%s:%d", truncPath(f.FilePath, 40), f.StartLine)
-		fmt.Fprintf(w, "  %-12s %-32s %-42s %s\n",
+		location := trunc(formatLocation(f), 38)
+		fmt.Fprintf(w, "  %-10s  %-28s  %-40s  %s\n",
 			severityColor(f.Severity, clr),
-			trunc(f.RuleName, 30),
-			clr.s(dim, trunc(location, 40)),
-			clr.s(gray, trunc(f.Description, 30)),
+			trunc(firstNonEmpty(f.RuleName, f.Title), 26),
+			clr.s(dim, location),
+			clr.s(gray, trunc(firstNonEmpty(f.Description, f.Title), 34)),
 		)
 		printVerdictAndFix(w, clr, f)
 	}
@@ -388,6 +388,26 @@ func printSummary(w io.Writer, clr color, result *core.ScanResult) {
 	}
 	summaryLine(w, clr, "")
 	fmt.Fprintf(w, "  %s\n\n", clr.s(cyan, "╚══════════════════════════════════════════════════════╝"))
+}
+
+func formatLocation(f core.Finding) string {
+	if f.FilePath == "" {
+		return "(no file)"
+	}
+	if f.StartLine > 0 {
+		return fmt.Sprintf("%s:%d", truncPath(f.FilePath, 100), f.StartLine)
+	}
+	return truncPath(f.FilePath, 100)
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 func trunc(s string, maxLen int) string {

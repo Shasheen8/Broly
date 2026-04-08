@@ -37,7 +37,8 @@ func main() {
 		Short: "Broly - Berserker Product Security Tool",
 		Long: `Broly is a production-grade security scanner combining SAST, SCA, and
 Secrets scanning into a single fast binary. Built in Go for speed.`,
-		SilenceUsage: true,
+		SilenceUsage:  true,
+		SilenceErrors: true,
 	}
 
 	root.AddCommand(scanCmd())
@@ -47,44 +48,48 @@ Secrets scanning into a single fast binary. Built in Go for speed.`,
 
 	if err := root.Execute(); err != nil {
 		if errors.Is(err, errFindings) {
+			fmt.Fprintln(os.Stderr)
+			fmt.Fprintln(os.Stderr, "Scan completed with findings. Broly is exiting with code 1 so shells and CI can detect the result.")
+			fmt.Fprintln(os.Stderr, "Tip: use --format json or --format sarif for machine-readable output.")
 			os.Exit(1)
 		}
+		fmt.Fprintf(os.Stderr, "broly failed: %v\n", err)
 		os.Exit(2)
 	}
 }
 
 func scanCmd() *cobra.Command {
 	var (
-		configFile           string
-		outputFormat         string
-		outputFile           string
-		enableSAST           bool
-		enableSCA            bool
-		enableSecrets        bool
-		workers              int
-		minSeverity          string
-		excludePaths         []string
-		secretsRules         string
-		disableRedact        bool
-		validateSecrets      bool
-		offline              bool
-		quiet                bool
-		aiModel              string
-		packageIntelligence  bool
-		packageRegistryMode  string
-		npmRegistryURL       string
-		pypiRegistryURL      string
-		cratesRegistryURL    string
-		languages            []string
-		aiFilterSecrets      bool
-		aiSCAReachability    bool
-		aiTriage             bool
-		explain              bool
-		baselineFile         string
-		incremental          bool
-		cachePath            string
-		containerImage       string
-		sastSliceFiles       int
+		configFile          string
+		outputFormat        string
+		outputFile          string
+		enableSAST          bool
+		enableSCA           bool
+		enableSecrets       bool
+		workers             int
+		minSeverity         string
+		excludePaths        []string
+		secretsRules        string
+		disableRedact       bool
+		validateSecrets     bool
+		offline             bool
+		quiet               bool
+		aiModel             string
+		packageIntelligence bool
+		packageRegistryMode string
+		npmRegistryURL      string
+		pypiRegistryURL     string
+		cratesRegistryURL   string
+		languages           []string
+		aiFilterSecrets     bool
+		aiSCAReachability   bool
+		aiTriage            bool
+		explain             bool
+		baselineFile        string
+		incremental         bool
+		cachePath           string
+		containerImage      string
+		sastSliceFiles      int
 	)
 
 	cmd := &cobra.Command{
