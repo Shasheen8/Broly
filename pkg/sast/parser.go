@@ -1,6 +1,7 @@
 package sast
 
 import (
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -8,7 +9,7 @@ import (
 )
 
 // parseLLMResponse parses the LLM's structured markdown output into findings.
-func parseLLMResponse(filePath, response string) []parsedFinding {
+func parseLLMResponse(response string) []parsedFinding {
 	resp := strings.TrimSpace(response)
 	if resp == "" || strings.Contains(resp, "NO_FINDINGS") {
 		return nil
@@ -88,6 +89,41 @@ func extractField(line, field string) (string, string, bool) {
 	}
 
 	return field, strings.TrimSpace(rest), true
+}
+
+func attributeParsedFindings(slice analysisSlice, parsed []parsedFinding) []core.Finding {
+	findings := make([]core.Finding, 0, len(parsed))
+	for _, finding := range parsed {
+		filePath, lang := resolveSliceLocation(slice, finding.location)
+		f := finding.toFinding(filePath, lang)
+		if line := extractLineNumber(finding.location); line > 0 {
+			f.StartLine = line
+		}
+		findings = append(findings, f)
+	}
+	return findings
+}
+
+func resolveSliceLocation(slice analysisSlice, location string) (string, string) {
+	location = strings.TrimSpace(location)
+	if location == "" || location == "N/A" {
+		return slice.Primary.Path, slice.Primary.Language
+	}
+
+	filePart := location
+	if idx := strings.LastIndex(location, ":"); idx >= 0 {
+		filePart = strings.TrimSpace(location[:idx])
+	}
+	filePart = filepath.ToSlash(filePart)
+
+	files := append([]sliceFile{slice.Primary}, slice.Supporting...)
+	for _, file := range files {
+		if file.RelativePath == filePart || filepath.Base(file.Path) == filePart {
+			return file.Path, file.Language
+		}
+	}
+
+	return slice.Primary.Path, slice.Primary.Language
 }
 
 func (p *parsedFinding) toFinding(filePath, lang string) core.Finding {

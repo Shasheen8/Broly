@@ -21,18 +21,22 @@ type Config struct {
 	DisableRedaction bool   `yaml:"disable_redaction" json:"disable_redaction"`
 	ValidateSecrets  bool   `yaml:"validate_secrets" json:"validate_secrets"`
 
-	Offline      bool     `yaml:"offline" json:"offline"`
-	Languages    []string `yaml:"languages" json:"languages"`
-	AIModel      string   `yaml:"ai_model" json:"ai_model"`
-	AIFilterSecrets   bool `yaml:"ai_filter_secrets" json:"ai_filter_secrets"`
-	AISCAReachability bool `yaml:"ai_sca_reachability" json:"ai_sca_reachability"`
-	AITriage          bool `yaml:"ai_triage" json:"ai_triage"`
-	Explain           bool `yaml:"explain" json:"explain"`
-	BaselineFile string `yaml:"baseline_file" json:"baseline_file"`
-	Incremental  bool   `yaml:"incremental" json:"incremental"`
-	CachePath    string `yaml:"cache_path" json:"cache_path"`
-	Quiet          bool   `yaml:"quiet" json:"quiet"`
-	ContainerImage  string   `yaml:"container_image" json:"container_image"`
-	AllowedLicenses []string `yaml:"allowed_licenses" json:"allowed_licenses"`
-	DeniedLicenses  []string `yaml:"denied_licenses" json:"denied_licenses"`
+	Offline             bool     `yaml:"offline" json:"offline"`
+	Languages           []string `yaml:"languages" json:"languages"`
+	AIModel             string   `yaml:"ai_model" json:"ai_model"`
+	PackageRegistryMode string   `yaml:"package_registry_mode" json:"package_registry_mode"`
+	NPMRegistryURL      string   `yaml:"npm_registry_url" json:"npm_registry_url"`
+	PyPIRegistryURL     string   `yaml:"pypi_registry_url" json:"pypi_registry_url"`
+	CratesRegistryURL   string   `yaml:"crates_registry_url" json:"crates_registry_url"`
+	AIFilterSecrets     bool     `yaml:"ai_filter_secrets" json:"ai_filter_secrets"`
+	AISCAReachability   bool     `yaml:"ai_sca_reachability" json:"ai_sca_reachability"`
+	AITriage            bool     `yaml:"ai_triage" json:"ai_triage"`
+	Explain             bool     `yaml:"explain" json:"explain"`
+	BaselineFile        string   `yaml:"baseline_file" json:"baseline_file"`
+	Incremental         bool     `yaml:"incremental" json:"incremental"`
+	CachePath           string   `yaml:"cache_path" json:"cache_path"`
+	Quiet               bool     `yaml:"quiet" json:"quiet"`
+	ContainerImage      string   `yaml:"container_image" json:"container_image"`
+	AllowedLicenses     []string `yaml:"allowed_licenses" json:"allowed_licenses"`
+	DeniedLicenses      []string `yaml:"denied_licenses" json:"denied_licenses"`
 }

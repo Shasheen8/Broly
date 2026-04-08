@@ -34,12 +34,12 @@ func postCheckRun(ctx context.Context, client *github.Client, req scanRequest, r
 	}
 
 	_, _, err := client.Checks.CreateCheckRun(ctx, req.owner, req.repo, github.CreateCheckRunOptions{
-		Name:       "Broly Security Scan",
-		HeadSHA:    req.headSHA,
-		Status:     github.Ptr("completed"),
-		Conclusion: github.Ptr(conclusion),
+		Name:        "Broly Security Scan",
+		HeadSHA:     req.headSHA,
+		Status:      github.Ptr("completed"),
+		Conclusion:  github.Ptr(conclusion),
 		CompletedAt: &github.Timestamp{Time: time.Now()},
-		Output:     output,
+		Output:      output,
 	})
 	if err != nil {
 		slog.Error("create check run", "err", err)
@@ -136,7 +136,6 @@ func buildAnnotations(result *core.ScanResult, limit int) []*github.CheckRunAnno
 	}
 	return annotations
 }
-
 
 func buildCommentBody(result *core.ScanResult) string {
 	var b strings.Builder

@@ -27,10 +27,10 @@ type spdxCreation struct {
 }
 
 type spdxPackage struct {
-	SPDXID           string           `json:"SPDXID"`
-	Name             string           `json:"name"`
-	VersionInfo      string           `json:"versionInfo"`
-	DownloadLocation string           `json:"downloadLocation"`
+	SPDXID           string            `json:"SPDXID"`
+	Name             string            `json:"name"`
+	VersionInfo      string            `json:"versionInfo"`
+	DownloadLocation string            `json:"downloadLocation"`
 	ExternalRefs     []spdxExternalRef `json:"externalRefs,omitempty"`
 }
 

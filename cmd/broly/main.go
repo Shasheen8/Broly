@@ -18,8 +18,8 @@ import (
 	"github.com/Shasheen8/Broly/pkg/license"
 	"github.com/Shasheen8/Broly/pkg/orchestrator"
 	"github.com/Shasheen8/Broly/pkg/report"
-	"github.com/Shasheen8/Broly/pkg/sbom"
 	"github.com/Shasheen8/Broly/pkg/sast"
+	"github.com/Shasheen8/Broly/pkg/sbom"
 	"github.com/Shasheen8/Broly/pkg/sca"
 	"github.com/Shasheen8/Broly/pkg/secrets"
 )
@@ -55,21 +55,25 @@ Secrets scanning into a single fast binary. Built in Go for speed.`,
 
 func scanCmd() *cobra.Command {
 	var (
-		configFile      string
-		outputFormat    string
-		outputFile      string
-		enableSAST      bool
-		enableSCA       bool
-		enableSecrets   bool
-		workers         int
-		minSeverity     string
-		excludePaths    []string
-		secretsRules    string
-		disableRedact   bool
-		validateSecrets bool
-		offline         bool
-		quiet           bool
+		configFile          string
+		outputFormat        string
+		outputFile          string
+		enableSAST          bool
+		enableSCA           bool
+		enableSecrets       bool
+		workers             int
+		minSeverity         string
+		excludePaths        []string
+		secretsRules        string
+		disableRedact       bool
+		validateSecrets     bool
+		offline             bool
+		quiet               bool
 		aiModel             string
+		packageRegistryMode string
+		npmRegistryURL      string
+		pypiRegistryURL     string
+		cratesRegistryURL   string
 		languages           []string
 		aiFilterSecrets     bool
 		aiSCAReachability   bool
@@ -140,6 +144,18 @@ By default all scanners are enabled and the current directory is scanned.`,
 			if f.Changed("ai-model") {
 				cfg.AIModel = aiModel
 			}
+			if f.Changed("package-registry-mode") {
+				cfg.PackageRegistryMode = packageRegistryMode
+			}
+			if f.Changed("npm-registry-url") {
+				cfg.NPMRegistryURL = npmRegistryURL
+			}
+			if f.Changed("pypi-registry-url") {
+				cfg.PyPIRegistryURL = pypiRegistryURL
+			}
+			if f.Changed("crates-registry-url") {
+				cfg.CratesRegistryURL = cratesRegistryURL
+			}
 			if f.Changed("languages") {
 				cfg.Languages = languages
 			}
@@ -169,8 +185,8 @@ By default all scanners are enabled and the current directory is scanned.`,
 			}
 
 			// Scanner enable flags: CLI always wins; if none set and config has none, enable all.
-			cliSAST    := f.Changed("sast")
-			cliSCA     := f.Changed("sca")
+			cliSAST := f.Changed("sast")
+			cliSCA := f.Changed("sca")
 			cliSecrets := f.Changed("secrets")
 
 			if cliSAST {
@@ -208,6 +224,10 @@ By default all scanners are enabled and the current directory is scanned.`,
 	flags.BoolVar(&validateSecrets, "validate", false, "Validate detected secrets against source APIs")
 	flags.BoolVar(&offline, "offline", false, "Run SCA in offline mode (skip OSV API)")
 	flags.StringVar(&aiModel, "ai-model", "", "Together.ai model for AI features (default: Qwen/Qwen3-Coder-Next-FP8)")
+	flags.StringVar(&packageRegistryMode, "package-registry-mode", "auto", "Package registry routing: auto, public-only, custom-only")
+	flags.StringVar(&npmRegistryURL, "npm-registry-url", "", "Custom npm registry base URL for package intelligence")
+	flags.StringVar(&pypiRegistryURL, "pypi-registry-url", "", "Custom PyPI registry base URL for package intelligence")
+	flags.StringVar(&cratesRegistryURL, "crates-registry-url", "", "Custom crates registry base URL for package intelligence")
 	flags.StringSliceVar(&languages, "languages", nil, "Limit SAST to specific languages (go,python,javascript)")
 	flags.BoolVar(&aiFilterSecrets, "ai-filter-secrets", false, "Use AI to filter false positive secrets findings (requires TOGETHER_API_KEY)")
 	flags.BoolVar(&aiSCAReachability, "ai-sca-reachability", false, "Use AI to analyze reachability of vulnerable dependencies (requires TOGETHER_API_KEY)")

@@ -159,8 +159,8 @@ type pullRequestEvent struct {
 }
 
 type prInfo struct {
-	Head   prRef  `json:"head"`
-	Base   prRef  `json:"base"`
+	Head prRef `json:"head"`
+	Base prRef `json:"base"`
 }
 
 type prRef struct {
@@ -209,11 +209,11 @@ func (a *App) handlePullRequest(body []byte) {
 	client := a.clientForInstallation(event.Installation.ID)
 
 	go a.scanPR(context.Background(), client, scanRequest{
-		owner:   event.Repository.Owner.Login,
-		repo:    event.Repository.Name,
-		cloneURL: event.Repository.CloneURL,
-		prNumber: event.Number,
-		headSHA: event.PullRequest.Head.SHA,
+		owner:      event.Repository.Owner.Login,
+		repo:       event.Repository.Name,
+		cloneURL:   event.Repository.CloneURL,
+		prNumber:   event.Number,
+		headSHA:    event.PullRequest.Head.SHA,
 		baseBranch: event.PullRequest.Base.Ref,
 	})
 }
