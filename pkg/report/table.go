@@ -44,6 +44,12 @@ type color struct {
 	enabled bool
 }
 
+type tableColumn struct {
+	width int
+	value string
+	style func(string) string
+}
+
 func (c color) s(code, text string) string {
 	if !c.enabled {
 		return text
@@ -228,13 +234,12 @@ func printSecretsTable(w io.Writer, clr color, findings []core.Finding) {
 	fmt.Fprintln(w, hdr)
 	fmt.Fprintf(w, "  %s\n", clr.s(gray, strings.Repeat("─", 116)))
 	for _, f := range findings {
-		location := trunc(formatLocation(f), 38)
-		fmt.Fprintf(w, "  %-10s  %-28s  %-40s  %s\n",
-			severityColor(f.Severity, clr),
-			trunc(f.RuleName, 26),
-			clr.s(dim, location),
-			clr.s(gray, trunc(f.Redacted, 30)),
-		)
+		printTableRow(w, []tableColumn{
+			{width: 10, value: f.Severity.String(), style: func(s string) string { return severityColor(f.Severity, clr) }},
+			{width: 28, value: f.RuleName, style: func(s string) string { return s }},
+			{width: 40, value: formatLocation(f), style: func(s string) string { return clr.s(dim, s) }},
+			{width: 24, value: f.Redacted, style: func(s string) string { return clr.s(gray, s) }},
+		})
 		printVerdictAndFix(w, clr, f)
 	}
 }
@@ -244,20 +249,20 @@ func printSCATable(w io.Writer, clr color, findings []core.Finding) {
 	fmt.Fprintln(w, hdr)
 	fmt.Fprintf(w, "  %s\n", clr.s(gray, strings.Repeat("─", 116)))
 	for _, f := range findings {
-		fixed := f.FixedVersion
-		if fixed == "" {
-			fixed = clr.s(red, "no patch")
-		} else {
-			fixed = clr.s(green, fixed)
+		fixedValue := f.FixedVersion
+		fixedStyle := func(s string) string { return clr.s(green, s) }
+		if fixedValue == "" {
+			fixedValue = "no patch"
+			fixedStyle = func(s string) string { return clr.s(red, s) }
 		}
-		fmt.Fprintf(w, "  %-10s  %-20s  %-20s  %-12s  %-12s  %s\n",
-			severityColor(f.Severity, clr),
-			clr.s(cyan, trunc(f.RuleID, 18)),
-			clr.s(white, trunc(f.PackageName, 18)),
-			clr.s(gray, trunc(f.PackageVersion, 10)),
-			fixed,
-			clr.s(dim, trunc(f.Ecosystem, 14)),
-		)
+		printTableRow(w, []tableColumn{
+			{width: 10, value: f.Severity.String(), style: func(s string) string { return severityColor(f.Severity, clr) }},
+			{width: 20, value: f.RuleID, style: func(s string) string { return clr.s(cyan, s) }},
+			{width: 20, value: f.PackageName, style: func(s string) string { return clr.s(white, s) }},
+			{width: 12, value: f.PackageVersion, style: func(s string) string { return clr.s(gray, s) }},
+			{width: 12, value: fixedValue, style: fixedStyle},
+			{width: 14, value: f.Ecosystem, style: func(s string) string { return clr.s(dim, s) }},
+		})
 		printVerdictAndFix(w, clr, f)
 	}
 }
@@ -267,25 +272,27 @@ func printContainerTable(w io.Writer, clr color, findings []core.Finding) {
 	fmt.Fprintln(w, hdr)
 	fmt.Fprintf(w, "  %s\n", clr.s(gray, strings.Repeat("─", 130)))
 	for _, f := range findings {
-		fixed := f.FixedVersion
-		if fixed == "" {
-			fixed = clr.s(red, "no patch")
-		} else {
-			fixed = clr.s(green, fixed)
+		fixedValue := f.FixedVersion
+		fixedStyle := func(s string) string { return clr.s(green, s) }
+		if fixedValue == "" {
+			fixedValue = "no patch"
+			fixedStyle = func(s string) string { return clr.s(red, s) }
 		}
-		layer := clr.s(gray, "unknown")
+		layerValue := "unknown"
+		layerStyle := func(s string) string { return clr.s(gray, s) }
 		if f.LayerIndex > 0 {
-			layer = clr.s(yellow, fmt.Sprintf("#%d", f.LayerIndex))
+			layerValue = fmt.Sprintf("#%d", f.LayerIndex)
+			layerStyle = func(s string) string { return clr.s(yellow, s) }
 		}
-		fmt.Fprintf(w, "  %-10s  %-20s  %-20s  %-12s  %-12s  %-14s  %s\n",
-			severityColor(f.Severity, clr),
-			clr.s(cyan, trunc(f.RuleID, 18)),
-			clr.s(white, trunc(f.PackageName, 18)),
-			clr.s(gray, trunc(f.PackageVersion, 10)),
-			fixed,
-			clr.s(dim, trunc(f.Ecosystem, 12)),
-			layer,
-		)
+		printTableRow(w, []tableColumn{
+			{width: 10, value: f.Severity.String(), style: func(s string) string { return severityColor(f.Severity, clr) }},
+			{width: 20, value: f.RuleID, style: func(s string) string { return clr.s(cyan, s) }},
+			{width: 20, value: f.PackageName, style: func(s string) string { return clr.s(white, s) }},
+			{width: 12, value: f.PackageVersion, style: func(s string) string { return clr.s(gray, s) }},
+			{width: 12, value: fixedValue, style: fixedStyle},
+			{width: 14, value: f.Ecosystem, style: func(s string) string { return clr.s(dim, s) }},
+			{width: 10, value: layerValue, style: layerStyle},
+		})
 		printVerdictAndFix(w, clr, f)
 	}
 }
@@ -295,13 +302,12 @@ func printSASTTable(w io.Writer, clr color, findings []core.Finding) {
 	fmt.Fprintln(w, hdr)
 	fmt.Fprintf(w, "  %s\n", clr.s(gray, strings.Repeat("─", 116)))
 	for _, f := range findings {
-		location := trunc(formatLocation(f), 38)
-		fmt.Fprintf(w, "  %-10s  %-28s  %-40s  %s\n",
-			severityColor(f.Severity, clr),
-			trunc(firstNonEmpty(f.RuleName, f.Title), 26),
-			clr.s(dim, location),
-			clr.s(gray, trunc(firstNonEmpty(f.Description, f.Title), 34)),
-		)
+		printTableRow(w, []tableColumn{
+			{width: 10, value: f.Severity.String(), style: func(s string) string { return severityColor(f.Severity, clr) }},
+			{width: 28, value: firstNonEmpty(f.RuleName, f.Title), style: func(s string) string { return s }},
+			{width: 40, value: formatLocation(f), style: func(s string) string { return clr.s(dim, s) }},
+			{width: 34, value: firstNonEmpty(f.Description, f.Title), style: func(s string) string { return clr.s(gray, s) }},
+		})
 		printVerdictAndFix(w, clr, f)
 	}
 }
@@ -408,6 +414,126 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func printTableRow(w io.Writer, columns []tableColumn) {
+	wrapped := make([][]string, len(columns))
+	maxLines := 0
+	for i, column := range columns {
+		wrapped[i] = wrapCell(column.value, column.width)
+		if len(wrapped[i]) > maxLines {
+			maxLines = len(wrapped[i])
+		}
+	}
+
+	for lineIdx := 0; lineIdx < maxLines; lineIdx++ {
+		fmt.Fprint(w, "  ")
+		for colIdx, column := range columns {
+			cell := ""
+			if lineIdx < len(wrapped[colIdx]) {
+				cell = wrapped[colIdx][lineIdx]
+			}
+			styled := cell
+			if cell != "" && column.style != nil {
+				styled = column.style(cell)
+			}
+			fmt.Fprint(w, padVisible(styled, column.width))
+			if colIdx < len(columns)-1 {
+				fmt.Fprint(w, "  ")
+			}
+		}
+		fmt.Fprintln(w)
+	}
+}
+
+func wrapCell(value string, width int) []string {
+	value = strings.TrimSpace(value)
+	if value == "" || width <= 0 {
+		return []string{""}
+	}
+
+	lines := make([]string, 0)
+	for _, rawLine := range strings.Split(value, "\n") {
+		rawLine = strings.TrimSpace(rawLine)
+		if rawLine == "" {
+			lines = append(lines, "")
+			continue
+		}
+
+		words := strings.Fields(rawLine)
+		if len(words) == 0 {
+			lines = append(lines, "")
+			continue
+		}
+
+		line := ""
+		for _, word := range words {
+			parts := wrapToken(word, width)
+			for idx, part := range parts {
+				if line == "" {
+					line = part
+					continue
+				}
+				if idx > 0 {
+					lines = append(lines, line)
+					line = part
+					continue
+				}
+				if visibleLen(line+" "+part) <= width {
+					line += " " + part
+					continue
+				}
+				lines = append(lines, line)
+				line = part
+			}
+		}
+		if line != "" {
+			lines = append(lines, line)
+		}
+	}
+
+	if len(lines) == 0 {
+		return []string{""}
+	}
+	return lines
+}
+
+func wrapToken(value string, width int) []string {
+	if visibleLen(value) <= width || width <= 0 {
+		return []string{value}
+	}
+
+	runes := []rune(value)
+	lines := make([]string, 0, (len(runes)/width)+1)
+	for len(runes) > 0 {
+		if len(runes) <= width {
+			lines = append(lines, string(runes))
+			break
+		}
+		end := width
+		split := preferredSplitIndex(runes, end)
+		lines = append(lines, string(runes[:split]))
+		runes = runes[split:]
+	}
+	return lines
+}
+
+func preferredSplitIndex(runes []rune, end int) int {
+	for i := end; i > 0; i-- {
+		switch runes[i-1] {
+		case '/', '.', '_', '-', ':':
+			return i
+		}
+	}
+	return end
+}
+
+func padVisible(value string, width int) string {
+	padding := width - visibleLen(value)
+	if padding <= 0 {
+		return value
+	}
+	return value + strings.Repeat(" ", padding)
 }
 
 func trunc(s string, maxLen int) string {
