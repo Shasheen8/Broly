@@ -9,11 +9,10 @@
 
 ### A berserker code security scanner.
 
-Secrets · SCA · SAST · Containers in a single binary.
-AI-powered. No rule files. No rule engine.
+Secrets · SCA · SAST · Containers. AI-powered intelligent findings. No rules. No YAML.
 
 <a href="https://github.com/Shasheen8/Broly/actions/workflows/ci.yml"><img src="https://github.com/Shasheen8/Broly/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-<a href="https://github.com/Shasheen8/Broly"><img src="https://img.shields.io/badge/Go-1.24-00ADD8?style=flat&logo=go" alt="Go"></a>
+<a href="https://github.com/Shasheen8/Broly"><img src="https://img.shields.io/badge/Go-1.26-00ADD8?style=flat&logo=go" alt="Go"></a>
 <a href="https://github.com/Shasheen8/Broly/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=flat" alt="License"></a>
 <a href="https://github.com/Shasheen8/Broly/releases"><img src="https://img.shields.io/badge/Release-latest-blue?style=flat" alt="Release"></a>
 <a href="https://together.ai"><img src="https://img.shields.io/badge/Powered%20by-Together%20AI-blueviolet?style=flat" alt="Together AI"></a>
@@ -29,12 +28,12 @@ AI-powered. No rule files. No rule engine.
 | Scanner | Engine | AI Layer |
 |---------|--------|----------|
 | **Secrets** | [Titus](https://github.com/praetorian-inc/titus) · 487 rules · Hyperscan | `--ai-filter-secrets` eliminates false positives |
-| **SCA** | [osv-scalibr](https://github.com/google/osv-scalibr) + [osv.dev](https://osv.dev) · 20 ecosystems | `--ai-sca-reachability` checks if the vuln is actually called · `--package-intelligence` detects hallucinated/non-existent dependencies |
-| **SAST** | [Together AI](https://together.ai) · `Qwen/Qwen3-Coder-Next-FP8` + regex pre-filter | Slice-aware multi-file analysis · source-to-sink data flow · 17 deterministic patterns · priority scoring |
-| **Dockerfile** | AI-powered · Dockerfile, Containerfile, Compose | Privilege escalation, secret exposure, dangerous mounts |
+| **SCA** | [osv-scalibr](https://github.com/google/osv-scalibr) + [osv.dev](https://osv.dev) · 20 ecosystems | `--ai-sca-reachability` · `--package-intelligence` for hallucinated deps |
+| **SAST** | [Together AI](https://together.ai) · `Qwen/Qwen3-Coder-Next-FP8` · 17 regex patterns | Slice-aware multi-file · source-to-sink data flow · priority scoring |
+| **Dockerfile** | AI-powered · Dockerfile, Containerfile, Compose | Privilege escalation · secret exposure · dangerous mounts |
 | **Container** | [go-containerregistry](https://github.com/google/go-containerregistry) + [osv.dev](https://osv.dev) · Alpine, Debian, Ubuntu, RHEL | OS package CVEs with layer attribution |
-| **License** | File-based detection · 13 license types | Policy engine: `allowed_licenses` / `denied_licenses` in `.broly.yaml` |
-| **SBOM** | [osv-scalibr](https://github.com/google/osv-scalibr) · 20 ecosystems | `broly sbom` generates CycloneDX 1.5 or SPDX 2.3 with PURLs |
+| **License** | File-based detection · 13 license types | Policy engine via `allowed_licenses` / `denied_licenses` in `.broly.yaml` |
+| **SBOM** | [osv-scalibr](https://github.com/google/osv-scalibr) · 20 ecosystems | CycloneDX 1.5 or SPDX 2.3 with PURLs |
 
 ---
 
