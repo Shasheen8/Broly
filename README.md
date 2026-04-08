@@ -103,7 +103,7 @@ broly scan --incremental                          # skip unchanged files
 
 ## Scanner Output
 
-*Demo videos coming soon.*
+*Video for each scanner output coming soon.*
 
 Each scanner outputs an aligned table in the terminal. Supports JSON (`-f json`), SARIF (`-f sarif`), and table (default).
 
