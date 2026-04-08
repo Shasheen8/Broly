@@ -5,8 +5,7 @@ name: Broly Security Scan
 #   jobs:
 #     security:
 #       uses: Shasheen8/Broly/.github/workflows/broly-scan.yml@main
-#       secrets:
-#         together_api_key: ${{ secrets.TOGETHER_API_KEY }}
+#       secrets: inherit
 #
 # Optional inputs:
 #   min_severity   — info | low | medium | high | critical  (default: low)
@@ -29,8 +28,8 @@ on:
         type: boolean
         default: false
     secrets:
-      together_api_key:
-        description: "Together AI API key (required for SAST and AI features)"
+      ai_api_key:
+        description: "API key for AI-powered scanning features"
         required: false
 
 permissions:
@@ -85,7 +84,7 @@ jobs:
 
           # Add SAST when key is present and scanners=all or scanners=sast
           SAST_FLAGS=""
-          if [ -n "${TOGETHER_API_KEY}" ]; then
+          if [ -n "${AI_API_KEY}" ]; then
             if [ "${INPUT_SCANNERS}" = "all" ] || [ "${INPUT_SCANNERS}" = "sast" ]; then
               SAST_FLAGS="--sast"
               if [ "${INPUT_AI_TRIAGE}" = "true" ]; then
@@ -97,7 +96,7 @@ jobs:
           echo "scan=${SCAN_FLAGS}" >> "$GITHUB_OUTPUT"
           echo "sast=${SAST_FLAGS}" >> "$GITHUB_OUTPUT"
         env:
-          TOGETHER_API_KEY: ${{ secrets.together_api_key }}
+          AI_API_KEY: ${{ secrets.ai_api_key }}
           INPUT_SCANNERS: ${{ inputs.scanners }}
           INPUT_AI_TRIAGE: ${{ inputs.ai_triage }}
 

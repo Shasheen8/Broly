@@ -136,7 +136,7 @@ jobs:
   security:
     uses: Shasheen8/Broly/.github/workflows/broly-scan.yml@main
     secrets:
-      together_api_key: ${{ secrets.TOGETHER_API_KEY }}
+      ai_api_key: ${{ secrets.AI_API_KEY }}
 ```
 
 Supports `min_severity`, `scanners`, and `ai_triage` inputs. Posts findings as a PR comment and uploads SARIF to the GitHub Security tab.
