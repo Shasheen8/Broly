@@ -20,15 +20,15 @@ const (
 )
 
 type Finding struct {
-	ID          string   `json:"id"`
-	Type        ScanType `json:"type"`
-	RuleID      string   `json:"rule_id"`
-	RuleName    string   `json:"rule_name"`
+	ID            string   `json:"id"`
+	Type          ScanType `json:"type"`
+	RuleID        string   `json:"rule_id"`
+	RuleName      string   `json:"rule_name"`
 	Severity      Severity `json:"severity"`
 	PriorityScore int      `json:"priority_score,omitempty"`
 	Confidence    string   `json:"confidence,omitempty"`
-	Title       string   `json:"title"`
-	Description string   `json:"description"`
+	Title         string   `json:"title"`
+	Description   string   `json:"description"`
 
 	FilePath     string `json:"file_path"`
 	ArtifactPath string `json:"artifact_path,omitempty"`

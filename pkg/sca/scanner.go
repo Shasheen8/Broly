@@ -35,6 +35,7 @@ type SCAScanner struct {
 	extractors   []filesystem.Extractor
 	offline      bool
 	reachability *AIReachability
+	intel        *packageIntelligence
 }
 
 func NewSCAScanner() *SCAScanner {
@@ -66,6 +67,13 @@ func (s *SCAScanner) Init(cfg *core.Config) error {
 			fmt.Fprintln(os.Stderr, "warning: TOGETHER_API_KEY not set — AI SCA reachability disabled")
 		}
 	}
+	if cfg.PackageIntelligence && !s.offline {
+		intel, err := newPackageIntelligence(cfg)
+		if err != nil {
+			return err
+		}
+		s.intel = intel
+	}
 
 	return nil
 }
@@ -96,6 +104,14 @@ func (s *SCAScanner) Scan(ctx context.Context, paths []string, findings chan<- c
 		pkgs := inv.Packages
 		if len(pkgs) == 0 || s.offline {
 			continue
+		}
+
+		for _, finding := range s.intel.Analyze(ctx, pkgs) {
+			select {
+			case findings <- finding:
+			case <-ctx.Done():
+				return nil
+			}
 		}
 
 		for start := 0; start < len(pkgs); start += 1000 {

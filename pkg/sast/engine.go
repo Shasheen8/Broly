@@ -31,6 +31,7 @@ type SASTScanner struct {
 	apiKeySet    bool
 	fileCache    *cache.Cache
 	incremental  bool
+	sliceFiles   int
 }
 
 func NewSASTScanner() *SASTScanner {
@@ -59,6 +60,11 @@ func (s *SASTScanner) Init(cfg *core.Config) error {
 	s.langFilter = make(map[string]bool)
 	for _, l := range cfg.Languages {
 		s.langFilter[strings.ToLower(l)] = true
+	}
+
+	s.sliceFiles = cfg.SASTSliceFiles
+	if s.sliceFiles <= 0 {
+		s.sliceFiles = defaultMaxContextFiles
 	}
 
 	s.incremental = cfg.Incremental
@@ -99,8 +105,10 @@ func (s *SASTScanner) Scan(ctx context.Context, paths []string, findings chan<- 
 	}
 
 	type fileJob struct {
-		path string
-		lang string
+		path  string
+		root  string
+		index *repoIndex
+		lang  string
 	}
 
 	jobs := make(chan fileJob, 64)
@@ -120,7 +128,7 @@ func (s *SASTScanner) Scan(ctx context.Context, paths []string, findings chan<- 
 				if ctx.Err() != nil {
 					return
 				}
-				if s.scanFile(ctx, job.path, job.lang, findings) && s.fileCache != nil {
+				if s.scanFile(ctx, job.index, job.root, job.path, job.lang, findings) && s.fileCache != nil {
 					successMu.Lock()
 					successPaths = append(successPaths, job.path)
 					successMu.Unlock()
@@ -134,6 +142,8 @@ func (s *SASTScanner) Scan(ctx context.Context, paths []string, findings chan<- 
 		if ctx.Err() != nil {
 			break
 		}
+		root := scanRoot(target)
+		index := newRepoIndex(root)
 		filepath.WalkDir(target, func(path string, d fs.DirEntry, err error) error {
 			if err != nil || ctx.Err() != nil {
 				return nil
@@ -174,7 +184,7 @@ func (s *SASTScanner) Scan(ctx context.Context, paths []string, findings chan<- 
 				return nil
 			}
 
-			jobs <- fileJob{path: path, lang: lang}
+			jobs <- fileJob{path: path, root: root, index: index, lang: lang}
 			return nil
 		})
 	}
@@ -195,7 +205,7 @@ func (s *SASTScanner) Scan(ctx context.Context, paths []string, findings chan<- 
 	return nil
 }
 
-func (s *SASTScanner) scanFile(ctx context.Context, path, lang string, findings chan<- core.Finding) bool {
+func (s *SASTScanner) scanFile(ctx context.Context, index *repoIndex, root, path, lang string, findings chan<- core.Finding) bool {
 	src, err := os.ReadFile(path)
 	if err != nil {
 		return false
@@ -225,8 +235,12 @@ func (s *SASTScanner) scanFile(ctx context.Context, path, lang string, findings 
 		}
 	}
 
-	// AI scan: LLM-based deep analysis.
-	prompt := buildPrompt(path, lang, content)
+	// AI scan: LLM-based deep analysis with a bounded multi-file slice.
+	slice, err := buildAnalysisSlice(index, root, path, lang, content, s.sliceFiles, defaultMaxContextBytes)
+	if err != nil {
+		return false
+	}
+	prompt := buildPrompt(slice)
 
 	response, err := s.client.complete(ctx, prompt)
 	if err != nil {
@@ -236,12 +250,11 @@ func (s *SASTScanner) scanFile(ctx context.Context, path, lang string, findings 
 		return false
 	}
 
-	parsed := parseLLMResponse(path, response)
+	parsed := parseLLMResponse(response)
 	if len(parsed) == 0 && len(strings.TrimSpace(response)) > 0 && !strings.Contains(response, "NO_FINDINGS") {
 		return false
 	}
-	for _, pf := range parsed {
-		f := pf.toFinding(path, lang)
+	for _, f := range attributeParsedFindings(slice, parsed) {
 		f.Timestamp = time.Now()
 		select {
 		case findings <- f:

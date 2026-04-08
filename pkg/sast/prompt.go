@@ -185,10 +185,11 @@ Analyze this Docker Compose file for security misconfigurations and vulnerabilit
 **LOW**: Missing health checks, minor network isolation gaps, .env files without gitignore note
 `
 
-// buildPrompt constructs the full security analysis prompt for a given file.
-func buildPrompt(filePath, language, code string) string {
+// buildPrompt constructs the full security analysis prompt for a bounded analysis slice.
+func buildPrompt(slice analysisSlice) string {
 	var description string
 	var analysis string
+	language := slice.Primary.Language
 
 	switch language {
 	case "dockerfile":
@@ -202,8 +203,26 @@ func buildPrompt(filePath, language, code string) string {
 		analysis = promptCodeAnalysis
 	}
 
-	return fmt.Sprintf(promptIntro, description, filePath, language) +
-		codeFence + language + "\n" + code + "\n" + codeFence +
+	prompt := fmt.Sprintf(promptIntro, description, slice.Primary.RelativePath, language) +
+		codeFence + language + "\n" + slice.Primary.Content + "\n" + codeFence
+
+	prompt += "\n\nAnalysis slice:\n"
+	prompt += "Primary file: " + slice.Primary.RelativePath + "\n"
+
+	if len(slice.Supporting) == 0 {
+		prompt += "Supporting files: none\n"
+	} else {
+		prompt += "Supporting files:\n"
+		for _, file := range slice.Supporting {
+			prompt += "\nSupporting file: " + file.RelativePath + "\n"
+			if file.Language != "" {
+				prompt += "Language: " + file.Language + "\n"
+			}
+			prompt += codeFence + file.Language + "\n" + file.Content + "\n" + codeFence + "\n"
+		}
+	}
+
+	return prompt +
 		analysis +
 		promptResponseFormat
 }
