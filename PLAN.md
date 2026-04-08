@@ -4,8 +4,8 @@
 
 **Author:** Shasheen B
 **Created:** 2026-03-08
-**Last Updated:** 2026-04-08
-**Status:** Phases 1-8C complete, 7D partial, 11B complete (PR #13). Remaining: 11A, 11C, 11D. Phases 9+ require infrastructure.
+**Last Updated:** 2026-04-04
+**Status:** Phases 1-8C complete, 7D partial. All pending items consolidated in Phase 11. Phases 9+ require infrastructure.
 
 ---
 
@@ -901,12 +901,12 @@ All pending items from earlier phases collected in one place.
 - [ ] **AWS deployment** — ECS Fargate or Lambda+SQS; ALB for HTTPS; auto-scaling; IAM role for GitHub App service
 - [ ] **External monitoring** — `/healthz` endpoint already implemented; wire up uptime check (e.g. UptimeRobot, Fly.io health checks)
 
-#### 11B - AI Depth (Complete - 2026-04-08, PR #13)
+#### 11B - AI Depth
 
 *(items from Phase 5 and Phase 8C)*
 
-- [x] **Slice-aware multi-file SAST** — repo index + import graph traversal (Go: same-package siblings + local module imports; JS/TS: relative imports); bounded by `--sast-slice-files` (default 2) and 16KB; finding attribution resolves back to correct file in slice; path containment enforced
-- [x] **Package intelligence** — 5-state registry lookup model (exists/missing/private/transient/ambiguous); backends for npm, PyPI, crates.io; PyPI PEP 503 normalization; lookup cache per scan; conservative emission (all backends must report missing); `--package-intelligence` flag to opt in; `--package-registry-mode` + custom registry URLs for internal registries
+- [ ] **Multi-file SAST** — send cross-file context for inter-procedural taint analysis; improves accuracy on source/sink patterns that span files
+- [ ] **Hallucinated package detection** — detect AI-generated package names that don't exist in registries; needs registry API calls (npm, PyPI, crates.io), not just OSV
 
 #### 11C - IaC Scanning
 
