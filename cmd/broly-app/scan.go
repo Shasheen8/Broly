@@ -197,7 +197,6 @@ func getChangedFiles(ctx context.Context, client *github.Client, req scanRequest
 func runBrolyScan(ctx context.Context, dir string, changedFiles []string) (*core.ScanResult, error) {
 	hasAI := os.Getenv("TOGETHER_API_KEY") != ""
 
-	// Secrets + SCA: scan full repo.
 	cfg := &core.Config{
 		Targets:       []string{dir},
 		EnableSecrets: true,

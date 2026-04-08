@@ -2,7 +2,6 @@ package sast
 
 import "fmt"
 
-// codeFence is three backticks, used to build markdown code blocks.
 const codeFence = "```"
 
 // promptIntro is the intro section shared across all prompts (before the code block).

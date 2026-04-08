@@ -212,7 +212,6 @@ func (s *SASTScanner) scanFile(ctx context.Context, index *repoIndex, root, path
 	}
 	content := string(src)
 
-	// Fast regex pre-filter: deterministic pattern matching (runs instantly).
 	for _, hit := range runPrefilter(content) {
 		f := core.Finding{
 			Type:        core.ScanTypeSAST,
