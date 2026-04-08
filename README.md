@@ -45,7 +45,7 @@ AI-powered. No rule files. No rule engine.
 go install github.com/Shasheen8/Broly/cmd/broly@latest
 ```
 
-**Pre-built binaries** (Linux/macOS) — download from [Releases](https://github.com/Shasheen8/Broly/releases).
+**Pre-built binaries** (Linux/macOS): [Releases](https://github.com/Shasheen8/Broly/releases).
 
 **From source** (full Hyperscan support for secrets engine):
 
@@ -127,9 +127,9 @@ Each scanner outputs an aligned table in the terminal. Supports JSON (`-f json`)
 
 ## CI Integration
 
-**GitHub App** — install once on your org, scans every PR automatically. No per-repo setup needed.
+**GitHub App**: install once on your org and every PR gets scanned automatically. No per-repo setup needed.
 
-**Reusable workflow** — drop one line into any repo's existing CI:
+**Reusable workflow**: drop one line into any repo's existing CI:
 
 ```yaml
 jobs:
@@ -143,18 +143,18 @@ Supports `min_severity`, `scanners`, and `ai_triage` inputs. Posts findings as a
 
 ## GitHub App
 
-One install covers your entire org. Every PR gets scanned automatically — no workflow files, no per-repo setup, no secrets to configure per repo.
+One install covers your entire org. Every PR gets scanned automatically. No workflow files, no per-repo setup, no secrets to configure per repo.
 
 **On every PR, Broly:**
-- Runs secrets, SCA, and SAST on changed files only — no historic noise
+- Runs secrets, SCA, and SAST on changed files only (no historic noise)
 - Posts findings as an inline check run with file:line annotations
 - Labels each finding TRUE/FALSE positive with a confidence score and fix suggestion
-- Adds a checkbox per finding — check it to suppress it forever
+- Adds a checkbox per finding. Check it to suppress it forever
 
 > [!NOTE]
 > Only findings in files changed by the PR are reported. Broly never flags pre-existing issues on a clean PR.
 
-**Developer feedback loop:** when a developer checks a false positive box, Broly commits the fingerprint to `.broly-baseline.yaml` on the branch. The finding is suppressed on every future scan — automatically, no config needed. Each repo builds its own false positive memory over time.
+**Developer feedback loop:** when a developer checks a false positive box, Broly commits the fingerprint to `.broly-baseline.yaml` on the branch. The finding is suppressed on every future scan, automatically. No config needed. Each repo builds its own false positive memory over time.
 
 ### Running locally
 
@@ -171,7 +171,7 @@ go run ./cmd/broly-app
 
 ### Deployment
 
-Multi-stage Dockerfile at `cmd/broly-app/Dockerfile`. Chainguard hardened runtime — non-root, no shell, minimal attack surface.
+Multi-stage Dockerfile at `cmd/broly-app/Dockerfile`. Chainguard hardened runtime. Non-root, no shell, minimal attack surface.
 
 **Environment variables:**
 
@@ -233,7 +233,7 @@ denied_licenses:
 ### Baseline
 
 > [!NOTE]
-> `suppress` silences known false positives. `require` asserts specific findings must be detected every scan — missing entries cause a non-zero exit.
+> `suppress` silences known false positives. `require` asserts specific findings must be detected every scan. Missing entries cause a non-zero exit.
 
 ```yaml
 suppress:
