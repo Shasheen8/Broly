@@ -180,7 +180,7 @@ Multi-stage Dockerfile at `cmd/broly-app/Dockerfile`. Chainguard hardened runtim
 | `APP_ID` | ✓ | GitHub App ID |
 | `PRIVATE_KEY_PATH` | ✓ | Path to the `.pem` private key file |
 | `WEBHOOK_SECRET` | ✓ | Webhook secret from the GitHub App settings |
-| `TOGETHER_API_KEY` | — | Together AI key — enables SAST and AI triage |
+| `TOGETHER_API_KEY` | ✓ | Together AI key — required for SAST and AI triage |
 | `PORT` | — | HTTP port (default: `8080`) |
 | `MAX_CONCURRENT_SCANS` | — | Parallel scan limit (default: `4`) |
 
