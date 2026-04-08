@@ -143,30 +143,64 @@ Supports `min_severity`, `scanners`, and `ai_triage` inputs. Posts findings as a
 
 ## GitHub App
 
-Install once on your org, scans every PR automatically. No per-repo workflow setup. Only findings in changed files are reported — no historic noise.
+One install covers your entire org. Every PR gets scanned automatically — no workflow files, no per-repo setup, no secrets to configure per repo.
 
-Check a box in the PR comment to mark a finding as a false positive. Broly commits the fingerprint to `.broly-baseline.yaml` and the finding never surfaces again. Suppressions accumulate over time — each repo builds its own false positive memory.
+**On every PR, Broly:**
+- Runs secrets, SCA, and SAST on changed files only — no historic noise
+- Posts findings as an inline check run with file:line annotations
+- Labels each finding TRUE/FALSE positive with a confidence score and fix suggestion
+- Adds a checkbox per finding — check it to suppress it forever
+
+> [!NOTE]
+> Only findings in files changed by the PR are reported. Broly never flags pre-existing issues on a clean PR.
+
+**Developer feedback loop:** when a developer checks a false positive box, Broly commits the fingerprint to `.broly-baseline.yaml` on the branch. The finding is suppressed on every future scan — automatically, no config needed. Each repo builds its own false positive memory over time.
+
+### Running locally
 
 ```bash
-# run locally
-APP_ID=123456 PRIVATE_KEY_PATH=./app.pem WEBHOOK_SECRET=your_secret go run ./cmd/broly-app
+APP_ID=your_app_id \
+PRIVATE_KEY_PATH=./broly.pem \
+WEBHOOK_SECRET=your_webhook_secret \
+TOGETHER_API_KEY=your_key \
+go run ./cmd/broly-app
 ```
+
+> [!TIP]
+> Use [smee.io](https://smee.io) to proxy GitHub webhooks to your local server during development.
 
 ### Deployment
 
-Multi-stage Dockerfile at `cmd/broly-app/Dockerfile`. Uses Chainguard hardened images — non-root, no shell, minimal attack surface.
+Multi-stage Dockerfile at `cmd/broly-app/Dockerfile`. Chainguard hardened runtime — non-root, no shell, minimal attack surface.
+
+**Environment variables:**
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `APP_ID` | ✓ | GitHub App ID |
+| `PRIVATE_KEY_PATH` | ✓ | Path to the `.pem` private key file |
+| `WEBHOOK_SECRET` | ✓ | Webhook secret from the GitHub App settings |
+| `TOGETHER_API_KEY` | — | Together AI key — enables SAST and AI triage |
+| `PORT` | — | HTTP port (default: `8080`) |
+| `MAX_CONCURRENT_SCANS` | — | Parallel scan limit (default: `4`) |
 
 ```bash
 docker build -f cmd/broly-app/Dockerfile -t broly-app .
 
 docker run -p 8080:8080 \
-  -e APP_ID=123456 \
-  -e PRIVATE_KEY_PATH=/secrets/app.pem \
-  -e WEBHOOK_SECRET=your_secret \
+  -e APP_ID=your_app_id \
+  -e PRIVATE_KEY_PATH=/secrets/broly.pem \
+  -e WEBHOOK_SECRET=your_webhook_secret \
   -e TOGETHER_API_KEY=your_key \
-  -v /path/to/app.pem:/secrets/app.pem:ro \
+  -v /path/to/broly.pem:/secrets/broly.pem:ro \
   broly-app
 ```
+
+> [!TIP]
+> In production, mount the private key from a secrets manager rather than the host filesystem. The `/healthz` endpoint is available for uptime monitoring.
+
+> [!WARNING]
+> Never commit the `.pem` private key to source control. Add it to `.gitignore`.
 
 ---
 
