@@ -37,6 +37,10 @@ jobs:
         run: go vet ./...
 
   tag:
+    # Versioning rules:
+    #   PR merge  → bump minor (v1.1.0 → v1.2.0)
+    #   Direct push to main → bump patch (v1.0.0 → v1.0.1)
+    #   Breaking changes → tag manually (v2.0.0)
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: build
     runs-on: ubuntu-latest
@@ -46,21 +50,28 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GH_BROLY }}
 
-      - name: Bump patch version and push tag
+      - name: Bump version and push tag
         run: |
           set -e
           latest=$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
           if [ -z "$latest" ]; then
-            next="v0.1.0"
+            next="v1.0.0"
           else
             major=$(echo "$latest" | cut -d. -f1 | tr -d v)
             minor=$(echo "$latest" | cut -d. -f2)
             patch=$(echo "$latest" | cut -d. -f3)
-            next="v${major}.${minor}.$((patch + 1))"
+
+            if echo "${COMMIT_MSG}" | grep -q "^Merge pull request"; then
+              next="v${major}.$((minor + 1)).0"
+            else
+              next="v${major}.${minor}.$((patch + 1))"
+            fi
           fi
+          echo "Latest: ${latest:-none} → Next: ${next}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git tag "$next"
           git push origin "$next"
         env:
           GH_TOKEN: ${{ secrets.GH_BROLY }}
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
