@@ -397,7 +397,7 @@ func versionCmd() *cobra.Command {
 		Use:   "version",
 		Short: "Print version information",
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Printf("broly %s (commit: %s)\n", version, commit)
+			fmt.Println(formatVersionInfo(currentVersionInfo()))
 		},
 	}
 }
