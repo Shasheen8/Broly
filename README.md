@@ -257,4 +257,4 @@ query = f"SELECT * FROM users WHERE id = {user_id}"  # broly:ignore SQL-INJECTIO
 
 ## License
 
-MIT. See [LICENSE](LICENSE) for the full text.
+MIT. See [LICENSE](LICENSE).
