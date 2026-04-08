@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const hallucinatedPackageRuleID = "BROLY-HALLUCINATED-PACKAGE"
+const hallucinatedPackageRuleID = "broly.sca.hallucinated-package"
 
 var pypiNameNormalizer = regexp.MustCompile(`[-_.]+`)
 
@@ -54,12 +54,6 @@ func (b httpRegistryBackend) Lookup(ctx context.Context, pkg packageCandidate) p
 		result.Reason = "empty normalized package name"
 		return result
 	}
-	if b.name == "npm-public" && strings.HasPrefix(normalized, "@") {
-		result.Status = lookupPrivateOrUnsupported
-		result.Reason = "scoped npm package likely private"
-		return result
-	}
-
 	lookupURL, ok := registryLookupURL(b.ecosystem, b.baseURL, normalized)
 	if !ok {
 		result.Status = lookupPrivateOrUnsupported

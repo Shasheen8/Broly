@@ -31,6 +31,7 @@ type SASTScanner struct {
 	apiKeySet    bool
 	fileCache    *cache.Cache
 	incremental  bool
+	sliceFiles   int
 }
 
 func NewSASTScanner() *SASTScanner {
@@ -59,6 +60,11 @@ func (s *SASTScanner) Init(cfg *core.Config) error {
 	s.langFilter = make(map[string]bool)
 	for _, l := range cfg.Languages {
 		s.langFilter[strings.ToLower(l)] = true
+	}
+
+	s.sliceFiles = cfg.SASTSliceFiles
+	if s.sliceFiles <= 0 {
+		s.sliceFiles = defaultMaxContextFiles
 	}
 
 	s.incremental = cfg.Incremental
@@ -230,7 +236,7 @@ func (s *SASTScanner) scanFile(ctx context.Context, index *repoIndex, root, path
 	}
 
 	// AI scan: LLM-based deep analysis with a bounded multi-file slice.
-	slice, err := buildAnalysisSlice(index, root, path, lang, content, defaultMaxContextFiles, defaultMaxContextBytes)
+	slice, err := buildAnalysisSlice(index, root, path, lang, content, s.sliceFiles, defaultMaxContextBytes)
 	if err != nil {
 		return false
 	}

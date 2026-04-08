@@ -24,6 +24,7 @@ type Config struct {
 	Offline             bool     `yaml:"offline" json:"offline"`
 	Languages           []string `yaml:"languages" json:"languages"`
 	AIModel             string   `yaml:"ai_model" json:"ai_model"`
+	PackageIntelligence bool     `yaml:"package_intelligence" json:"package_intelligence"`
 	PackageRegistryMode string   `yaml:"package_registry_mode" json:"package_registry_mode"`
 	NPMRegistryURL      string   `yaml:"npm_registry_url" json:"npm_registry_url"`
 	PyPIRegistryURL     string   `yaml:"pypi_registry_url" json:"pypi_registry_url"`
@@ -37,6 +38,7 @@ type Config struct {
 	CachePath           string   `yaml:"cache_path" json:"cache_path"`
 	Quiet               bool     `yaml:"quiet" json:"quiet"`
 	ContainerImage      string   `yaml:"container_image" json:"container_image"`
+	SASTSliceFiles      int      `yaml:"sast_slice_files" json:"sast_slice_files"`
 	AllowedLicenses     []string `yaml:"allowed_licenses" json:"allowed_licenses"`
 	DeniedLicenses      []string `yaml:"denied_licenses" json:"denied_licenses"`
 }

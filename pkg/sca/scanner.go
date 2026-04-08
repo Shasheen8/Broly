@@ -67,7 +67,7 @@ func (s *SCAScanner) Init(cfg *core.Config) error {
 			fmt.Fprintln(os.Stderr, "warning: TOGETHER_API_KEY not set — AI SCA reachability disabled")
 		}
 	}
-	if !s.offline {
+	if cfg.PackageIntelligence && !s.offline {
 		intel, err := newPackageIntelligence(cfg)
 		if err != nil {
 			return err
