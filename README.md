@@ -39,17 +39,13 @@ AI-powered. No rule files. No rule engine.
 
 ## Install
 
-**Pre-built binaries** (Linux/macOS, no dependencies):
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/Shasheen8/Broly/main/install.sh | sh
-```
-
-**Go install** (pure Go, no CGO required):
+**Go install:**
 
 ```bash
 go install github.com/Shasheen8/Broly/cmd/broly@latest
 ```
+
+**Pre-built binaries** (Linux/macOS) — download from [Releases](https://github.com/Shasheen8/Broly/releases).
 
 **From source** (full Hyperscan support for secrets engine):
 
