@@ -23,10 +23,11 @@ Open an issue with a clear description, the problem it solves, and any alternati
 ## Development Setup
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/Broly.git
+git clone https://github.com/Shasheen8/Broly.git
 cd Broly
 
-# Build
+# Build (requires Vectorscan for full Hyperscan support)
+brew install vectorscan   # macOS
 make build
 
 # Run checks
@@ -34,10 +35,6 @@ make check
 
 # Run tests
 go test ./...
-
-# Build with Hyperscan (macOS)
-brew install vectorscan
-make build
 ```
 
 AI features require `TOGETHER_API_KEY` set in your environment.
@@ -47,26 +44,30 @@ AI features require `TOGETHER_API_KEY` set in your environment.
 - Standard Go conventions (`gofmt`, `go vet`)
 - Keep functions focused and small
 - Error handling: return errors, don't swallow them silently
-- No unnecessary abstractions -- three similar lines is better than a premature helper
+- No unnecessary abstractions — three similar lines is better than a premature helper
 
 ## Project Structure
 
 ```
 Broly/
-cmd/broly/         CLI entry point (Cobra)
+cmd/
+  broly/         CLI entry point (Cobra)
+  broly-app/     GitHub App webhook server
 pkg/
-  core/            Finding, Config, Severity, Scanner interface
-  ai/              Shared Together AI client
-  secrets/         Titus adapter + AI false positive filter
-  sca/             osv-scalibr + osv.dev + AI reachability
-  sast/            AI SAST engine (prompt, parser, language detection)
-  container/       Container image scanner (APK, DPKG, RPM + OSV)
-  triage/          AI verdict, confidence, fix suggestion
-  baseline/        Suppress/require rules
-  suppress/        Inline broly:ignore handling
-  cache/           Incremental scan hash cache
-  report/          Table, JSON, SARIF formatters
-  orchestrator/    Concurrent scanner coordination
+  core/          Finding, Config, Severity, Scanner interface
+  ai/            Shared Together AI client
+  secrets/       Titus adapter + AI false positive filter
+  sca/           osv-scalibr + osv.dev + AI reachability + package intelligence
+  sast/          AI SAST engine (prompt, parser, slice builder, language detection)
+  container/     Container image scanner (APK, DPKG, RPM + OSV)
+  license/       License detection and policy engine
+  sbom/          CycloneDX and SPDX formatters
+  triage/        AI verdict, confidence, fix suggestion
+  baseline/      Suppress/require rules
+  suppress/      Inline broly:ignore handling
+  cache/         Incremental scan hash cache
+  report/        Table, JSON, SARIF formatters
+  orchestrator/  Concurrent scanner coordination
 ```
 
 ## Commit Messages
