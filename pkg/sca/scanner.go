@@ -70,9 +70,10 @@ func (s *SCAScanner) Init(cfg *core.Config) error {
 	if cfg.PackageIntelligence && !s.offline {
 		intel, err := newPackageIntelligence(cfg)
 		if err != nil {
-			return err
+			fmt.Fprintf(os.Stderr, "warning: package intelligence disabled: %v\n", err)
+		} else {
+			s.intel = intel
 		}
-		s.intel = intel
 	}
 
 	return nil

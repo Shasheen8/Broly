@@ -3,12 +3,15 @@ package sca
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"regexp"
 	"strings"
 	"time"
 )
+
+var registryHTTPClient = &http.Client{Timeout: 5 * time.Second}
 
 const hallucinatedPackageRuleID = "broly.sca.hallucinated-package"
 
@@ -32,7 +35,7 @@ func newHTTPRegistryBackend(name, ecosystem, baseURL string) registryBackend {
 		name:      name,
 		ecosystem: ecosystem,
 		baseURL:   strings.TrimRight(baseURL, "/"),
-		client:    &http.Client{Timeout: 5 * time.Second},
+		client:    registryHTTPClient,
 	}
 }
 
@@ -75,7 +78,10 @@ func (b httpRegistryBackend) Lookup(ctx context.Context, pkg packageCandidate) p
 		result.Reason = err.Error()
 		return result
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		resp.Body.Close()
+	}()
 
 	switch resp.StatusCode {
 	case http.StatusOK:
