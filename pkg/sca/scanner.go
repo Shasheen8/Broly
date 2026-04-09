@@ -22,6 +22,7 @@ import (
 	"osv.dev/bindings/go/osvdev"
 
 	"github.com/Shasheen8/Broly/pkg/core"
+	"github.com/Shasheen8/Broly/pkg/osvutil"
 )
 
 var ecosystems = []string{
@@ -36,6 +37,7 @@ type SCAScanner struct {
 	offline      bool
 	reachability *AIReachability
 	intel        *packageIntelligence
+	fixedCache   map[string]string
 }
 
 func NewSCAScanner() *SCAScanner {
@@ -49,6 +51,7 @@ func (s *SCAScanner) Init(cfg *core.Config) error {
 	s.offline = cfg.Offline
 	s.osvClient = osvdev.DefaultClient()
 	s.osvClient.Config.UserAgent = "broly-sca/1.0"
+	s.fixedCache = make(map[string]string)
 
 	var extractors []filesystem.Extractor
 	for _, eco := range ecosystems {
@@ -196,7 +199,7 @@ func (s *SCAScanner) emitFindings(
 				PackageName:    pkg.Name,
 				PackageVersion: pkg.Version,
 				Ecosystem:      eco.String(),
-				FixedVersion:   extractFixedVersion(vuln),
+				FixedVersion:   osvutil.ResolveFixedVersion(ctx, s.osvClient, vuln, s.fixedCache),
 				CVE:            cve,
 				References:     refs,
 				Tags:           []string{"sca", strings.ToLower(eco.String())},
@@ -232,17 +235,4 @@ func parseCVSSSeverity(vuln *osvschema.Vulnerability) (core.Severity, float64) {
 		}
 	}
 	return core.SeverityMedium, 0
-}
-
-func extractFixedVersion(vuln *osvschema.Vulnerability) string {
-	for _, affected := range vuln.GetAffected() {
-		for _, r := range affected.GetRanges() {
-			for _, event := range r.GetEvents() {
-				if event.GetFixed() != "" {
-					return event.GetFixed()
-				}
-			}
-		}
-	}
-	return ""
 }

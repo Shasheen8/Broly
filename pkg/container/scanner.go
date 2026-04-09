@@ -29,12 +29,14 @@ import (
 	"osv.dev/bindings/go/osvdev"
 
 	"github.com/Shasheen8/Broly/pkg/core"
+	"github.com/Shasheen8/Broly/pkg/osvutil"
 )
 
 type ContainerScanner struct {
-	imageRef  string
-	quiet     bool
-	osvClient *osvdev.OSVClient
+	imageRef   string
+	quiet      bool
+	osvClient  *osvdev.OSVClient
+	fixedCache map[string]string
 }
 
 func NewContainerScanner() *ContainerScanner {
@@ -49,6 +51,7 @@ func (s *ContainerScanner) Init(cfg *core.Config) error {
 	s.quiet = cfg.Quiet
 	s.osvClient = osvdev.DefaultClient()
 	s.osvClient.Config.UserAgent = "broly-container/1.0"
+	s.fixedCache = make(map[string]string)
 	return nil
 }
 
@@ -142,7 +145,7 @@ func (s *ContainerScanner) scanOSPackages(ctx context.Context, pkgs []pkg, ecosy
 			p := batch[i]
 
 			for _, vuln := range vulnList.GetVulns() {
-				f := containerFinding(vuln, p.Name, p.Version, ecosystem, s.imageRef, "", p.LayerDigest, p.LayerIndex, imgMeta)
+				f := s.containerFinding(vuln, p.Name, p.Version, ecosystem, s.imageRef, "", p.LayerDigest, p.LayerIndex, imgMeta)
 				select {
 				case findings <- f:
 				case <-ctx.Done():
@@ -239,7 +242,7 @@ func (s *ContainerScanner) scanLanguagePackages(ctx context.Context, img v1.Imag
 			artifactPath := artifactPathFromLocations(p.Locations, tmpDir)
 
 			for _, vuln := range vulnList.GetVulns() {
-				f := containerFinding(vuln, p.Name, p.Version, eco.String(), s.imageRef, artifactPath, lr.layerDigest, lr.layerIndex, meta)
+				f := s.containerFinding(vuln, p.Name, p.Version, eco.String(), s.imageRef, artifactPath, lr.layerDigest, lr.layerIndex, meta)
 				select {
 				case findings <- f:
 				case <-ctx.Done():
@@ -284,7 +287,7 @@ type imageMetadata struct {
 }
 
 // containerFinding builds a Finding from a vulnerability match. Used for both OS and language packages.
-func containerFinding(vuln *osvschema.Vulnerability, pkgName, pkgVersion, ecosystem, imageRef, artifactPath, layerDigest string, layerIndex int, meta imageMetadata) core.Finding {
+func (s *ContainerScanner) containerFinding(vuln *osvschema.Vulnerability, pkgName, pkgVersion, ecosystem, imageRef, artifactPath, layerDigest string, layerIndex int, meta imageMetadata) core.Finding {
 	id := vuln.GetId()
 
 	var cve string
@@ -321,7 +324,7 @@ func containerFinding(vuln *osvschema.Vulnerability, pkgName, pkgVersion, ecosys
 		PackageName:    pkgName,
 		PackageVersion: pkgVersion,
 		Ecosystem:      ecosystem,
-		FixedVersion:   containerFixedVersion(vuln),
+		FixedVersion:   osvutil.ResolveFixedVersion(context.Background(), s.osvClient, vuln, s.fixedCache),
 		CVE:            cve,
 		References:     refs,
 		ImageDigest:    meta.digest,
@@ -346,19 +349,6 @@ func containerCVSSSeverity(vuln *osvschema.Vulnerability) (core.Severity, float6
 		}
 	}
 	return core.SeverityMedium, 0
-}
-
-func containerFixedVersion(vuln *osvschema.Vulnerability) string {
-	for _, affected := range vuln.GetAffected() {
-		for _, r := range affected.GetRanges() {
-			for _, event := range r.GetEvents() {
-				if event.GetFixed() != "" {
-					return event.GetFixed()
-				}
-			}
-		}
-	}
-	return ""
 }
 
 // pullImage loads a container image from a registry, local Docker daemon, or tarball.

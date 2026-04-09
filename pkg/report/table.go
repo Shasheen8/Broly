@@ -301,15 +301,55 @@ func printSASTTable(w io.Writer, clr color, findings []core.Finding) {
 	hdr := clr.s(bold+gray, fmt.Sprintf("  %-10s  %-28s  %-40s  %s", "SEVERITY", "ISSUE", "FILE", "DESCRIPTION"))
 	fmt.Fprintln(w, hdr)
 	fmt.Fprintf(w, "  %s\n", clr.s(gray, strings.Repeat("─", 116)))
-	for _, f := range findings {
-		printTableRow(w, []tableColumn{
+	for i, f := range findings {
+		mainLines := printTableRow(w, []tableColumn{
 			{width: 10, value: f.Severity.String(), style: func(s string) string { return severityColor(f.Severity, clr) }},
 			{width: 28, value: firstNonEmpty(f.RuleName, f.Title), style: func(s string) string { return s }},
 			{width: 40, value: formatLocation(f), style: func(s string) string { return clr.s(dim, s) }},
 			{width: 34, value: firstNonEmpty(f.Description, f.Title), style: func(s string) string { return clr.s(gray, s) }},
 		})
-		printVerdictAndFix(w, clr, f)
+		detailLines := printSASTDetails(w, clr, f)
+		if i < len(findings)-1 && (mainLines > 1 || detailLines > 0) {
+			fmt.Fprintln(w)
+		}
 	}
+}
+
+func printSASTDetails(w io.Writer, clr color, f core.Finding) int {
+	lines := 0
+	if f.Verdict != "" {
+		conf := ""
+		if f.Confidence != "" {
+			conf = clr.s(gray, fmt.Sprintf(" (confidence: %s)", f.Confidence))
+		}
+		lines += printDetailBlock(w, clr, "verdict", verdictColor(f.Verdict, clr)+conf+" "+clr.s(gray, f.VerdictReason), clr.s(dim+cyan, "verdict"))
+		if f.Explanation != "" {
+			lines += printDetailBlock(w, clr, "why", clr.s(dim, f.Explanation), clr.s(dim+cyan, "why"))
+		}
+	}
+	if f.FixSuggestion != "" {
+		lines += printDetailBlock(w, clr, "fix", clr.s(dim, f.FixSuggestion), clr.s(dim+cyan, "fix"))
+	}
+	return lines
+}
+
+func printDetailBlock(w io.Writer, clr color, label, content, styledLabel string) int {
+	const labelWidth = 8
+	const detailWidth = 100
+
+	lines := wrapCell(content, detailWidth)
+	for i, line := range lines {
+		labelText := ""
+		if i == 0 {
+			labelText = styledLabel
+		}
+		fmt.Fprintf(w, "  %s %s %s\n",
+			clr.s(gray, "│"),
+			padVisible(labelText, labelWidth),
+			line,
+		)
+	}
+	return len(lines)
 }
 
 func printVerdictAndFix(w io.Writer, clr color, f core.Finding) {
@@ -416,7 +456,7 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
-func printTableRow(w io.Writer, columns []tableColumn) {
+func printTableRow(w io.Writer, columns []tableColumn) int {
 	wrapped := make([][]string, len(columns))
 	maxLines := 0
 	for i, column := range columns {
@@ -444,6 +484,7 @@ func printTableRow(w io.Writer, columns []tableColumn) {
 		}
 		fmt.Fprintln(w)
 	}
+	return maxLines
 }
 
 func wrapCell(value string, width int) []string {
