@@ -224,7 +224,7 @@ func buildCommentBody(result *core.ScanResult) string {
 	// Fix suggestions for true positives.
 	var fixes []core.Finding
 	for _, f := range result.Findings {
-		if f.FixSuggestion != "" && f.Verdict == "TRUE_POSITIVE" {
+		if (f.FixSuggestion != "" || f.FixCode != "") && f.Verdict == "TRUE_POSITIVE" {
 			fixes = append(fixes, f)
 		}
 		if len(fixes) >= 10 {
@@ -241,7 +241,13 @@ func buildCommentBody(result *core.ScanResult) string {
 					title += fmt.Sprintf(":%d", f.StartLine)
 				}
 			}
-			fmt.Fprintf(&b, "<details><summary>🔧 %s</summary>\n\n```\n%s\n```\n", title, f.FixSuggestion)
+			fmt.Fprintf(&b, "<details><summary>🔧 %s</summary>\n\n", title)
+			if f.FixSuggestion != "" {
+				fmt.Fprintf(&b, "%s\n\n", f.FixSuggestion)
+			}
+			if f.FixCode != "" {
+				fmt.Fprintf(&b, "```\n%s\n```\n", f.FixCode)
+			}
 			if f.Explanation != "" {
 				fmt.Fprintf(&b, "\n> %s\n", f.Explanation)
 			} else if f.VerdictReason != "" {

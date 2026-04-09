@@ -93,6 +93,10 @@ func (f *TableFormatter) Format(w io.Writer, result *core.ScanResult) error {
 			clr.s(cyan+bold, fmt.Sprintf("▸ %s", label)),
 			clr.s(gray, fmt.Sprintf("(%d finding%s)", len(findings), plural(len(findings)))),
 		)
+		if scanType == core.ScanTypeSAST {
+			printSASTTable(w, clr, findings)
+			continue
+		}
 		printScanTypeTable(w, clr, scanType, findings)
 	}
 
@@ -307,21 +311,176 @@ func printContainerTable(w io.Writer, clr color, findings []core.Finding) {
 }
 
 func printSASTTable(w io.Writer, clr color, findings []core.Finding) {
-	hdr := clr.s(bold+gray, fmt.Sprintf("  %-10s  %-28s  %-40s  %s", "SEVERITY", "FINDING", "LOCATION", "DETAIL"))
-	fmt.Fprintln(w, hdr)
-	fmt.Fprintf(w, "  %s\n", clr.s(gray, strings.Repeat("─", 116)))
-	for i, f := range findings {
-		mainLines := printTableRow(w, []tableColumn{
-			{width: 10, value: f.Severity.String(), style: func(s string) string { return severityColor(f.Severity, clr) }},
-			{width: 28, value: firstNonEmpty(f.RuleName, f.Title), style: func(s string) string { return s }},
-			{width: 40, value: formatLocation(f), style: func(s string) string { return clr.s(dim, s) }},
-			{width: 34, value: firstNonEmpty(f.Description, f.Title), style: func(s string) string { return clr.s(gray, s) }},
+	const (
+		severityWidth   = 12
+		detailsWidth    = 46
+		assessmentWidth = 34
+		fixWidth        = 42
+	)
+
+	printBoundedTableRow(w, []tableColumn{
+		{width: severityWidth, value: clr.s(bold+white, "SEVERITY")},
+		{width: detailsWidth, value: clr.s(bold+white, "FINDING DETAILS")},
+		{width: assessmentWidth, value: clr.s(bold+white, "ASSESSMENT / CONTEXT")},
+		{width: fixWidth, value: clr.s(bold+white, "TARGETED FIX")},
+	})
+	printBoundedDivider(w, severityWidth, detailsWidth, assessmentWidth, fixWidth)
+	for _, f := range findings {
+		printBoundedTableRow(w, []tableColumn{
+			{width: severityWidth, value: severityLabel(f.Severity), style: func(s string) string { return styleSeverityLabel(f.Severity, clr, s) }},
+			{width: detailsWidth, value: sastFindingDetailsCell(f)},
+			{width: assessmentWidth, value: sastAssessmentContextCell(f)},
+			{width: fixWidth, value: sastTargetedFixCell(f)},
 		})
-		detailLines := printFindingDetails(w, clr, f)
-		if i < len(findings)-1 && (mainLines > 1 || detailLines > 0) {
-			fmt.Fprintln(w)
+		printBoundedDivider(w, severityWidth, detailsWidth, assessmentWidth, fixWidth)
+	}
+}
+
+func printBoundedDivider(w io.Writer, widths ...int) {
+	totalWidth := 13
+	for _, width := range widths {
+		totalWidth += width
+	}
+	fmt.Fprintf(w, "  %s\n", strings.Repeat("-", totalWidth))
+}
+
+func printBoundedTableRow(w io.Writer, columns []tableColumn) int {
+	wrapped := make([][]string, len(columns))
+	maxLines := 0
+	for i, column := range columns {
+		wrapped[i] = wrapCell(column.value, column.width)
+		if len(wrapped[i]) > maxLines {
+			maxLines = len(wrapped[i])
 		}
 	}
+
+	for lineIdx := 0; lineIdx < maxLines; lineIdx++ {
+		fmt.Fprint(w, "  | ")
+		for colIdx, column := range columns {
+			cell := ""
+			if lineIdx < len(wrapped[colIdx]) {
+				cell = wrapped[colIdx][lineIdx]
+			}
+			styled := cell
+			if cell != "" && column.style != nil {
+				styled = column.style(cell)
+			}
+			fmt.Fprint(w, padVisible(styled, column.width))
+			if colIdx < len(columns)-1 {
+				fmt.Fprint(w, " | ")
+			} else {
+				fmt.Fprintln(w, " |")
+			}
+		}
+	}
+	return maxLines
+}
+
+func severityLabel(sev core.Severity) string {
+	value := strings.ToLower(sev.String())
+	if value == "" {
+		return "-"
+	}
+	return strings.ToUpper(value[:1]) + value[1:]
+}
+
+func styleSeverityLabel(sev core.Severity, clr color, text string) string {
+	switch sev {
+	case core.SeverityCritical:
+		return clr.s(bold+brightRed, text)
+	case core.SeverityHigh:
+		return clr.s(bold+orange, text)
+	case core.SeverityMedium:
+		return clr.s(bold+yellow, text)
+	case core.SeverityLow:
+		return clr.s(bold+blue, text)
+	default:
+		return clr.s(gray, text)
+	}
+}
+
+func sastFindingDetailsCell(f core.Finding) string {
+	parts := []string{firstNonEmpty(f.RuleName, f.Title, f.RuleID, "Finding")}
+	if location := formatFullLocation(f); location != "" && location != "(no file)" {
+		parts = append(parts, "", location)
+	}
+	if description := inlineText(f.Description); description != "" && description != parts[0] {
+		parts = append(parts, "", description)
+	}
+	if code := prefixedMultiline("Code: ", sastCodeLine(f)); code != "" {
+		parts = append(parts, "", code)
+	}
+	return strings.Join(parts, "\n")
+}
+
+func sastAssessmentContextCell(f core.Finding) string {
+	parts := make([]string, 0, 5)
+	headerParts := make([]string, 0, 2)
+	if verdict := strings.TrimSpace(f.Verdict); verdict != "" {
+		headerParts = append(headerParts, verdict)
+	}
+	if confidence := strings.TrimSpace(f.Confidence); confidence != "" {
+		headerParts = append(headerParts, fmt.Sprintf("[%s]", confidence))
+	}
+	header := strings.Join(headerParts, " ")
+	if header == "" {
+		header = "-"
+	}
+	parts = append(parts, header)
+	if reason := inlineText(f.VerdictReason); reason != "" {
+		parts = append(parts, "", reason)
+	}
+	if explanation := inlineText(f.Explanation); explanation != "" && explanation != inlineText(f.VerdictReason) {
+		parts = append(parts, "", explanation)
+	}
+	return strings.Join(parts, "\n")
+}
+
+func sastTargetedFixCell(f core.Finding) string {
+	parts := make([]string, 0, 4)
+	if recommendation := strings.TrimSpace(f.FixSuggestion); recommendation != "" {
+		parts = append(parts, "Recommendation: "+recommendation)
+	}
+	if code := strings.TrimSpace(f.FixCode); code != "" {
+		if len(parts) > 0 {
+			parts = append(parts, "")
+		}
+		parts = append(parts, prefixFirstLine("Code fix: ", code))
+	}
+	if len(parts) == 0 {
+		return "-"
+	}
+	return strings.Join(parts, "\n")
+}
+
+func prefixedMultiline(prefix, value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	lines := strings.Split(value, "\n")
+	prefixed := make([]string, 0, len(lines))
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		prefixed = append(prefixed, prefix+line)
+	}
+	return strings.Join(prefixed, "\n")
+}
+
+func prefixFirstLine(prefix, value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	lines := strings.Split(value, "\n")
+	lines[0] = prefix + strings.TrimSpace(lines[0])
+	for i := 1; i < len(lines); i++ {
+		lines[i] = strings.TrimSpace(lines[i])
+	}
+	return strings.Join(lines, "\n")
 }
 
 func printFindingDetails(w io.Writer, clr color, f core.Finding) int {
@@ -341,6 +500,9 @@ func printFindingDetails(w io.Writer, clr color, f core.Finding) int {
 	}
 	if f.FixSuggestion != "" {
 		lines += printDetailBlock(w, clr, clr.s(dim, f.FixSuggestion), clr.s(dim+cyan, "fix"))
+	}
+	if f.FixCode != "" {
+		lines += printDetailBlock(w, clr, clr.s(dim, f.FixCode), clr.s(dim+cyan, "code"))
 	}
 	return lines
 }
@@ -438,6 +600,24 @@ func formatLocation(f core.Finding) string {
 	return truncPath(f.FilePath, 100)
 }
 
+func formatFullLocation(f core.Finding) string {
+	if f.FilePath == "" {
+		return "(no file)"
+	}
+	if f.StartLine > 0 {
+		return fmt.Sprintf("%s:%d", f.FilePath, f.StartLine)
+	}
+	return f.FilePath
+}
+
+func formatCompactLocation(f core.Finding, maxLen int) string {
+	location := formatFullLocation(f)
+	if maxLen <= 0 {
+		return location
+	}
+	return truncPath(location, maxLen)
+}
+
 func firstNonEmpty(values ...string) string {
 	for _, value := range values {
 		value = strings.TrimSpace(value)
@@ -446,6 +626,113 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func compactCell(value string, width int) string {
+	value = inlineText(value)
+	if width <= 0 || visibleLen(value) <= width {
+		return value
+	}
+	return trunc(value, width)
+}
+
+func inlineText(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	return strings.Join(strings.Fields(value), " ")
+}
+
+func sastSummaryText(f core.Finding) string {
+	summary := firstNonEmpty(f.Description, f.RuleID, f.Title)
+	summary = inlineText(summary)
+	if summary == "" {
+		return "-"
+	}
+	return summary
+}
+
+func hasSASTDetails(f core.Finding) bool {
+	return f.Verdict != "" || f.Explanation != "" || f.FixSuggestion != "" || f.FixCode != ""
+}
+
+func sastVerdictCell(f core.Finding, clr color) string {
+	parts := make([]string, 0, 3)
+	if f.Verdict != "" {
+		parts = append(parts, verdictColor(f.Verdict, clr))
+	}
+	if f.Confidence != "" {
+		parts = append(parts, clr.s(gray, fmt.Sprintf("(confidence: %s)", f.Confidence)))
+	}
+	if reason := strings.TrimSpace(f.VerdictReason); reason != "" {
+		parts = append(parts, clr.s(gray, reason))
+	}
+	lines := []string{strings.Join(parts, " ")}
+	if explanation := inlineText(f.Explanation); explanation != "" {
+		lines = append(lines, explanation)
+	}
+	return strings.TrimSpace(strings.Join(lines, "\n"))
+}
+
+func sastCodeCell(f core.Finding) string {
+	parts := make([]string, 0, 2)
+	if loc := formatFullLocation(f); loc != "" {
+		parts = append(parts, loc)
+	}
+	if code := sastCodeLine(f); code != "" {
+		parts = append(parts, code)
+	}
+	if len(parts) == 0 {
+		return "-"
+	}
+	return strings.Join(parts, "\n")
+}
+
+func sastFixCell(f core.Finding) string {
+	fix := strings.TrimSpace(f.FixSuggestion)
+	if fix == "" {
+		return "-"
+	}
+	return fix
+}
+
+func sastCodeLine(f core.Finding) string {
+	if f.FilePath == "" || f.StartLine <= 0 {
+		return ""
+	}
+	data, err := os.ReadFile(f.FilePath)
+	if err != nil {
+		return ""
+	}
+	lines := strings.Split(string(data), "\n")
+	if f.StartLine > len(lines) {
+		return ""
+	}
+	line := strings.TrimSpace(lines[f.StartLine-1])
+	if line == "" {
+		return ""
+	}
+	parts := []string{line}
+	if looksLikeContextLine(line) {
+		for next := f.StartLine; next < len(lines); next++ {
+			candidate := strings.TrimSpace(lines[next])
+			if candidate == "" {
+				continue
+			}
+			parts = append(parts, candidate)
+			break
+		}
+	}
+	return strings.Join(parts, "\n")
+}
+
+func looksLikeContextLine(line string) bool {
+	line = strings.TrimSpace(line)
+	if line == "" {
+		return false
+	}
+	return strings.HasPrefix(line, "func ") || strings.HasPrefix(line, "if ") || strings.HasPrefix(line, "for ") || strings.HasSuffix(line, "{")
 }
 
 func printTableRow(w io.Writer, columns []tableColumn) int {

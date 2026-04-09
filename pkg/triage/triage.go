@@ -130,10 +130,16 @@ func buildSASTTriagePrompt(f *core.Finding, codeCtx string, explain bool) string
 	}
 
 	sb.WriteString(`
+Fix guidance constraints:
+- Use the exact identifiers and APIs visible in the provided code when possible.
+- Keep the fix targeted to this file and the vulnerable code path shown in the context.
+- Do not invent placeholder helper names, generic wrappers, or pseudocode.
+- If the provided context is insufficient for a safe code-specific fix, say so plainly in FIX instead of giving generic advice.
+
 Determine:
 1. Is this a TRUE_POSITIVE (real, exploitable vulnerability) or FALSE_POSITIVE (test/placeholder/safe pattern)?
 2. Your confidence in that verdict.
-3. If TRUE_POSITIVE, provide a concrete code fix — actual code, not advice.
+3. If TRUE_POSITIVE, provide both a minimal targeted recommendation and a concrete code fix — actual code for this specific snippet, not generic advice.
 
 Respond with exactly:
 VERDICT: TRUE_POSITIVE or FALSE_POSITIVE
@@ -143,7 +149,8 @@ REASON: One sentence.`)
 	if explain {
 		sb.WriteString("\nEXPLANATION: One sentence. Concrete attack vector and real-world impact specific to this code — not generic advice.")
 	}
-	sb.WriteString("\nFIX:\n<2-5 lines of corrected code, or N/A if false positive>")
+	sb.WriteString("\nRECOMMENDATION: One short sentence with the minimal targeted remediation for this file.")
+	sb.WriteString("\nCODE_FIX:\n<2-8 lines of corrected code using local identifiers, or a one-sentence limitation if the context is too incomplete, or N/A if false positive>")
 
 	return sb.String()
 }
@@ -174,13 +181,16 @@ func (t *Triager) Run(ctx context.Context, findings []core.Finding) []core.Findi
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
-			verdict, confidence, reason, explanation, fix := triageFinding(ctx, t.client, &out[i], t.explain)
+			verdict, confidence, reason, explanation, recommendation, codeFix := triageFinding(ctx, t.client, &out[i], t.explain)
 			out[i].Verdict = verdict
 			out[i].Confidence = confidence
 			out[i].VerdictReason = reason
 			out[i].Explanation = explanation
-			if fix != "" || out[i].FixSuggestion == "" {
-				out[i].FixSuggestion = fix
+			if recommendation != "" || out[i].FixSuggestion == "" {
+				out[i].FixSuggestion = recommendation
+			}
+			if codeFix != "" || out[i].FixCode == "" {
+				out[i].FixCode = codeFix
 			}
 		}(i)
 	}
@@ -188,7 +198,7 @@ func (t *Triager) Run(ctx context.Context, findings []core.Finding) []core.Findi
 	return out
 }
 
-func triageFinding(ctx context.Context, client *ai.Client, f *core.Finding, explain bool) (verdict, confidence, reason, explanation, fix string) {
+func triageFinding(ctx context.Context, client *ai.Client, f *core.Finding, explain bool) (verdict, confidence, reason, explanation, recommendation, codeFix string) {
 	var prompt string
 
 	if f.Type == core.ScanTypeContainer {
@@ -207,7 +217,7 @@ func triageFinding(ctx context.Context, client *ai.Client, f *core.Finding, expl
 
 	resp, err := client.Complete(ctx, prompt, 768)
 	if err != nil {
-		return "UNKNOWN", "", "AI triage failed: " + err.Error(), "", ""
+		return "UNKNOWN", "", "AI triage failed: " + err.Error(), "", "", ""
 	}
 
 	return parseTriageResponse(resp)
@@ -301,10 +311,11 @@ FIX:
 	)
 }
 
-func parseTriageResponse(resp string) (verdict, confidence, reason, explanation, fix string) {
+func parseTriageResponse(resp string) (verdict, confidence, reason, explanation, recommendation, codeFix string) {
 	verdict = "UNKNOWN"
 	var fixLines []string
 	inFix := false
+	inCodeFix := false
 
 	for _, line := range strings.Split(resp, "\n") {
 		trimmed := strings.TrimSpace(line)
@@ -318,6 +329,7 @@ func parseTriageResponse(resp string) (verdict, confidence, reason, explanation,
 				verdict = "TRUE_POSITIVE"
 			}
 			inFix = false
+			inCodeFix = false
 			continue
 		}
 		if strings.HasPrefix(upper, "CONFIDENCE:") {
@@ -331,16 +343,34 @@ func parseTriageResponse(resp string) (verdict, confidence, reason, explanation,
 				confidence = "LOW"
 			}
 			inFix = false
+			inCodeFix = false
 			continue
 		}
 		if strings.HasPrefix(upper, "REASON:") {
 			reason = strings.TrimSpace(trimmed[7:])
 			inFix = false
+			inCodeFix = false
 			continue
 		}
 		if strings.HasPrefix(upper, "EXPLANATION:") {
 			explanation = strings.TrimSpace(trimmed[12:])
 			inFix = false
+			inCodeFix = false
+			continue
+		}
+		if strings.HasPrefix(upper, "RECOMMENDATION:") {
+			recommendation = strings.TrimSpace(trimmed[len("RECOMMENDATION:"):])
+			inFix = false
+			inCodeFix = false
+			continue
+		}
+		if strings.HasPrefix(upper, "CODE_FIX:") {
+			rest := strings.TrimSpace(trimmed[len("CODE_FIX:"):])
+			if rest != "" && strings.ToUpper(rest) != "N/A" && !isCodeFence(rest) {
+				fixLines = append(fixLines, rest)
+			}
+			inFix = false
+			inCodeFix = true
 			continue
 		}
 		if strings.HasPrefix(upper, "FIX:") {
@@ -349,15 +379,20 @@ func parseTriageResponse(resp string) (verdict, confidence, reason, explanation,
 				fixLines = append(fixLines, rest)
 			}
 			inFix = true
+			inCodeFix = false
 			continue
 		}
-		if inFix && trimmed != "" && strings.ToUpper(trimmed) != "N/A" && !isCodeFence(trimmed) {
+		if (inFix || inCodeFix) && trimmed != "" && strings.ToUpper(trimmed) != "N/A" && !isCodeFence(trimmed) {
 			fixLines = append(fixLines, trimmed)
 		}
 	}
 
-	fix = strings.Join(fixLines, "\n")
-	return verdict, confidence, reason, explanation, fix
+	if inCodeFix || strings.Contains(strings.ToUpper(resp), "CODE_FIX:") {
+		codeFix = strings.Join(fixLines, "\n")
+		return verdict, confidence, reason, explanation, recommendation, codeFix
+	}
+	recommendation = strings.Join(fixLines, "\n")
+	return verdict, confidence, reason, explanation, recommendation, ""
 }
 
 func isCodeFence(s string) bool {

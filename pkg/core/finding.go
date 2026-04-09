@@ -61,7 +61,8 @@ type Finding struct {
 
 	Verdict       string `json:"verdict,omitempty"`        // TRUE_POSITIVE, FALSE_POSITIVE, UNKNOWN
 	VerdictReason string `json:"verdict_reason,omitempty"` // one-sentence explanation
-	FixSuggestion string `json:"fix_suggestion,omitempty"` // concrete code fix from LLM
+	FixSuggestion string `json:"fix_suggestion,omitempty"` // minimal targeted remediation guidance
+	FixCode       string `json:"fix_code,omitempty"`       // concrete code fix snippet from LLM
 	Explanation   string `json:"explanation,omitempty"`
 }
 
