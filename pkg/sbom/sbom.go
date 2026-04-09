@@ -12,9 +12,12 @@ import (
 	"github.com/google/osv-scalibr/extractor/filesystem"
 	"github.com/google/osv-scalibr/extractor/filesystem/list"
 	scalibrfs "github.com/google/osv-scalibr/fs"
+	"github.com/google/osv-scalibr/inventory"
 	"github.com/google/osv-scalibr/stats"
 
 	cpb "github.com/google/osv-scalibr/binary/proto/config_go_proto"
+
+	"github.com/Shasheen8/Broly/pkg/core"
 )
 
 var ecosystems = []string{
@@ -57,13 +60,16 @@ func Generate(ctx context.Context, paths []string, toolVersion string) (*Result,
 			continue
 		}
 
-		inv, _, err := filesystem.Run(ctx, &filesystem.Config{
-			Extractors: extractors,
-			ScanRoots:  []*scalibrfs.ScanRoot{{Path: target, FS: scalibrfs.DirFS(target)}},
-			Stats:      stats.NoopCollector{},
+		var inv inventory.Inventory
+		core.WithSuppressedStdlog(func() {
+			inv, _, err = filesystem.Run(ctx, &filesystem.Config{
+				Extractors: extractors,
+				ScanRoots:  []*scalibrfs.ScanRoot{{Path: target, FS: scalibrfs.DirFS(target)}},
+				Stats:      stats.NoopCollector{},
+			})
 		})
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "warning: sbom extraction in %s: %v\n", target, err)
+			core.Warnf("SBOM extraction in %s: %v", target, err)
 			continue
 		}
 		allPkgs = append(allPkgs, inv.Packages...)

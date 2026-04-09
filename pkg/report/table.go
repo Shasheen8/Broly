@@ -233,14 +233,17 @@ func printSecretsTable(w io.Writer, clr color, findings []core.Finding) {
 	hdr := clr.s(bold+gray, fmt.Sprintf("  %-10s  %-28s  %-40s  %s", "SEVERITY", "RULE", "FILE", "REDACTED"))
 	fmt.Fprintln(w, hdr)
 	fmt.Fprintf(w, "  %s\n", clr.s(gray, strings.Repeat("─", 116)))
-	for _, f := range findings {
-		printTableRow(w, []tableColumn{
+	for i, f := range findings {
+		mainLines := printTableRow(w, []tableColumn{
 			{width: 10, value: f.Severity.String(), style: func(s string) string { return severityColor(f.Severity, clr) }},
 			{width: 28, value: f.RuleName, style: func(s string) string { return s }},
 			{width: 40, value: formatLocation(f), style: func(s string) string { return clr.s(dim, s) }},
 			{width: 24, value: f.Redacted, style: func(s string) string { return clr.s(gray, s) }},
 		})
-		printVerdictAndFix(w, clr, f)
+		detailLines := printFindingDetails(w, clr, f)
+		if i < len(findings)-1 && (mainLines > 1 || detailLines > 0) {
+			fmt.Fprintln(w)
+		}
 	}
 }
 
@@ -248,14 +251,14 @@ func printSCATable(w io.Writer, clr color, findings []core.Finding) {
 	hdr := clr.s(bold+gray, fmt.Sprintf("  %-10s  %-20s  %-20s  %-12s  %-12s  %s", "SEVERITY", "VULN ID", "PACKAGE", "VERSION", "FIXED", "ECOSYSTEM"))
 	fmt.Fprintln(w, hdr)
 	fmt.Fprintf(w, "  %s\n", clr.s(gray, strings.Repeat("─", 116)))
-	for _, f := range findings {
+	for i, f := range findings {
 		fixedValue := f.FixedVersion
 		fixedStyle := func(s string) string { return clr.s(green, s) }
 		if fixedValue == "" {
 			fixedValue = "no patch"
 			fixedStyle = func(s string) string { return clr.s(red, s) }
 		}
-		printTableRow(w, []tableColumn{
+		mainLines := printTableRow(w, []tableColumn{
 			{width: 10, value: f.Severity.String(), style: func(s string) string { return severityColor(f.Severity, clr) }},
 			{width: 20, value: f.RuleID, style: func(s string) string { return clr.s(cyan, s) }},
 			{width: 20, value: f.PackageName, style: func(s string) string { return clr.s(white, s) }},
@@ -263,7 +266,10 @@ func printSCATable(w io.Writer, clr color, findings []core.Finding) {
 			{width: 12, value: fixedValue, style: fixedStyle},
 			{width: 14, value: f.Ecosystem, style: func(s string) string { return clr.s(dim, s) }},
 		})
-		printVerdictAndFix(w, clr, f)
+		detailLines := printFindingDetails(w, clr, f)
+		if i < len(findings)-1 && (mainLines > 1 || detailLines > 0) {
+			fmt.Fprintln(w)
+		}
 	}
 }
 
@@ -271,20 +277,20 @@ func printContainerTable(w io.Writer, clr color, findings []core.Finding) {
 	hdr := clr.s(bold+gray, fmt.Sprintf("  %-10s  %-20s  %-20s  %-12s  %-12s  %-14s  %s", "SEVERITY", "VULN ID", "PACKAGE", "VERSION", "FIXED", "ECOSYSTEM", "LAYER"))
 	fmt.Fprintln(w, hdr)
 	fmt.Fprintf(w, "  %s\n", clr.s(gray, strings.Repeat("─", 130)))
-	for _, f := range findings {
+	for i, f := range findings {
 		fixedValue := f.FixedVersion
 		fixedStyle := func(s string) string { return clr.s(green, s) }
 		if fixedValue == "" {
 			fixedValue = "no patch"
 			fixedStyle = func(s string) string { return clr.s(red, s) }
 		}
-		layerValue := "unknown"
+		layerValue := "n/a"
 		layerStyle := func(s string) string { return clr.s(gray, s) }
 		if f.LayerIndex > 0 {
 			layerValue = fmt.Sprintf("#%d", f.LayerIndex)
 			layerStyle = func(s string) string { return clr.s(yellow, s) }
 		}
-		printTableRow(w, []tableColumn{
+		mainLines := printTableRow(w, []tableColumn{
 			{width: 10, value: f.Severity.String(), style: func(s string) string { return severityColor(f.Severity, clr) }},
 			{width: 20, value: f.RuleID, style: func(s string) string { return clr.s(cyan, s) }},
 			{width: 20, value: f.PackageName, style: func(s string) string { return clr.s(white, s) }},
@@ -293,12 +299,15 @@ func printContainerTable(w io.Writer, clr color, findings []core.Finding) {
 			{width: 14, value: f.Ecosystem, style: func(s string) string { return clr.s(dim, s) }},
 			{width: 10, value: layerValue, style: layerStyle},
 		})
-		printVerdictAndFix(w, clr, f)
+		detailLines := printFindingDetails(w, clr, f)
+		if i < len(findings)-1 && (mainLines > 1 || detailLines > 0) {
+			fmt.Fprintln(w)
+		}
 	}
 }
 
 func printSASTTable(w io.Writer, clr color, findings []core.Finding) {
-	hdr := clr.s(bold+gray, fmt.Sprintf("  %-10s  %-28s  %-40s  %s", "SEVERITY", "ISSUE", "FILE", "DESCRIPTION"))
+	hdr := clr.s(bold+gray, fmt.Sprintf("  %-10s  %-28s  %-40s  %s", "SEVERITY", "FINDING", "LOCATION", "DETAIL"))
 	fmt.Fprintln(w, hdr)
 	fmt.Fprintf(w, "  %s\n", clr.s(gray, strings.Repeat("─", 116)))
 	for i, f := range findings {
@@ -308,32 +317,35 @@ func printSASTTable(w io.Writer, clr color, findings []core.Finding) {
 			{width: 40, value: formatLocation(f), style: func(s string) string { return clr.s(dim, s) }},
 			{width: 34, value: firstNonEmpty(f.Description, f.Title), style: func(s string) string { return clr.s(gray, s) }},
 		})
-		detailLines := printSASTDetails(w, clr, f)
+		detailLines := printFindingDetails(w, clr, f)
 		if i < len(findings)-1 && (mainLines > 1 || detailLines > 0) {
 			fmt.Fprintln(w)
 		}
 	}
 }
 
-func printSASTDetails(w io.Writer, clr color, f core.Finding) int {
+func printFindingDetails(w io.Writer, clr color, f core.Finding) int {
 	lines := 0
 	if f.Verdict != "" {
-		conf := ""
+		parts := []string{verdictColor(f.Verdict, clr)}
 		if f.Confidence != "" {
-			conf = clr.s(gray, fmt.Sprintf(" (confidence: %s)", f.Confidence))
+			parts = append(parts, clr.s(gray, fmt.Sprintf("(confidence: %s)", f.Confidence)))
 		}
-		lines += printDetailBlock(w, clr, "verdict", verdictColor(f.Verdict, clr)+conf+" "+clr.s(gray, f.VerdictReason), clr.s(dim+cyan, "verdict"))
-		if f.Explanation != "" {
-			lines += printDetailBlock(w, clr, "why", clr.s(dim, f.Explanation), clr.s(dim+cyan, "why"))
+		if reason := strings.TrimSpace(f.VerdictReason); reason != "" {
+			parts = append(parts, clr.s(gray, reason))
 		}
+		lines += printDetailBlock(w, clr, strings.Join(parts, " "), clr.s(dim+cyan, "verdict"))
+	}
+	if f.Explanation != "" {
+		lines += printDetailBlock(w, clr, clr.s(dim, f.Explanation), clr.s(dim+cyan, "why"))
 	}
 	if f.FixSuggestion != "" {
-		lines += printDetailBlock(w, clr, "fix", clr.s(dim, f.FixSuggestion), clr.s(dim+cyan, "fix"))
+		lines += printDetailBlock(w, clr, clr.s(dim, f.FixSuggestion), clr.s(dim+cyan, "fix"))
 	}
 	return lines
 }
 
-func printDetailBlock(w io.Writer, clr color, label, content, styledLabel string) int {
+func printDetailBlock(w io.Writer, clr color, content, styledLabel string) int {
 	const labelWidth = 8
 	const detailWidth = 100
 
@@ -350,29 +362,6 @@ func printDetailBlock(w io.Writer, clr color, label, content, styledLabel string
 		)
 	}
 	return len(lines)
-}
-
-func printVerdictAndFix(w io.Writer, clr color, f core.Finding) {
-	if f.Verdict != "" {
-		conf := ""
-		if f.Confidence != "" {
-			conf = " [" + f.Confidence + "]"
-		}
-		fmt.Fprintf(w, "  %s%s %s\n",
-			verdictColor(f.Verdict, clr),
-			clr.s(gray, conf),
-			clr.s(gray, trunc(f.VerdictReason, 80)),
-		)
-		if f.Explanation != "" {
-			fmt.Fprintf(w, "  %s\n", clr.s(dim, "    "+f.Explanation))
-		}
-	}
-	if f.FixSuggestion != "" {
-		fmt.Fprintf(w, "  %s\n", clr.s(dim+cyan, "  fix:"))
-		for _, line := range strings.Split(f.FixSuggestion, "\n") {
-			fmt.Fprintf(w, "  %s\n", clr.s(dim, "    "+line))
-		}
-	}
 }
 
 func verdictColor(verdict string, clr color) string {
@@ -412,11 +401,14 @@ func printSummary(w io.Writer, clr color, result *core.ScanResult) {
 	summaryLine(w, clr, fmt.Sprintf("  %s  total findings",
 		clr.s(bold+white, fmt.Sprintf("%d", len(result.Findings))),
 	))
-	summaryLine(w, clr, fmt.Sprintf("  %s  %s  %s  %s",
+	summaryLine(w, clr, fmt.Sprintf("  %s  %s  %s",
 		clr.s(bold+brightRed, fmt.Sprintf("Critical %-3d", counts[core.SeverityCritical])),
 		clr.s(bold+orange, fmt.Sprintf("High %-3d", counts[core.SeverityHigh])),
 		clr.s(bold+yellow, fmt.Sprintf("Medium %-3d", counts[core.SeverityMedium])),
+	))
+	summaryLine(w, clr, fmt.Sprintf("  %s  %s",
 		clr.s(bold+blue, fmt.Sprintf("Low %-3d", counts[core.SeverityLow])),
+		clr.s(bold+gray, fmt.Sprintf("Info %-3d", counts[core.SeverityInfo])),
 	))
 	summaryLine(w, clr, fmt.Sprintf("  %s",
 		clr.s(gray, fmt.Sprintf("duration: %s", result.Duration.Round(time.Millisecond))),

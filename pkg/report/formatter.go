@@ -23,6 +23,6 @@ func GetFormatter(format string) (Formatter, error) {
 	case "table", "":
 		return &TableFormatter{}, nil
 	default:
-		return nil, fmt.Errorf("unsupported output format: %s", format)
+		return nil, fmt.Errorf("unsupported output format %q (use: table, json, sarif)", format)
 	}
 }

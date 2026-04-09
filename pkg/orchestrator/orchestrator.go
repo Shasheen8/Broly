@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"sync"
 
 	"github.com/Shasheen8/Broly/pkg/baseline"
@@ -114,7 +113,7 @@ func (o *Orchestrator) Run(ctx context.Context) (*core.ScanResult, error) {
 		var err error
 		bl, err = baseline.Load(o.config.BaselineFile)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "warning: could not load baseline %s: %v\n", o.config.BaselineFile, err)
+			core.Warnf("could not load baseline %s: %v", o.config.BaselineFile, err)
 			bl = nil
 		}
 	}
@@ -136,7 +135,7 @@ func (o *Orchestrator) Run(ctx context.Context) (*core.ScanResult, error) {
 		if t != nil {
 			findings = t.Run(ctx, findings)
 		} else {
-			fmt.Fprintln(os.Stderr, "warning: TOGETHER_API_KEY not set — AI triage disabled")
+			core.Warnf("TOGETHER_API_KEY not set - AI triage disabled")
 		}
 	}
 

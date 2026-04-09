@@ -28,15 +28,18 @@ var (
 	version = "dev"
 	commit  = "none"
 
-	errFindings = errors.New("findings detected")
+	errFindingsDetected           = errors.New("findings detected")
+	errMissingRequiredFindings    = errors.New("required baseline findings missing")
+	errFindingsAndMissingRequired = errors.New("findings detected and required baseline findings missing")
 )
 
 func main() {
 	root := &cobra.Command{
 		Use:   "broly",
-		Short: "Broly - Berserker Product Security Tool",
-		Long: `Broly is a production-grade security scanner combining SAST, SCA, and
-Secrets scanning into a single fast binary. Built in Go for speed.`,
+		Short: "Broly - Berserker Vulnerability Scanner",
+		Long: `Broly is a fast vulnerability scanner for secrets, SCA, SAST, containers,
+and license policy checks. Built in Go for speed and designed for both local
+developer runs and CI.`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
@@ -47,10 +50,11 @@ Secrets scanning into a single fast binary. Built in Go for speed.`,
 	root.AddCommand(validateCmd())
 
 	if err := root.Execute(); err != nil {
-		if errors.Is(err, errFindings) {
+		if lines := completionMessage(err); len(lines) > 0 {
 			fmt.Fprintln(os.Stderr)
-			fmt.Fprintln(os.Stderr, "Scan completed with findings. Broly is exiting with code 1 so shells and CI can detect the result.")
-			fmt.Fprintln(os.Stderr, "Tip: use --format json or --format sarif for machine-readable output.")
+			for _, line := range lines {
+				fmt.Fprintln(os.Stderr, line)
+			}
 			os.Exit(1)
 		}
 		fmt.Fprintf(os.Stderr, "broly failed: %v\n", err)
@@ -95,8 +99,8 @@ func scanCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "scan [paths...]",
 		Short: "Scan targets for security findings",
-		Long: `Run SAST, SCA, and Secrets scanning against the specified paths.
-By default all scanners are enabled and the current directory is scanned.`,
+		Long: `Run Broly's scan engines against the specified paths.
+By default secrets, SCA, and SAST are enabled and the current directory is scanned.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
 				args = []string{"."}
@@ -197,26 +201,12 @@ By default all scanners are enabled and the current directory is scanned.`,
 				cfg.SASTSliceFiles = sastSliceFiles
 			}
 
-			// Scanner enable flags: CLI always wins; if none set and config has none, enable all.
-			cliSAST := f.Changed("sast")
-			cliSCA := f.Changed("sca")
-			cliSecrets := f.Changed("secrets")
-
-			if cliSAST {
-				cfg.EnableSAST = enableSAST
-			}
-			if cliSCA {
-				cfg.EnableSCA = enableSCA
-			}
-			if cliSecrets {
-				cfg.EnableSecrets = enableSecrets
-			}
-
-			if !cfg.EnableSAST && !cfg.EnableSCA && !cfg.EnableSecrets {
-				cfg.EnableSAST = true
-				cfg.EnableSCA = true
-				cfg.EnableSecrets = true
-			}
+			finalizeScannerSelection(
+				cfg,
+				f.Changed("sast"), enableSAST,
+				f.Changed("sca"), enableSCA,
+				f.Changed("secrets"), enableSecrets,
+			)
 
 			return runScan(cfg)
 		},
@@ -228,12 +218,12 @@ By default all scanners are enabled and the current directory is scanned.`,
 	flags.StringVarP(&outputFile, "output", "o", "", "Write output to file (default: stdout)")
 	flags.BoolVar(&enableSAST, "sast", false, "Enable SAST scanning")
 	flags.BoolVar(&enableSCA, "sca", false, "Enable SCA scanning")
-	flags.BoolVar(&enableSecrets, "secrets", false, "Enable Secrets scanning")
+	flags.BoolVar(&enableSecrets, "secrets", false, "Enable secrets scanning")
 	flags.IntVar(&workers, "workers", 8, "Number of parallel workers")
 	flags.StringVar(&minSeverity, "min-severity", "info", "Minimum severity: info, low, medium, high, critical")
 	flags.StringSliceVar(&excludePaths, "exclude", nil, "Paths to exclude from scanning")
 	flags.StringVar(&secretsRules, "secrets-rules", "", "Custom secrets rules directory")
-	flags.BoolVar(&disableRedact, "no-redact", false, "Disable secret redaction in output")
+	flags.BoolVar(&disableRedact, "no-redact", false, "Disable secret redaction in human-readable output")
 	flags.BoolVar(&validateSecrets, "validate", false, "Validate detected secrets against source APIs")
 	flags.BoolVar(&offline, "offline", false, "Run SCA in offline mode (skip OSV API)")
 	flags.StringVar(&aiModel, "ai-model", "", "Together.ai model for AI features (default: Qwen/Qwen3-Coder-Next-FP8)")
@@ -247,7 +237,7 @@ By default all scanners are enabled and the current directory is scanned.`,
 	flags.BoolVar(&aiSCAReachability, "ai-sca-reachability", false, "Use AI to analyze reachability of vulnerable dependencies (requires TOGETHER_API_KEY)")
 	flags.BoolVar(&aiTriage, "ai-triage", false, "Use AI to triage findings: TRUE/FALSE positive verdict + fix suggestion (requires TOGETHER_API_KEY)")
 	flags.BoolVar(&explain, "explain", false, "Add a plain-language attack scenario per finding (use with --ai-triage)")
-	flags.BoolVarP(&quiet, "quiet", "q", false, "Suppress progress output")
+	flags.BoolVarP(&quiet, "quiet", "q", false, "Suppress progress output while keeping warnings visible")
 	flags.StringVar(&baselineFile, "baseline", "", "Baseline file for suppress/require rules")
 	flags.BoolVar(&incremental, "incremental", false, "Only re-scan SAST files changed since last run")
 	flags.StringVar(&cachePath, "cache-path", "", "Path to incremental scan cache (default: .broly-cache.json)")
@@ -266,9 +256,27 @@ func loadConfigFile(path string) *core.Config {
 		return cfg
 	}
 	if err := yaml.Unmarshal(data, cfg); err != nil {
-		fmt.Fprintf(os.Stderr, "warning: could not parse config file %s: %v\n", path, err)
+		core.Warnf("could not parse config file %s: %v", path, err)
 	}
 	return cfg
+}
+
+func finalizeScannerSelection(cfg *core.Config, cliSAST, enableSAST, cliSCA, enableSCA, cliSecrets, enableSecrets bool) {
+	if cliSAST {
+		cfg.EnableSAST = enableSAST
+	}
+	if cliSCA {
+		cfg.EnableSCA = enableSCA
+	}
+	if cliSecrets {
+		cfg.EnableSecrets = enableSecrets
+	}
+
+	if !cfg.EnableSAST && !cfg.EnableSCA && !cfg.EnableSecrets && cfg.ContainerImage == "" {
+		cfg.EnableSAST = true
+		cfg.EnableSCA = true
+		cfg.EnableSecrets = true
+	}
 }
 
 func runScan(cfg *core.Config) error {
@@ -277,20 +285,7 @@ func runScan(cfg *core.Config) error {
 
 	if !cfg.Quiet {
 		fmt.Fprintf(os.Stderr, "broly v%s - scanning %s\n", version, strings.Join(cfg.Targets, ", "))
-		scanners := make([]string, 0, 3)
-		if cfg.EnableSecrets {
-			scanners = append(scanners, "secrets")
-		}
-		if cfg.EnableSCA {
-			scanners = append(scanners, "sca")
-		}
-		if cfg.EnableSAST {
-			scanners = append(scanners, "sast")
-		}
-		if cfg.ContainerImage != "" {
-			scanners = append(scanners, "container")
-		}
-		fmt.Fprintf(os.Stderr, "scanners: %s | workers: %d\n\n", strings.Join(scanners, ", "), cfg.Workers)
+		fmt.Fprintf(os.Stderr, "scanners: %s | workers: %d\n\n", strings.Join(configuredScannerNames(cfg), ", "), cfg.Workers)
 	}
 
 	report.Version = version
@@ -339,10 +334,7 @@ func runScan(cfg *core.Config) error {
 		return fmt.Errorf("format output: %w", err)
 	}
 
-	if len(result.Findings) > 0 || len(result.MissingRequired) > 0 {
-		return errFindings
-	}
-	return nil
+	return scanCompletionError(result)
 }
 
 func sbomCmd() *cobra.Command {
@@ -354,7 +346,7 @@ func sbomCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "sbom [paths...]",
 		Short: "Generate a Software Bill of Materials",
-		Long:  `Extract all packages from the specified paths and output a CycloneDX or SPDX SBOM.`,
+		Long:  `Extract packages from the specified paths and output a CycloneDX or SPDX SBOM.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
 				args = []string{"."}
@@ -382,12 +374,12 @@ func sbomCmd() *cobra.Command {
 			case "spdx":
 				return sbom.FormatSPDX(w, result)
 			default:
-				return fmt.Errorf("unknown sbom format %q (use: cyclonedx, spdx)", outputFormat)
+				return fmt.Errorf("unknown sbom format %q (use: cyclonedx, cdx, spdx)", outputFormat)
 			}
 		},
 	}
 
-	cmd.Flags().StringVarP(&outputFormat, "format", "f", "cyclonedx", "SBOM format: cyclonedx, spdx")
+	cmd.Flags().StringVarP(&outputFormat, "format", "f", "cyclonedx", "SBOM format: cyclonedx, cdx, spdx")
 	cmd.Flags().StringVarP(&outputFile, "output", "o", "", "Write output to file (default: stdout)")
 	return cmd
 }
@@ -405,14 +397,72 @@ func versionCmd() *cobra.Command {
 func validateCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "validate-rules",
-		Short: "Validate that builtin secrets rules load successfully",
+		Short: "Validate that built-in secrets rules load successfully",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			count, err := secrets.ValidateRules()
 			if err != nil {
 				return err
 			}
-			fmt.Printf("  %d builtin rules loaded successfully.\n", count)
+			fmt.Printf("  Validated %d built-in secrets rules.\n", count)
 			return nil
 		},
+	}
+}
+
+func configuredScannerNames(cfg *core.Config) []string {
+	scanners := make([]string, 0, 5)
+	if cfg.EnableSecrets {
+		scanners = append(scanners, "secrets")
+	}
+	if cfg.EnableSCA {
+		scanners = append(scanners, "sca")
+	}
+	if cfg.EnableSAST {
+		scanners = append(scanners, "sast")
+	}
+	if cfg.ContainerImage != "" {
+		scanners = append(scanners, "container")
+	}
+	if len(cfg.AllowedLicenses) > 0 || len(cfg.DeniedLicenses) > 0 {
+		scanners = append(scanners, "license")
+	}
+	return scanners
+}
+
+func scanCompletionError(result *core.ScanResult) error {
+	hasFindings := len(result.Findings) > 0
+	hasMissingRequired := len(result.MissingRequired) > 0
+
+	switch {
+	case hasFindings && hasMissingRequired:
+		return errFindingsAndMissingRequired
+	case hasFindings:
+		return errFindingsDetected
+	case hasMissingRequired:
+		return errMissingRequiredFindings
+	default:
+		return nil
+	}
+}
+
+func completionMessage(err error) []string {
+	switch {
+	case errors.Is(err, errFindingsAndMissingRequired):
+		return []string{
+			"Scan completed with findings, and required baseline matches were missing. Broly is exiting with code 1 so shells and CI can detect the result.",
+			"Tip: use --format json or --format sarif for machine-readable findings, then review the missing required items in the summary above.",
+		}
+	case errors.Is(err, errFindingsDetected):
+		return []string{
+			"Scan completed with findings. Broly is exiting with code 1 so shells and CI can detect the result.",
+			"Tip: use --format json or --format sarif for machine-readable output.",
+		}
+	case errors.Is(err, errMissingRequiredFindings):
+		return []string{
+			"Scan completed without findings, but required baseline matches were missing. Broly is exiting with code 1 so shells and CI can detect the result.",
+			"Tip: review the missing required items in the summary above.",
+		}
+	default:
+		return nil
 	}
 }

@@ -3,7 +3,6 @@ package sast
 
 import (
 	"context"
-	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -75,14 +74,14 @@ func (s *SASTScanner) Init(cfg *core.Config) error {
 		}
 		c, err := cache.Load(cachePath)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "warning: could not load sast cache: %v\n", err)
+			core.Warnf("could not load SAST cache: %v", err)
 		} else {
 			s.fileCache = c
 		}
 	}
 
 	if os.Getenv("TOGETHER_API_KEY") == "" {
-		fmt.Fprintln(os.Stderr, "warning: TOGETHER_API_KEY not set — SAST scanning will be skipped")
+		core.Warnf("TOGETHER_API_KEY not set - SAST scanning skipped")
 		s.apiKeySet = false
 		return nil
 	}
@@ -244,7 +243,7 @@ func (s *SASTScanner) scanFile(ctx context.Context, index *repoIndex, root, path
 	response, err := s.client.complete(ctx, prompt)
 	if err != nil {
 		if ctx.Err() == nil {
-			fmt.Fprintf(os.Stderr, "warning: sast ai scan of %s: %v\n", path, err)
+			core.Warnf("SAST AI scan of %s: %v", path, err)
 		}
 		return false
 	}

@@ -2,7 +2,6 @@ package suppress
 
 import (
 	"bufio"
-	"fmt"
 	"os"
 	"strings"
 
@@ -69,7 +68,7 @@ func cachedLines(path string, cache map[string][]string) []string {
 	}
 	if sc.Err() != nil {
 		// Partial read — cache what we got, suppression may miss lines past the break.
-		fmt.Fprintf(os.Stderr, "warning: partial read of %s for inline suppression: %v\n", path, sc.Err())
+		core.Warnf("partial read of %s for inline suppression: %v", path, sc.Err())
 	}
 	cache[path] = lines
 	return lines

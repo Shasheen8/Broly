@@ -13,6 +13,7 @@ import (
 	"github.com/google/osv-scalibr/extractor/filesystem"
 	"github.com/google/osv-scalibr/extractor/filesystem/list"
 	scalibrfs "github.com/google/osv-scalibr/fs"
+	"github.com/google/osv-scalibr/inventory"
 	"github.com/google/osv-scalibr/stats"
 
 	cpb "github.com/google/osv-scalibr/binary/proto/config_go_proto"
@@ -57,7 +58,7 @@ func (s *SCAScanner) Init(cfg *core.Config) error {
 	for _, eco := range ecosystems {
 		exts, err := list.ExtractorsFromName(eco, &cpb.PluginConfig{})
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "warning: sca extractor unavailable for %s: %v\n", eco, err)
+			core.Warnf("SCA extractor unavailable for %s: %v", eco, err)
 			continue
 		}
 		extractors = append(extractors, exts...)
@@ -67,13 +68,13 @@ func (s *SCAScanner) Init(cfg *core.Config) error {
 	if cfg.AISCAReachability {
 		s.reachability = newAIReachability(cfg.AIModel)
 		if s.reachability == nil {
-			fmt.Fprintln(os.Stderr, "warning: TOGETHER_API_KEY not set — AI SCA reachability disabled")
+			core.Warnf("TOGETHER_API_KEY not set - AI SCA reachability disabled")
 		}
 	}
 	if cfg.PackageIntelligence && !s.offline {
 		intel, err := newPackageIntelligence(cfg)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "warning: package intelligence disabled: %v\n", err)
+			core.Warnf("package intelligence disabled: %v", err)
 		} else {
 			s.intel = intel
 		}
@@ -95,13 +96,16 @@ func (s *SCAScanner) Scan(ctx context.Context, paths []string, findings chan<- c
 			continue
 		}
 
-		inv, _, err := filesystem.Run(ctx, &filesystem.Config{
-			Extractors: s.extractors,
-			ScanRoots:  []*scalibrfs.ScanRoot{{Path: target, FS: scalibrfs.DirFS(target)}},
-			Stats:      stats.NoopCollector{},
+		var inv inventory.Inventory
+		core.WithSuppressedStdlog(func() {
+			inv, _, err = filesystem.Run(ctx, &filesystem.Config{
+				Extractors: s.extractors,
+				ScanRoots:  []*scalibrfs.ScanRoot{{Path: target, FS: scalibrfs.DirFS(target)}},
+				Stats:      stats.NoopCollector{},
+			})
 		})
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "warning: sca extraction in %s: %v\n", target, err)
+			core.Warnf("SCA extraction in %s: %v", target, err)
 			continue
 		}
 

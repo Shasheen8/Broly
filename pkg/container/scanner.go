@@ -20,6 +20,7 @@ import (
 	"github.com/google/osv-scalibr/extractor/filesystem"
 	"github.com/google/osv-scalibr/extractor/filesystem/list"
 	scalibrfs "github.com/google/osv-scalibr/fs"
+	"github.com/google/osv-scalibr/inventory"
 	"github.com/google/osv-scalibr/stats"
 
 	cpb "github.com/google/osv-scalibr/binary/proto/config_go_proto"
@@ -79,9 +80,7 @@ func (s *ContainerScanner) Scan(ctx context.Context, paths []string, findings ch
 	}
 
 	digestStr := digest.String()
-	if !s.quiet {
-		fmt.Fprintf(os.Stderr, "image: %s | digest: %s | layers: %d\n", s.imageRef, digestStr, len(layers))
-	}
+	core.Progressf(s.quiet, "image: %s | digest: %s | layers: %d", s.imageRef, digestStr, len(layers))
 
 	imgMeta := imageMetadata{
 		digest:    digestStr,
@@ -96,14 +95,12 @@ func (s *ContainerScanner) Scan(ctx context.Context, paths []string, findings ch
 	// OS package scan (requires known distro).
 	ecosystem := distro.osvEcosystem()
 	if ecosystem != "" && len(pkgs) > 0 {
-		if !s.quiet {
-			fmt.Fprintf(os.Stderr, "distro: %s %s | ecosystem: %s | packages: %d\n", distro.ID, distro.Version, ecosystem, len(pkgs))
-		}
+		core.Progressf(s.quiet, "distro: %s %s | ecosystem: %s | packages: %d", distro.ID, distro.Version, ecosystem, len(pkgs))
 		if err := s.scanOSPackages(ctx, pkgs, ecosystem, imgMeta, findings); err != nil {
 			return err
 		}
 	} else if distro.ID != "" {
-		fmt.Fprintf(os.Stderr, "warning: distro %q not mapped to OSV ecosystem\n", distro.ID)
+		core.Warnf("container distro %q is not mapped to an OSV ecosystem", distro.ID)
 	}
 
 	// Language package scan (always runs).
@@ -190,10 +187,13 @@ func (s *ContainerScanner) scanLanguagePackages(ctx context.Context, img v1.Imag
 	}
 
 	// Run scalibr on the temp dir.
-	inv, _, err := filesystem.Run(ctx, &filesystem.Config{
-		Extractors: extractors,
-		ScanRoots:  []*scalibrfs.ScanRoot{{Path: tmpDir, FS: scalibrfs.DirFS(tmpDir)}},
-		Stats:      stats.NoopCollector{},
+	var inv inventory.Inventory
+	core.WithSuppressedStdlog(func() {
+		inv, _, err = filesystem.Run(ctx, &filesystem.Config{
+			Extractors: extractors,
+			ScanRoots:  []*scalibrfs.ScanRoot{{Path: tmpDir, FS: scalibrfs.DirFS(tmpDir)}},
+			Stats:      stats.NoopCollector{},
+		})
 	})
 	if err != nil {
 		return err
@@ -204,9 +204,7 @@ func (s *ContainerScanner) scanLanguagePackages(ctx context.Context, img v1.Imag
 		return nil
 	}
 
-	if !s.quiet {
-		fmt.Fprintf(os.Stderr, "container language packages: %d\n", len(pkgs))
-	}
+	core.Progressf(s.quiet, "container language packages: %d", len(pkgs))
 
 	// Query OSV in batches of 1000.
 	for start := 0; start < len(pkgs); start += 1000 {
@@ -380,9 +378,7 @@ func pullImage(ctx context.Context, ref string, quiet bool) (v1.Image, error) {
 	if dockerAvailable() {
 		img, err := daemon.Image(parsed)
 		if err == nil {
-			if !quiet {
-				fmt.Fprintf(os.Stderr, "using local image after registry pull failed: %v\n", remoteErr)
-			}
+			core.Progressf(quiet, "using local image after registry pull failed: %v", remoteErr)
 			return img, nil
 		}
 	}

@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io/fs"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -76,7 +75,7 @@ func (s *SecretsScanner) Init(cfg *core.Config) error {
 	if cfg.AIFilterSecrets {
 		s.validator = newAIValidator(cfg.AIModel)
 		if s.validator == nil {
-			fmt.Fprintln(os.Stderr, "warning: TOGETHER_API_KEY not set — AI secrets filtering disabled")
+			core.Warnf("TOGETHER_API_KEY not set - AI secrets filtering disabled")
 		}
 	}
 
@@ -91,7 +90,7 @@ func (s *SecretsScanner) Scan(ctx context.Context, paths []string, findings chan
 			return nil
 		}
 		if err := s.scanPath(ctx, target, findings); err != nil {
-			fmt.Fprintf(os.Stderr, "warning: secrets scan of %s: %v\n", target, err)
+			core.Warnf("secrets scan of %s: %v", target, err)
 		}
 	}
 
