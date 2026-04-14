@@ -107,18 +107,45 @@ Each scanner outputs an aligned table in the terminal. Supports JSON (`-f json`)
 
 ### AI Triage
 
-`--ai-triage` labels every finding TRUE or FALSE positive with a confidence score and a concrete fix. Add `--explain` for a one-sentence attack scenario:
+`--ai-triage` adds an AI verdict to each finding in the terminal table:
 
+- `TRUE_POSITIVE` or `FALSE_POSITIVE`
+- confidence score
+- short reasoning in the `ASSESSMENT / CONTEXT` column
+- targeted remediation in the `TARGETED FIX` column, including a concrete code fix when the model has enough local context
+
+`--ai-triage --explain` adds one more thing: a plain-language attack scenario or impact sentence. The table format stays the same, but each finding becomes more verbose.
+
+Use:
+
+```bash
+broly scan . --ai-triage
+broly scan . --ai-triage --explain
 ```
-  CRITICAL   SQL injection via unsanitized user input         api/handlers.py:10
-  🔺 TRUE_POSITIVE  confidence: HIGH
-     An attacker can send id=1 OR 1=1-- to dump the entire users table.
-     fix:
-       cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))
 
-  HIGH       Path traversal in read_file                      api/handlers.py:20
-  🟢 FALSE_POSITIVE  confidence: HIGH
-     File path is validated against an allowlist before reaching the filesystem.
+Rule of thumb:
+
+- `--ai-triage` is better for day-to-day developer scans
+- `--ai-triage --explain` is better for reviews, demos, and cases where you want the exploit path spelled out more clearly
+
+Example difference:
+
+```text
+--ai-triage
+| Critical | SQL injection in login query | TRUE_POSITIVE [HIGH] | Recommendation: Use a prepared statement. |
+|          | Code: $query = "SELECT ..."  | User input is        | Code fix: $stmt = $db->prepare(...);      |
+|          |                              | concatenated into a  |                                           |
+|          |                              | SQL query.           |                                           |
+
+--ai-triage --explain
+| Critical | SQL injection in login query | TRUE_POSITIVE [HIGH] | Recommendation: Use a prepared statement. |
+|          | Code: $query = "SELECT ..."  | User input is        | Code fix: $stmt = $db->prepare(...);      |
+|          |                              | concatenated into a  |                                           |
+|          |                              | SQL query.           |                                           |
+|          |                              | An attacker can send |                                           |
+|          |                              | ' OR 1=1 -- to       |                                           |
+|          |                              | bypass login or dump |                                           |
+|          |                              | data.                |                                           |
 ```
 
 ---
