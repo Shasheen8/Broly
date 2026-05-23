@@ -9,6 +9,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/Shasheen8/Broly/pkg/ai"
 	"github.com/Shasheen8/Broly/pkg/core"
 )
 
@@ -83,7 +84,7 @@ func (f *TableFormatter) Format(w io.Writer, result *core.ScanResult) error {
 
 	printBanner(w, clr)
 
-	for _, scanType := range []core.ScanType{core.ScanTypeSecrets, core.ScanTypeSCA, core.ScanTypeSAST, core.ScanTypeDockerfile, core.ScanTypeContainer, core.ScanTypeLicense} {
+	for _, scanType := range []core.ScanType{core.ScanTypeSecrets, core.ScanTypeSCA, core.ScanTypeSAST, core.ScanTypeWorkflow, core.ScanTypeDockerfile, core.ScanTypeContainer, core.ScanTypeLicense} {
 		findings, ok := byScanType[scanType]
 		if !ok {
 			continue
@@ -105,22 +106,7 @@ func (f *TableFormatter) Format(w io.Writer, result *core.ScanResult) error {
 }
 
 func scanTypeLabel(t core.ScanType) string {
-	switch t {
-	case core.ScanTypeSecrets:
-		return "SECRETS"
-	case core.ScanTypeSCA:
-		return "SCA"
-	case core.ScanTypeSAST:
-		return "SAST"
-	case core.ScanTypeDockerfile:
-		return "DOCKERFILE"
-	case core.ScanTypeContainer:
-		return "CONTAINER"
-	case core.ScanTypeLicense:
-		return "LICENSE"
-	default:
-		return strings.ToUpper(string(t))
-	}
+	return t.Label()
 }
 
 func plural(n int) string {
@@ -194,7 +180,7 @@ func printBanner(w io.Writer, clr color) {
 		"⚡  "+clr.s(bold+brightRed, "BROLY")+"  "+clr.s(bold+white, "Berserker Vulnerability Scanner"),
 	)
 	bannerCentered(w, clr,
-		clr.s(dim+cyan, "Secrets · SCA · SAST · Powered by Together AI"),
+		clr.s(dim+cyan, fmt.Sprintf("Secrets · SCA · SAST · SBOM · Powered by Together AI (%s)", ai.DefaultModel)),
 	)
 	bannerCentered(w, clr, "")
 	fmt.Fprintf(w, "  %s\n", clr.s(cyan, "╚══════════════════════════════════════════════════════╝"))
@@ -224,7 +210,7 @@ func printScanTypeTable(w io.Writer, clr color, scanType core.ScanType, findings
 		printSCATable(w, clr, findings)
 	case core.ScanTypeContainer:
 		printContainerTable(w, clr, findings)
-	case core.ScanTypeSAST:
+	case core.ScanTypeSAST, core.ScanTypeWorkflow:
 		printSASTTable(w, clr, findings)
 	case core.ScanTypeDockerfile:
 		printSASTTable(w, clr, findings)

@@ -7,9 +7,9 @@
 
 # Broly
 
-### A berserker code security scanner.
+### CLI-first berserker code security scanner.
 
-Secrets · SCA · SAST · Containers. AI-powered intelligent findings. No rules. No YAML.
+Secrets · SCA · SAST · Containers · SBOM. AI-powered findings. Run locally or in CI with one binary.
 
 <a href="https://github.com/Shasheen8/Broly/actions/workflows/ci.yml"><img src="https://github.com/Shasheen8/Broly/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
 <a href="https://github.com/Shasheen8/Broly"><img src="https://img.shields.io/badge/Go-1.26-00ADD8?style=flat&logo=go" alt="Go"></a>
@@ -29,9 +29,9 @@ Secrets · SCA · SAST · Containers. AI-powered intelligent findings. No rules.
 |---------|--------|----------|
 | **Secrets** | [Titus](https://github.com/praetorian-inc/titus) · 487 rules · Hyperscan | `--ai-filter-secrets` eliminates false positives |
 | **SCA** | [osv-scalibr](https://github.com/google/osv-scalibr) + [osv.dev](https://osv.dev) · 20 ecosystems | `--ai-sca-reachability` · `--package-intelligence` for hallucinated deps |
-| **SAST** | [Together AI](https://together.ai) · `Qwen/Qwen3-Coder-Next-FP8` · 17 regex patterns | Slice-aware multi-file · source-to-sink data flow · priority scoring |
+| **SAST** | [Together AI](https://together.ai) · `Qwen/Qwen3.5-9B` · 17 regex patterns | Slice-aware multi-file · source-to-sink data flow · priority scoring |
 | **Dockerfile** | AI-powered · Dockerfile, Containerfile, Compose | Privilege escalation · secret exposure · dangerous mounts |
-| **Container** | [go-containerregistry](https://github.com/google/go-containerregistry) + [osv.dev](https://osv.dev) · Alpine, Debian, Ubuntu, RHEL | OS package CVEs with layer attribution |
+| **Container** | [go-containerregistry](https://github.com/google/go-containerregistry) + [osv.dev](https://osv.dev) · pulls registry/local/tar images | OS package CVEs with layer attribution · auto-discovers `FROM` images in Dockerfiles and Compose |
 | **License** | File-based detection · 13 license types | Policy engine via `allowed_licenses` / `denied_licenses` in `.broly.yaml` |
 | **SBOM** | [osv-scalibr](https://github.com/google/osv-scalibr) · 20 ecosystems | CycloneDX 1.5 or SPDX 2.3 with PURLs |
 
@@ -78,9 +78,10 @@ broly scan --package-intelligence                 # detect hallucinated/non-exis
 broly scan --ai-triage                            # verdict (TP/FP) + fix suggestion per finding
 broly scan --ai-triage --explain                  # + one-sentence attack scenario per finding
 
-# Container scanning
+# Container scanning (pulls and analyzes the image — not advisory-only)
 broly scan --container alpine:3.19                # pull and scan a registry image
 broly scan --container ./image.tar                # scan from a local tarball
+broly scan .                                      # also scans base images referenced in Dockerfile / Compose files under targets
 
 # Output
 broly scan -f json                                # JSON output
@@ -94,8 +95,11 @@ broly sbom -f spdx -o sbom.json                   # SPDX 2.3 to file
 # Config and suppression
 broly scan --config .broly.yaml                   # project config; also activates license policy
 broly scan --baseline .broly-baseline.yaml        # suppress known FPs / require specific findings
-broly scan --incremental                          # skip unchanged files
+broly scan --incremental                          # skip unchanged SAST files since last run
 ```
+
+> [!NOTE]
+> **GitHub Actions (workflow) scanning** is not part of this CLI-focused repo. Setting `enable_workflow: true` in `.broly.yaml` makes `broly scan` exit with an error. Use the reusable workflow below or a hosted scanner if you need Actions coverage.
 
 ---
 
@@ -152,9 +156,7 @@ Example difference:
 
 ## CI Integration
 
-**GitHub App**: install once on your org and every PR gets scanned automatically. No per-repo setup needed.
-
-**Reusable workflow**: drop one line into any repo's existing CI:
+Run the **`broly` CLI** in GitHub Actions with the reusable workflow:
 
 ```yaml
 jobs:
@@ -164,68 +166,16 @@ jobs:
       ai_api_key: ${{ secrets.AI_API_KEY }}
 ```
 
-Supports `min_severity`, `scanners`, and `ai_triage` inputs. Posts findings as a PR comment and uploads SARIF to the GitHub Security tab.
+Supports `min_severity`, `scanners`, and `ai_triage` inputs. Uploads SARIF to the GitHub Security tab when configured in the workflow.
 
-## GitHub App
+### Optional: `broly-app` webhook server
 
-One install covers your entire org. Every PR gets scanned automatically. No workflow files, no per-repo setup, no secrets to configure per repo.
-
-**On every PR, Broly:**
-- Runs secrets, SCA, and SAST on changed files only (no historic noise)
-- Posts findings as an inline check run with file:line annotations
-- Labels each finding TRUE/FALSE positive with a confidence score and fix suggestion
-- Adds a checkbox per finding. Check it to suppress it forever
-
-> [!NOTE]
-> Only findings in files changed by the PR are reported. Broly never flags pre-existing issues on a clean PR.
-
-**Developer feedback loop:** when a developer checks a false positive box, Broly commits the fingerprint to `.broly-baseline.yaml` on the branch. The finding is suppressed on every future scan, automatically. No config needed. Each repo builds its own false positive memory over time.
-
-### Running locally
+`cmd/broly-app` is a minimal GitHub App webhook handler for local experiments (PR scan + check run). It does **not** include the production hosted control plane (DynamoDB, baseline registry, workflow/zizmor, org-wide PR bot). For that, use Together’s deployed Broly or extend this repo yourself.
 
 ```bash
-APP_ID=your_app_id \
-PRIVATE_KEY_PATH=./broly.pem \
-WEBHOOK_SECRET=your_webhook_secret \
-TOGETHER_API_KEY=your_key \
-go run ./cmd/broly-app
+APP_ID=... PRIVATE_KEY_PATH=./broly.pem WEBHOOK_SECRET=... TOGETHER_API_KEY=... \
+  go run ./cmd/broly-app
 ```
-
-> [!TIP]
-> Use [smee.io](https://smee.io) to proxy GitHub webhooks to your local server during development.
-
-### Deployment
-
-Multi-stage Dockerfile at `cmd/broly-app/Dockerfile`. Chainguard hardened runtime. Non-root, no shell, minimal attack surface.
-
-**Environment variables:**
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `APP_ID` | ✓ | GitHub App ID |
-| `PRIVATE_KEY_PATH` | ✓ | Path to the `.pem` private key file |
-| `WEBHOOK_SECRET` | ✓ | Webhook secret from the GitHub App settings |
-| `TOGETHER_API_KEY` | ✓ | Together AI key — required for SAST and AI triage |
-| `PORT` | — | HTTP port (default: `8080`) |
-| `MAX_CONCURRENT_SCANS` | — | Parallel scan limit (default: `4`) |
-
-```bash
-docker build -f cmd/broly-app/Dockerfile -t broly-app .
-
-docker run -p 8080:8080 \
-  -e APP_ID=your_app_id \
-  -e PRIVATE_KEY_PATH=/secrets/broly.pem \
-  -e WEBHOOK_SECRET=your_webhook_secret \
-  -e TOGETHER_API_KEY=your_key \
-  -v /path/to/broly.pem:/secrets/broly.pem:ro \
-  broly-app
-```
-
-> [!TIP]
-> In production, mount the private key from a secrets manager rather than the host filesystem. The `/healthz` endpoint is available for uptime monitoring.
-
-> [!WARNING]
-> Never commit the `.pem` private key to source control. Add it to `.gitignore`.
 
 ---
 
@@ -242,6 +192,9 @@ exclude_paths:
   - vendor
   - .git
 workers: 8
+path_strip_prefix: /home/runner/work/myrepo/myrepo   # optional: normalize paths in CI output
+additional_suppressions:                            # optional: extra fingerprint suppressions
+  - "abc123..."
 
 # License policy (findings only emitted when configured)
 allowed_licenses:

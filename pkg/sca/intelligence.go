@@ -84,7 +84,7 @@ func (p *packageIntelligence) Analyze(ctx context.Context, pkgs []*extractor.Pac
 			Tags:           []string{"sca", "package-intelligence", "hallucinated-package", registryTag(candidate.Ecosystem)},
 			Timestamp:      time.Now(),
 		}
-		finding.ComputeFingerprint()
+		finding.ComputeIdentityKeys()
 		if emitted[finding.Fingerprint] {
 			continue
 		}
