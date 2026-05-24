@@ -332,7 +332,7 @@ func (s *ContainerScanner) containerFinding(vuln *osvschema.Vulnerability, pkgNa
 		Tags:           tags,
 		Timestamp:      time.Now(),
 	}
-	f.ComputeFingerprint()
+	f.ComputeIdentityKeys()
 	return f
 }
 

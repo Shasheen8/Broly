@@ -24,6 +24,7 @@ import (
 
 	"github.com/Shasheen8/Broly/pkg/core"
 	"github.com/Shasheen8/Broly/pkg/osvutil"
+	"github.com/Shasheen8/Broly/pkg/scanignore"
 )
 
 var ecosystems = []string{
@@ -99,9 +100,10 @@ func (s *SCAScanner) Scan(ctx context.Context, paths []string, findings chan<- c
 		var inv inventory.Inventory
 		core.WithSuppressedStdlog(func() {
 			inv, _, err = filesystem.Run(ctx, &filesystem.Config{
-				Extractors: s.extractors,
-				ScanRoots:  []*scalibrfs.ScanRoot{{Path: target, FS: scalibrfs.DirFS(target)}},
-				Stats:      stats.NoopCollector{},
+				Extractors:   s.extractors,
+				ScanRoots:    []*scalibrfs.ScanRoot{{Path: target, FS: scalibrfs.DirFS(target)}},
+				SkipDirRegex: scanignore.SkipDirRegex(),
+				Stats:        stats.NoopCollector{},
 			})
 		})
 		if err != nil {
@@ -209,7 +211,7 @@ func (s *SCAScanner) emitFindings(
 				Tags:           []string{"sca", strings.ToLower(eco.String())},
 				Timestamp:      time.Now(),
 			}
-			finding.ComputeFingerprint()
+			finding.ComputeIdentityKeys()
 
 			// AI reachability analysis.
 			if s.reachability != nil {
