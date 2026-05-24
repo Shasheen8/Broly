@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
+	"github.com/Shasheen8/Broly/pkg/ai"
 	"github.com/Shasheen8/Broly/pkg/container"
 	"github.com/Shasheen8/Broly/pkg/core"
 	"github.com/Shasheen8/Broly/pkg/license"
@@ -201,6 +202,10 @@ By default secrets, SCA, and SAST are enabled and the current directory is scann
 				cfg.SASTSliceFiles = sastSliceFiles
 			}
 
+			if cfg.EnableWorkflow {
+				return fmt.Errorf("workflow scanning runs in broly-app only (GitHub App); it is not available in the broly CLI")
+			}
+
 			finalizeScannerSelection(
 				cfg,
 				f.Changed("sast"), enableSAST,
@@ -226,7 +231,7 @@ By default secrets, SCA, and SAST are enabled and the current directory is scann
 	flags.BoolVar(&disableRedact, "no-redact", false, "Disable secret redaction in human-readable output")
 	flags.BoolVar(&validateSecrets, "validate", false, "Validate detected secrets against source APIs")
 	flags.BoolVar(&offline, "offline", false, "Run SCA in offline mode (skip OSV API)")
-	flags.StringVar(&aiModel, "ai-model", "", "Together.ai model for AI features (default: Qwen/Qwen3-Coder-Next-FP8)")
+	flags.StringVar(&aiModel, "ai-model", "", fmt.Sprintf("Together.ai model for AI features (default: %s)", ai.DefaultModel))
 	flags.BoolVar(&packageIntelligence, "package-intelligence", false, "Check packages against public registries to detect hallucinated dependencies")
 	flags.StringVar(&packageRegistryMode, "package-registry-mode", "auto", "Package registry routing: auto, public-only, custom-only")
 	flags.StringVar(&npmRegistryURL, "npm-registry-url", "", "Custom npm registry base URL for package intelligence")
@@ -312,6 +317,37 @@ func runScan(cfg *core.Config) error {
 	if err != nil {
 		return fmt.Errorf("scan failed: %w", err)
 	}
+
+	// Auto-scan Dockerfile base images, skipping any explicit --container.
+	scanned := map[string]bool{}
+	if cfg.ContainerImage != "" {
+		scanned[cfg.ContainerImage] = true
+	}
+	for _, target := range cfg.Targets {
+		info, err := os.Stat(target)
+		if err != nil || !info.IsDir() {
+			continue
+		}
+		for _, rel := range container.FindContainerSpecs(target) {
+			content, ok := container.ReadDockerfile(target, rel)
+			if !ok {
+				continue
+			}
+			for _, img := range container.ImagesFromFile(rel, content) {
+				if scanned[img] {
+					continue
+				}
+				scanned[img] = true
+				cr, err := scanContainerImage(ctx, cfg, img, rel)
+				if err != nil {
+					core.Warnf("container scan of %s failed: %v", img, err)
+					continue
+				}
+				result.Findings = append(result.Findings, cr.Findings...)
+			}
+		}
+	}
+	result.Metrics.FindingsCount = len(result.Findings)
 	result.Duration = time.Since(start)
 
 	formatter, err := report.GetFormatter(cfg.OutputFormat)
@@ -335,6 +371,22 @@ func runScan(cfg *core.Config) error {
 	}
 
 	return scanCompletionError(result)
+}
+
+func scanContainerImage(ctx context.Context, base *core.Config, image, dockerfile string) (*core.ScanResult, error) {
+	cfg := *base
+	cfg.ContainerImage = image
+	orch := orchestrator.New(&cfg)
+	orch.Register(container.NewContainerScanner())
+	res, err := orch.Run(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for i := range res.Findings {
+		res.Findings[i].FilePath = dockerfile
+		res.Findings[i].ComputeIdentityKeys()
+	}
+	return res, nil
 }
 
 func sbomCmd() *cobra.Command {

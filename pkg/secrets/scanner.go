@@ -12,13 +12,8 @@ import (
 	titus "github.com/praetorian-inc/titus"
 
 	"github.com/Shasheen8/Broly/pkg/core"
+	"github.com/Shasheen8/Broly/pkg/scanignore"
 )
-
-var secretsSkipDirs = map[string]bool{
-	"vendor": true, "node_modules": true, ".git": true,
-	"dist": true, "build": true, "__pycache__": true,
-	".venv": true, "venv": true, "target": true,
-}
 
 type SecretsScanner struct {
 	scanner          *titus.Scanner
@@ -115,7 +110,7 @@ func (s *SecretsScanner) scanPath(ctx context.Context, root string, findings cha
 		}
 
 		if d.IsDir() {
-			if secretsSkipDirs[name] {
+			if scanignore.IsIgnoredDirName(name) {
 				return filepath.SkipDir
 			}
 			return nil
@@ -157,7 +152,7 @@ func (s *SecretsScanner) scanPath(ctx context.Context, root string, findings cha
 			if m.ValidationResult != nil {
 				f.Tags = append(f.Tags, string(m.ValidationResult.Status))
 			}
-			f.ComputeFingerprint()
+			f.ComputeIdentityKeys()
 			batch = append(batch, f)
 		}
 

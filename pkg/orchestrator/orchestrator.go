@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
+	"time"
 
 	"github.com/Shasheen8/Broly/pkg/baseline"
 	"github.com/Shasheen8/Broly/pkg/core"
@@ -52,6 +54,8 @@ func (o *Orchestrator) Run(ctx context.Context) (*core.ScanResult, error) {
 	var scanWg sync.WaitGroup
 	var fwdWg sync.WaitGroup
 	errCh := make(chan error, len(o.scanners))
+	scannerDurations := make(map[string]time.Duration, len(o.scanners))
+	var durationsMu sync.Mutex
 
 	for _, scanner := range o.scanners {
 		scanWg.Add(1)
@@ -73,9 +77,13 @@ func (o *Orchestrator) Run(ctx context.Context) (*core.ScanResult, error) {
 				}
 			}()
 
+			start := time.Now()
 			if err := s.Scan(ctx, o.config.Targets, ch); err != nil {
 				errCh <- fmt.Errorf("scanner %s: %w", s.Name(), err)
 			}
+			durationsMu.Lock()
+			scannerDurations[s.Name()] = time.Since(start)
+			durationsMu.Unlock()
 		}(scanner)
 	}
 
@@ -94,6 +102,7 @@ func (o *Orchestrator) Run(ctx context.Context) (*core.ScanResult, error) {
 	}
 
 	// Post-processing pipeline.
+	normalizeFindingPaths(findings, o.config.PathStripPrefix)
 	findings = deduplicateFindings(findings)
 
 	// Compute priority scores.
@@ -104,9 +113,10 @@ func (o *Orchestrator) Run(ctx context.Context) (*core.ScanResult, error) {
 	// Baseline: check required findings against full deduplicated set (before any filtering).
 	// Suppression is applied after other filters.
 	var (
-		inlineSuppressed   int
-		baselineSuppressed int
-		missingRequired    []string
+		inlineSuppressed     int
+		baselineSuppressed   int
+		additionalSuppressed int
+		missingRequired      []string
 	)
 	var bl *baseline.Baseline
 	if o.config.BaselineFile != "" {
@@ -128,10 +138,11 @@ func (o *Orchestrator) Run(ctx context.Context) (*core.ScanResult, error) {
 	if bl != nil {
 		findings, baselineSuppressed = bl.Suppress(findings)
 	}
+	findings, additionalSuppressed = suppressByFingerprint(findings, o.config.AdditionalSuppressions)
 
-	// AI triage: verdict + fix suggestion per finding.
+	// AI triage: verdict + fix suggestion for SAST findings.
 	if o.config.AITriage && len(findings) > 0 {
-		t := triage.New(o.config.AIModel, o.config.Explain)
+		t := triage.New(o.config.AIModel, o.config.Explain, o.config.PathStripPrefix)
 		if t != nil {
 			findings = t.Run(ctx, findings)
 		} else {
@@ -151,8 +162,8 @@ func (o *Orchestrator) Run(ctx context.Context) (*core.ScanResult, error) {
 	return &core.ScanResult{
 		Findings:        findings,
 		ScanTypes:       scanTypes,
-		Metrics:         core.ScanMetrics{FindingsCount: len(findings)},
-		SuppressedCount: inlineSuppressed + baselineSuppressed,
+		Metrics:         core.ScanMetrics{FindingsCount: len(findings), ScannerDurations: scannerDurations},
+		SuppressedCount: inlineSuppressed + baselineSuppressed + additionalSuppressed,
 		MissingRequired: missingRequired,
 	}, nil
 }
@@ -162,7 +173,11 @@ func deduplicateFindings(findings []core.Finding) []core.Finding {
 	out := make([]core.Finding, 0, len(findings))
 	for i := range findings {
 		if findings[i].Fingerprint == "" {
-			findings[i].ComputeFingerprint()
+			findings[i].ComputeIdentityKeys()
+		} else {
+			findings[i].ComputeOrgMatchKey()
+			findings[i].ComputeBaselineMatchKey()
+			findings[i].ComputeUsageDeltaKey()
 		}
 		if !seen[findings[i].Fingerprint] {
 			seen[findings[i].Fingerprint] = true
@@ -213,4 +228,51 @@ func toSet(items []string) map[string]bool {
 		s[item] = true
 	}
 	return s
+}
+
+func normalizeFindingPaths(findings []core.Finding, prefix string) {
+	if prefix == "" {
+		return
+	}
+
+	prefix = strings.TrimRight(prefix, "/")
+	for i := range findings {
+		originalFilePath := findings[i].FilePath
+		originalArtifactPath := findings[i].ArtifactPath
+		findings[i].FilePath = trimPathPrefix(findings[i].FilePath, prefix)
+		findings[i].ArtifactPath = trimPathPrefix(findings[i].ArtifactPath, prefix)
+		if findings[i].FilePath != originalFilePath || findings[i].ArtifactPath != originalArtifactPath {
+			findings[i].ComputeIdentityKeys()
+		}
+	}
+}
+
+func trimPathPrefix(path, prefix string) string {
+	if path == "" || prefix == "" {
+		return path
+	}
+	if !strings.HasPrefix(path, prefix) {
+		return path
+	}
+
+	trimmed := strings.TrimPrefix(path, prefix)
+	return strings.TrimPrefix(trimmed, "/")
+}
+
+func suppressByFingerprint(findings []core.Finding, fingerprints []string) ([]core.Finding, int) {
+	suppressed := toSet(fingerprints)
+	if len(suppressed) == 0 {
+		return findings, 0
+	}
+
+	filtered := make([]core.Finding, 0, len(findings))
+	var count int
+	for _, finding := range findings {
+		if suppressed[finding.Fingerprint] {
+			count++
+			continue
+		}
+		filtered = append(filtered, finding)
+	}
+	return filtered, count
 }
