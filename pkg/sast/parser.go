@@ -156,7 +156,7 @@ func (p *parsedFinding) toFinding(filePath, lang string) core.Finding {
 		FixSuggestion: fix,
 	}
 
-	f.ComputeIdentityKeys()
+	f.ComputeFingerprint()
 	return f
 }
 

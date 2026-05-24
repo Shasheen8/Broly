@@ -5,13 +5,12 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/togethercomputer/together-go"
 	"golang.org/x/time/rate"
 )
 
-const DefaultModel = "Qwen/Qwen3.5-9B"
+const DefaultModel = "Qwen/Qwen3-Coder-Next-FP8"
 
 var globalLimiter = rate.NewLimiter(rate.Limit(10), 20)
 
@@ -19,13 +18,6 @@ var globalLimiter = rate.NewLimiter(rate.Limit(10), 20)
 type Client struct {
 	inner *together.Client
 	model string
-}
-
-func (c *Client) ModelName() string {
-	if c == nil {
-		return ""
-	}
-	return c.model
 }
 
 // New returns a Client and true if TOGETHER_API_KEY is set, or nil and false otherwise.
@@ -53,12 +45,6 @@ func (c *Client) Complete(ctx context.Context, prompt string, maxTokens int) (st
 		Model: together.ChatCompletionNewParamsModel(c.model),
 		Messages: []together.ChatCompletionNewParamsMessageUnion{
 			{
-				OfChatCompletionNewsMessageChatCompletionSystemMessageParam: &together.ChatCompletionNewParamsMessageChatCompletionSystemMessageParam{
-					Role:    "system",
-					Content: "You are a security expert. Follow instructions exactly. Respond with the requested format only — no preamble, no markdown formatting, no extra commentary.",
-				},
-			},
-			{
 				OfChatCompletionNewsMessageChatCompletionUserMessageParam: &together.ChatCompletionNewParamsMessageChatCompletionUserMessageParam{
 					Role: "user",
 					Content: together.ChatCompletionNewParamsMessageChatCompletionUserMessageParamContentUnion{
@@ -67,10 +53,7 @@ func (c *Client) Complete(ctx context.Context, prompt string, maxTokens int) (st
 				},
 			},
 		},
-		MaxTokens: together.Int(int64(maxTokens)),
-		Reasoning: together.ChatCompletionNewParamsReasoning{
-			Enabled: together.Bool(false),
-		},
+		MaxTokens:   together.Int(int64(maxTokens)),
 		Temperature: together.Float(0.1),
 	})
 	if err != nil {
@@ -79,9 +62,5 @@ func (c *Client) Complete(ctx context.Context, prompt string, maxTokens int) (st
 	if len(resp.Choices) == 0 {
 		return "", fmt.Errorf("empty response from model")
 	}
-	content := resp.Choices[0].Message.Content
-	if strings.TrimSpace(content) == "" {
-		return "", fmt.Errorf("empty content from model")
-	}
-	return content, nil
+	return resp.Choices[0].Message.Content, nil
 }

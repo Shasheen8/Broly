@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/Shasheen8/Broly/pkg/core"
-	"github.com/Shasheen8/Broly/pkg/scanignore"
 )
 
 type policy struct {
@@ -87,7 +86,7 @@ func (s *LicenseScanner) Scan(ctx context.Context, paths []string, findings chan
 				Tags:        []string{"license", "policy"},
 				Timestamp:   time.Now(),
 			}
-			f.ComputeIdentityKeys()
+			f.ComputeFingerprint()
 			select {
 			case findings <- f:
 			case <-ctx.Done():
@@ -141,7 +140,8 @@ func detectLicenses(root string) []detection {
 			return nil
 		}
 		if d.IsDir() {
-			if scanignore.IsIgnoredDirName(d.Name()) {
+			name := d.Name()
+			if name == ".git" || name == "node_modules" || name == "vendor" || name == "dist" || name == "build" {
 				return filepath.SkipDir
 			}
 			return nil

@@ -10,14 +10,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Shasheen8/Broly/pkg/ai"
 	"github.com/Shasheen8/Broly/pkg/cache"
 	"github.com/Shasheen8/Broly/pkg/core"
-	"github.com/Shasheen8/Broly/pkg/scanignore"
 )
 
 const (
-	defaultModel       = ai.DefaultModel
+	defaultModel       = "Qwen/Qwen3-Coder-Next-FP8"
 	defaultMaxFileSize = 512 * 1024 // 512 KB
 	defaultWorkers     = 4
 )
@@ -157,7 +155,7 @@ func (s *SASTScanner) Scan(ctx context.Context, paths []string, findings chan<- 
 				return nil
 			}
 			if d.IsDir() {
-				if scanignore.IsIgnoredDirName(name) {
+				if skipDirs[name] {
 					return filepath.SkipDir
 				}
 				return nil
@@ -213,7 +211,6 @@ func (s *SASTScanner) scanFile(ctx context.Context, index *repoIndex, root, path
 	}
 	content := string(src)
 
-	var prefilterHits []core.Finding
 	for _, hit := range runPrefilter(content) {
 		f := core.Finding{
 			Type:        core.ScanTypeSAST,
@@ -228,24 +225,17 @@ func (s *SASTScanner) scanFile(ctx context.Context, index *repoIndex, root, path
 			Tags:        []string{"sast", "prefilter", hit.Pattern.Category},
 			Timestamp:   time.Now(),
 		}
-		f.ComputeIdentityKeys()
-		prefilterHits = append(prefilterHits, f)
+		f.ComputeFingerprint()
+		select {
+		case findings <- f:
+		case <-ctx.Done():
+			return false
+		}
 	}
 
-	prefilterLines := make(map[int]bool, len(prefilterHits))
-	for _, f := range prefilterHits {
-		prefilterLines[f.StartLine] = true
-	}
-
+	// AI scan: LLM-based deep analysis with a bounded multi-file slice.
 	slice, err := buildAnalysisSlice(index, root, path, lang, content, s.sliceFiles, defaultMaxContextBytes)
 	if err != nil {
-		for _, f := range prefilterHits {
-			select {
-			case findings <- f:
-			case <-ctx.Done():
-				return false
-			}
-		}
 		return false
 	}
 	prompt := buildPrompt(slice)
@@ -255,30 +245,14 @@ func (s *SASTScanner) scanFile(ctx context.Context, index *repoIndex, root, path
 		if ctx.Err() == nil {
 			core.Warnf("SAST AI scan of %s: %v", path, err)
 		}
-		for _, f := range prefilterHits {
-			select {
-			case findings <- f:
-			case <-ctx.Done():
-				return false
-			}
-		}
 		return false
 	}
 
 	parsed := parseLLMResponse(response)
-	llmFindings := attributeParsedFindings(slice, parsed)
-
-	for _, f := range prefilterHits {
-		select {
-		case findings <- f:
-		case <-ctx.Done():
-			return false
-		}
+	if len(parsed) == 0 && len(strings.TrimSpace(response)) > 0 && !strings.Contains(response, "NO_FINDINGS") {
+		return false
 	}
-	for _, f := range llmFindings {
-		if f.StartLine > 0 && prefilterLines[f.StartLine] {
-			continue
-		}
+	for _, f := range attributeParsedFindings(slice, parsed) {
 		f.Timestamp = time.Now()
 		select {
 		case findings <- f:
