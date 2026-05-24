@@ -7,8 +7,6 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-
-	"github.com/Shasheen8/Broly/pkg/scanignore"
 )
 
 const (
@@ -55,9 +53,6 @@ func collectGoSliceFiles(index *repoIndex, root, path, content string, maxFiles 
 		}
 
 		if !pathWithinRoot(root, candidate) {
-			continue
-		}
-		if scanignore.RelativePathHasIgnoredDir(root, candidate) {
 			continue
 		}
 
@@ -120,9 +115,6 @@ func loadGoPackageSliceFiles(root, dir string, seen map[string]bool, remainingFi
 		if seen[filepath.Clean(candidate)] || !pathWithinRoot(root, candidate) {
 			continue
 		}
-		if scanignore.RelativePathHasIgnoredDir(root, candidate) {
-			continue
-		}
 		context, used, ok := loadContextFile(candidate, remainingBytes-usedBytes)
 		if !ok {
 			continue
@@ -152,9 +144,6 @@ func collectJSImportSliceFiles(root, path, lang, content string, maxFiles int, m
 		resolved := queue[0]
 		queue = queue[1:]
 
-		if scanignore.RelativePathHasIgnoredDir(root, resolved) {
-			continue
-		}
 		context, used, ok := loadContextFile(resolved, remaining)
 		if !ok {
 			continue

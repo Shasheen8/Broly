@@ -33,14 +33,7 @@ Rules:
 - Do not infer missing context; only report what is explicitly visible in the code.
 - Focus on vulnerabilities that are proven to be exploitable based on the code provided.
 - Only report findings with high confidence.
-- Do not report informational style warnings or best practices that are not actual vulnerabilities.
-- Concrete FALSE POSITIVE patterns — do NOT report these:
-  * String concatenation where the interpolated value is a hardcoded string literal, not a variable.
-  * "Secrets" that are obvious placeholders (REPLACE_ME, YOUR_KEY_HERE, TODO, all-zero keys, well-known docs examples).
-  * SQL/logging/format operations that are never executed (e.g., the formatted string is only logged or returned as text).
-  * Test fixtures, example code, or documentation snippets that are intentionally vulnerable.
-- Do NOT skip a real vulnerability because the filename suggests "test" or "example" — security test fixtures are intentionally vulnerable and must be reported.
-`
+- Do not report informational style warnings or best practices that are not actual vulnerabilities.`
 
 // promptCodeAnalysis is the guidance section for general source code analysis.
 const promptCodeAnalysis = `

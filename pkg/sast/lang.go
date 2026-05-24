@@ -53,3 +53,11 @@ func detectLangByName(name string) (string, bool) {
 
 	return "", false
 }
+
+// skipDirs are directory names that are never scanned.
+var skipDirs = map[string]bool{
+	"vendor": true, "node_modules": true, ".git": true,
+	"dist": true, "build": true, "__pycache__": true,
+	".venv": true, "venv": true, ".tox": true,
+	"target": true, ".gradle": true, "out": true,
+}

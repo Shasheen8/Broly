@@ -73,19 +73,12 @@ func (v *AIValidator) validate(ctx context.Context, f core.Finding) bool {
 func parseVerdict(resp string) bool {
 	for _, line := range strings.Split(resp, "\n") {
 		line = strings.TrimSpace(line)
-		upper := strings.ToUpper(line)
-		upper = strings.TrimPrefix(upper, "**")
-		upper = strings.TrimSuffix(upper, "**")
-		if strings.HasPrefix(upper, "VERDICT:") || strings.HasPrefix(upper, "VERDICT :") {
-			val := strings.TrimSpace(strings.TrimPrefix(upper, "VERDICT:"))
-			val = strings.TrimPrefix(val, " ")
-			val = strings.TrimSpace(strings.Trim(val, "`*"))
-			val = strings.ReplaceAll(val, " ", "_")
-			val = strings.ReplaceAll(val, "-", "_")
+		if strings.HasPrefix(strings.ToUpper(line), "VERDICT:") {
+			val := strings.TrimSpace(strings.TrimPrefix(strings.ToUpper(line), "VERDICT:"))
 			return strings.Contains(val, "TRUE_POSITIVE")
 		}
 	}
-	return true
+	return true // default: pass-through if no verdict found
 }
 
 func (v *AIValidator) filterBatch(ctx context.Context, batch []core.Finding) []core.Finding {
@@ -95,6 +88,7 @@ func (v *AIValidator) filterBatch(ctx context.Context, batch []core.Finding) []c
 	}
 	results := make([]result, len(batch))
 	var wg sync.WaitGroup
+	var resMu sync.Mutex
 	sem := make(chan struct{}, 4)
 
 	for i, f := range batch {
@@ -103,12 +97,15 @@ func (v *AIValidator) filterBatch(ctx context.Context, batch []core.Finding) []c
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
-			results[i] = result{idx: i, tp: v.validate(ctx, f)}
+			tp := v.validate(ctx, f)
+			resMu.Lock()
+			results[i] = result{idx: i, tp: tp}
+			resMu.Unlock()
 		}(i, f)
 	}
 	wg.Wait()
 
-	out := make([]core.Finding, 0, len(batch))
+	var out []core.Finding
 	for _, r := range results {
 		if r.tp {
 			out = append(out, batch[r.idx])

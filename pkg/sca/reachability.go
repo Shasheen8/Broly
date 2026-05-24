@@ -11,7 +11,6 @@ import (
 
 	"github.com/Shasheen8/Broly/pkg/ai"
 	"github.com/Shasheen8/Broly/pkg/core"
-	"github.com/Shasheen8/Broly/pkg/scanignore"
 )
 
 const reachabilityPrompt = `You are a security expert analyzing whether a vulnerable dependency is actually reachable in source code.
@@ -127,13 +126,15 @@ func findImportingFiles(pkgName string, ecosystem string, scanPaths []string) []
 				return filepath.SkipAll
 			}
 			if d.IsDir() {
-				if scanignore.IsIgnoredDirName(d.Name()) {
-					return filepath.SkipDir
-				}
 				return nil
 			}
 			if seen[path] {
 				return nil
+			}
+			for _, p := range importSkipDirs {
+				if strings.Contains(path, string(filepath.Separator)+p+string(filepath.Separator)) {
+					return nil
+				}
 			}
 			if fileContainsAny(path, patterns) {
 				seen[path] = true
@@ -144,6 +145,8 @@ func findImportingFiles(pkgName string, ecosystem string, scanPaths []string) []
 	}
 	return found
 }
+
+var importSkipDirs = []string{"vendor", "node_modules", ".git", "dist", "build", "__pycache__"}
 
 func importPatterns(pkgName, ecosystem string) []string {
 	eco := strings.ToLower(ecosystem)
