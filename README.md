@@ -27,13 +27,12 @@ Secrets · SCA · SAST · Containers · SBOM. AI-powered findings. Run locally o
 
 | Scanner | Engine | AI Layer |
 |---------|--------|----------|
-| **Secrets** | [Titus](https://github.com/praetorian-inc/titus) · 487 rules · Hyperscan | `--ai-filter-secrets` eliminates false positives |
+| **Secrets** | [Titus](https://github.com/praetorian-inc/titus) · 487 rules · Hyperscan locally (Go regex in CI) | `--ai-filter-secrets` reduces false positives |
 | **SCA** | [osv-scalibr](https://github.com/google/osv-scalibr) + [osv.dev](https://osv.dev) · 20 ecosystems | `--ai-sca-reachability` · `--package-intelligence` for hallucinated deps |
-| **SAST** | [Together AI](https://together.ai) · `Qwen/Qwen3.5-9B` · 17 regex patterns | Slice-aware multi-file · source-to-sink data flow · priority scoring |
-| **Dockerfile** | AI-powered · Dockerfile, Containerfile, Compose | Privilege escalation · secret exposure · dangerous mounts |
-| **Container** | [go-containerregistry](https://github.com/google/go-containerregistry) + [osv.dev](https://osv.dev) · pulls registry/local/tar images | OS package CVEs with layer attribution · auto-discovers `FROM` images in Dockerfiles and Compose |
-| **License** | File-based detection · 13 license types | Policy engine via `allowed_licenses` / `denied_licenses` in `.broly.yaml` |
-| **SBOM** | [osv-scalibr](https://github.com/google/osv-scalibr) · 20 ecosystems | CycloneDX 1.5 or SPDX 2.3 with PURLs |
+| **SAST** | [Together AI](https://together.ai) · `Qwen/Qwen3.5-9B` · 17 regex prefilter patterns | Slice-aware multi-file analysis · includes `Dockerfile`, `Containerfile`, and Compose files when `--sast` is enabled |
+| **Container** | [go-containerregistry](https://github.com/google/go-containerregistry) + [osv.dev](https://osv.dev) | Pulls and scans registry, local daemon, or tarball images · auto-discovers base images from Dockerfiles and Compose under scan targets |
+| **License** | File-based detection · 13 license types | Only runs when `allowed_licenses` or `denied_licenses` is set in `.broly.yaml` |
+| **SBOM** | [osv-scalibr](https://github.com/google/osv-scalibr) · 20 ecosystems | `broly sbom` · CycloneDX 1.5 or SPDX 2.3 with PURLs |
 
 ---
 
@@ -43,14 +42,16 @@ Secrets · SCA · SAST · Containers · SBOM. AI-powered findings. Run locally o
 go install github.com/Shasheen8/Broly/cmd/broly@latest
 ```
 
-Requires [Vectorscan](https://github.com/VectorCamp/vectorscan) for the secrets engine:
+For fastest local secrets scanning, install [Vectorscan](https://github.com/VectorCamp/vectorscan) (Hyperscan). Without it, Broly falls back to the Go regex engine (same rules, slower):
 
 ```bash
 brew install vectorscan                   # macOS
 sudo apt-get install -y libhyperscan-dev  # Ubuntu / Debian
 ```
 
-Or download a pre-built binary (no dependencies) from [Releases](https://github.com/Shasheen8/Broly/releases).
+The reusable GitHub workflow installs Broly with `CGO_ENABLED=0`, so CI always uses the Go regex engine.
+
+Or download a pre-built binary from [Releases](https://github.com/Shasheen8/Broly/releases).
 
 SAST and AI features require a [Together AI](https://together.ai) API key:
 
@@ -63,7 +64,7 @@ export TOGETHER_API_KEY=your_key_here
 ## Usage
 
 ```bash
-broly scan                                        # all scanners, current directory
+broly scan                                        # secrets + SCA + SAST (SAST needs TOGETHER_API_KEY)
 broly scan /path/to/project                       # specific path
 
 # Individual scanners
@@ -78,10 +79,10 @@ broly scan --package-intelligence                 # detect hallucinated/non-exis
 broly scan --ai-triage                            # verdict (TP/FP) + fix suggestion per finding
 broly scan --ai-triage --explain                  # + one-sentence attack scenario per finding
 
-# Container scanning (pulls and analyzes the image — not advisory-only)
-broly scan --container alpine:3.19                # pull and scan a registry image
-broly scan --container ./image.tar                # scan from a local tarball
-broly scan .                                      # also scans base images referenced in Dockerfile / Compose files under targets
+# Container scanning (pulls and analyzes images — full OS package/CVE pass)
+broly scan --container alpine:3.19                # explicit image: pull + scan
+broly scan --container ./image.tar              # tarball
+broly scan .                                      # default scan also walks targets for Dockerfile / Compose and pulls each referenced base image
 
 # Output
 broly scan -f json                                # JSON output
@@ -99,7 +100,7 @@ broly scan --incremental                          # skip unchanged SAST files si
 ```
 
 > [!NOTE]
-> **GitHub Actions (workflow) scanning** is not part of this CLI-focused repo. Setting `enable_workflow: true` in `.broly.yaml` makes `broly scan` exit with an error. Use the reusable workflow below or a hosted scanner if you need Actions coverage.
+> **GitHub Actions security (zizmor)** is not in this repo — no `pkg/workflow` scanner and `broly-app` does not run workflow scans either. If `enable_workflow: true` is in `.broly.yaml`, `broly scan` exits with an error (the message mentions `broly-app`; that path is not implemented here). Use a hosted Broly deployment or another tool for Actions static analysis.
 
 ---
 
@@ -111,7 +112,7 @@ Each scanner outputs an aligned table in the terminal. Supports JSON (`-f json`)
 
 ### AI Triage
 
-`--ai-triage` adds an AI verdict to each finding in the terminal table:
+`--ai-triage` adds an AI verdict in the terminal table for **SAST and SCA** findings (secrets and container findings are not triaged in the CLI orchestrator):
 
 - `TRUE_POSITIVE` or `FALSE_POSITIVE`
 - confidence score
@@ -166,16 +167,26 @@ jobs:
       ai_api_key: ${{ secrets.AI_API_KEY }}
 ```
 
-Supports `min_severity`, `scanners`, and `ai_triage` inputs. Uploads SARIF to the GitHub Security tab when configured in the workflow.
+Inputs: `min_severity`, `scanners` (`all` | `sast` | `sca` | `secrets`), and `ai_triage`. On pull requests it runs **secrets + SCA** on the full tree (and **pulls base images** referenced in Dockerfiles/Compose, same as local `broly scan`), runs **SAST** on changed code files only when `ai_api_key` is set, uploads SARIF to the GitHub Security tab, and posts a **summary PR comment** (findings table only — no fix blocks or false-positive checkboxes). Push/workflow_dispatch runs a full-repo scan with the same scanner selection rules.
 
-### Optional: `broly-app` webhook server
+### Optional: `broly-app` (local GitHub App)
 
-`cmd/broly-app` is a minimal GitHub App webhook handler for local experiments (PR scan + check run). It does **not** include the production hosted control plane (DynamoDB, baseline registry, workflow/zizmor, org-wide PR bot). For that, use Together’s deployed Broly or extend this repo yourself.
+`cmd/broly-app` is a webhook server for testing the **full PR experience** locally. It is not the production hosted service (no DynamoDB, org registry, zizmor, etc.).
+
+On each pull request it:
+
+- Clones the PR head and runs **secrets + SCA** on the repo
+- Runs **SAST** on changed code files only when `TOGETHER_API_KEY` is set (with AI triage enabled)
+- Posts a **check run** (summary + file annotations) and a **PR comment** (severity table, triage verdicts, collapsible fix suggestions, false-positive checkboxes)
+
+Checkboxes in the PR comment are handled by [`.github/workflows/feedback.yml`](.github/workflows/feedback.yml): a maintainer checks a box, and the workflow commits the fingerprint to `.broly-baseline.yaml` on the PR branch.
 
 ```bash
 APP_ID=... PRIVATE_KEY_PATH=./broly.pem WEBHOOK_SECRET=... TOGETHER_API_KEY=... \
   go run ./cmd/broly-app
 ```
+
+Use [smee.io](https://smee.io) to forward GitHub webhooks to your machine while developing.
 
 ---
 
@@ -192,9 +203,12 @@ exclude_paths:
   - vendor
   - .git
 workers: 8
-path_strip_prefix: /home/runner/work/myrepo/myrepo   # optional: normalize paths in CI output
-additional_suppressions:                            # optional: extra fingerprint suppressions
+baseline_file: .broly-baseline.yaml                  # optional: suppress / require rules
+path_strip_prefix: /home/runner/work/myrepo/myrepo   # optional: strip clone path from finding paths
+additional_suppressions:                             # optional: suppress by fingerprint
   - "abc123..."
+
+# Do not set enable_workflow: true — the CLI does not run zizmor
 
 # License policy (findings only emitted when configured)
 allowed_licenses:
