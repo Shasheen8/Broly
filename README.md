@@ -9,7 +9,7 @@
 
 ### CLI-first berserker code security scanner.
 
-Secrets · SCA · SAST · Containers · SBOM. AI-powered findings. Run locally or in CI with one binary.
+Secrets · SCA · SAST · Workflow · IaC · Containers · SBOM · Supply Chain. AI-powered findings. Run locally or in CI with one binary.
 
 <a href="https://github.com/Shasheen8/Broly/actions/workflows/ci.yml"><img src="https://github.com/Shasheen8/Broly/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
 <a href="https://github.com/Shasheen8/Broly"><img src="https://img.shields.io/badge/Go-1.26-00ADD8?style=flat&logo=go" alt="Go"></a>
@@ -32,6 +32,9 @@ Secrets · SCA · SAST · Containers · SBOM. AI-powered findings. Run locally o
 | **SAST** | [Together AI](https://together.ai) · `Qwen/Qwen3.5-9B` · 17 regex prefilter patterns | Slice-aware multi-file analysis · includes `Dockerfile`, `Containerfile`, and Compose files when `--sast` is enabled |
 | **Container** | [go-containerregistry](https://github.com/google/go-containerregistry) + [osv.dev](https://osv.dev) | Pulls and scans registry, local daemon, or tarball images · auto-discovers base images from Dockerfiles and Compose under scan targets |
 | **License** | File-based detection · 13 license types | Only runs when `allowed_licenses` or `denied_licenses` is set in `.broly.yaml` |
+| **Workflow** | [zizmor](https://docs.zizmor.sh/) · GitHub Actions static analysis | `--workflow` scans `.github/workflows/` and composite actions |
+| **IaC** | [checkov](https://www.checkov.io/) · Terraform, Kubernetes, Helm, CloudFormation | `--iac` with 1200+ mapped checks and severity alignment |
+| **Supply Chain** | [depx](https://github.com/projectdiscovery/depx) · OpenSSF malicious-package audit | `--supply-chain` flags known-malicious dependencies (never baseline-suppressible) |
 | **SBOM** | [osv-scalibr](https://github.com/google/osv-scalibr) · 20 ecosystems | `broly sbom` · CycloneDX 1.5 or SPDX 2.3 with PURLs |
 
 ---
@@ -117,7 +120,7 @@ Each scanner outputs an aligned table in the terminal. Supports JSON (`-f json`)
 
 ### AI Triage
 
-`--ai-triage` adds an AI verdict in the terminal table for **SAST and SCA** findings (secrets and container findings are not triaged in the CLI orchestrator):
+`--ai-triage` adds an AI verdict in the terminal table for **SAST, SCA, and Workflow** findings (secrets, container, and IaC findings are not triaged in the CLI orchestrator):
 
 - `TRUE_POSITIVE` or `FALSE_POSITIVE`
 - confidence score
@@ -251,10 +254,10 @@ Findings include severity (mapped from AWS Security Hub / CIS risk levels), code
 
 ### Supply Chain Audit
 
-`--supply-chain` audits dependencies against known-malicious package feeds using [depx](https://github.com/anomaly/depx). Requires the `depx` binary:
+`--supply-chain` audits dependencies against known-malicious package feeds using [depx](https://github.com/projectdiscovery/depx). Requires the `depx` binary:
 
 ```bash
-# install depx (see https://github.com/anomaly/depx)
+# install depx (see https://github.com/projectdiscovery/depx)
 ```
 
 ```bash
@@ -321,7 +324,9 @@ path_strip_prefix: /home/runner/work/myrepo/myrepo   # optional: strip clone pat
 additional_suppressions:                             # optional: suppress by fingerprint
   - "abc123..."
 
-# Do not set enable_workflow: true — the CLI does not run zizmor
+enable_workflow: false                              # optional: scan GitHub Actions workflows with zizmor
+enable_iac: false                                   # optional: scan IaC files with checkov
+supply_chain: false                                 # optional: audit deps against malicious-package feeds
 
 # License policy (findings only emitted when configured)
 allowed_licenses:
