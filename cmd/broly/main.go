@@ -595,11 +595,11 @@ func printBanner() {
 		ver = "dev"
 	}
 	banner := fmt.Sprintf(`
-    ____  ____  ____  ____  __
-   / __ )/ __ \/ __ \/ /\ \/ /
-  / __  / /_/ / / / / /  \  / 
- / /_/ / _, _/ /_/ / /___/ /  
-/_____/_/ |_|\____/_____/_/   
+ ____  ____   ___  _  __   __
+| __ )|  _ \ / _ \| | \ \ / /
+|  _ \| |_) | | | | |  \ V / 
+| |_) |  _ <| |_| | |___| |  
+|____/|_| \_\\___/|_____|_|  
 
   Berserker Vulnerability Scanner %s
   Secrets - SCA - SAST - Workflow - IaC - Supply Chain
