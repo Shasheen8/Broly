@@ -189,7 +189,7 @@ Two-stage process:
 
 1. **Falsification filter** - fast single-prompt check: does the visible code directly disprove the finding? (hardcoded safe literal, code never reaches sink, visible upstream sanitization). If `DISPROVEN: YES`, the finding is immediately downgraded to `FALSE_POSITIVE` with `AdversarialVerdict: FALSIFIED`.
 
-2. **Full adversarial verify** - if the falsification filter doesn't disprove it, an agent loop (≤3 rounds) with repo tools traces data flow across files, hunts for auth gates, framework protections, or test-only paths. Returns:
+2. **Full adversarial verify** - if the falsification filter doesn't disprove it, an agent loop (max 3 rounds) with repo tools traces data flow across files, hunts for auth gates, framework protections, or test-only paths. Returns:
    - `CONFIRMED` - an external entry point can reach the sink with real impact (finding stays `TRUE_POSITIVE`)
    - `DISPUTED` - no reachable exploit path or visible defenses neutralize it (downgraded to `FALSE_POSITIVE`)
 
