@@ -108,7 +108,7 @@ broly scan --incremental                          # skip unchanged SAST files si
 ```
 
 > [!NOTE]
-> **GitHub Actions security (zizmor)** and **IaC scanning (checkov)** require their respective binaries. Install with `pip install zizmor checkov`. The `--workflow` and `--iac` flags auto-detect whether the tools are available.
+> **GitHub Actions security (zizmor)** and **IaC scanning (checkov)** auto-install on first use. Broly creates a Python venv at `~/.cache/broly/venv/` and `pip install`s the tools automatically. If you prefer to install them yourself: `pip install zizmor checkov`. The `--workflow` and `--iac` flags use the system-installed version if available, otherwise fall back to the venv.
 
 ---
 
@@ -224,11 +224,7 @@ broly scan . --ai-triage --exploit-chains
 
 ### Workflow Scanning
 
-`--workflow` scans GitHub Actions workflows (`.github/workflows/*.yml`) and composite action manifests (`action.yml`/`action.yaml`) using [zizmor](https://docs.zizmor.sh/). It requires the `zizmor` binary to be installed:
-
-```bash
-pip install zizmor          # or: uv tool install zizmor
-```
+`--workflow` scans GitHub Actions workflows (`.github/workflows/*.yml`) and composite action manifests (`action.yml`/`action.yaml`) using [zizmor](https://docs.zizmor.sh/). If zizmor is not installed, Broly auto-installs it into `~/.cache/broly/venv/`:
 
 ```bash
 broly scan . --workflow
@@ -239,11 +235,7 @@ Findings include severity, snippet, and rule-specific remediation suggestions. R
 
 ### IaC Scanning
 
-`--iac` scans infrastructure-as-code files using [checkov](https://www.checkov.io/). Supports Terraform, Kubernetes, Helm, and CloudFormation. Requires the `checkov` binary:
-
-```bash
-pip install checkov          # or: pipx install checkov
-```
+`--iac` scans infrastructure-as-code files using [checkov](https://www.checkov.io/). Supports Terraform, Kubernetes, Helm, and CloudFormation. If checkov is not installed, Broly auto-installs it into `~/.cache/broly/venv/`:
 
 ```bash
 broly scan . --iac

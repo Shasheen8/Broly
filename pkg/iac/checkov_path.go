@@ -5,9 +5,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sync"
-)
 
-const BundledCheckovPath = "/opt/checkov/bin/checkov"
+	"github.com/Shasheen8/Broly/pkg/toolinstall"
+)
 
 var (
 	checkovOnce     sync.Once
@@ -20,8 +20,9 @@ func CheckovExecutable() string {
 			checkovResolved = path
 			return
 		}
-		if st, err := os.Stat(BundledCheckovPath); err == nil && !st.IsDir() {
-			checkovResolved = BundledCheckovPath
+		venvPath := filepath.Join(toolinstall.VenvBinDir(), "checkov")
+		if st, err := os.Stat(venvPath); err == nil && !st.IsDir() {
+			checkovResolved = venvPath
 			return
 		}
 		checkovResolved = "checkov"
@@ -30,13 +31,7 @@ func CheckovExecutable() string {
 }
 
 func CheckovAvailable() bool {
-	path := CheckovExecutable()
-	if path == "checkov" {
-		_, err := exec.LookPath("checkov")
-		return err == nil
-	}
-	st, err := os.Stat(path)
-	return err == nil && !st.IsDir()
+	return toolinstall.ToolAvailable("checkov")
 }
 
 func SetCheckovExecutableForTest(path string) func() {

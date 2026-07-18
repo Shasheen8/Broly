@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/Shasheen8/Broly/pkg/core"
+	"github.com/Shasheen8/Broly/pkg/toolinstall"
 )
 
 type WorkflowScanner struct{}
@@ -16,7 +17,11 @@ func (s *WorkflowScanner) Type() core.ScanType { return core.ScanTypeWorkflow }
 
 func (s *WorkflowScanner) Init(_ *core.Config) error {
 	if !ZizmorAvailable() {
-		return fmt.Errorf("zizmor not found — install with 'pip install zizmor' or 'uv tool install zizmor'")
+		path, err := toolinstall.EnsureTool("zizmor", "zizmor")
+		if err != nil {
+			return err
+		}
+		zizmorResolved = path
 	}
 	return nil
 }

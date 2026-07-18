@@ -5,9 +5,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sync"
-)
 
-const BundledZizmorPath = "/usr/local/bin/zizmor"
+	"github.com/Shasheen8/Broly/pkg/toolinstall"
+)
 
 var (
 	zizmorOnce     sync.Once
@@ -20,8 +20,9 @@ func ZizmorExecutable() string {
 			zizmorResolved = path
 			return
 		}
-		if st, err := os.Stat(BundledZizmorPath); err == nil && !st.IsDir() {
-			zizmorResolved = BundledZizmorPath
+		venvPath := filepath.Join(toolinstall.VenvBinDir(), "zizmor")
+		if st, err := os.Stat(venvPath); err == nil && !st.IsDir() {
+			zizmorResolved = venvPath
 			return
 		}
 		zizmorResolved = "zizmor"
@@ -30,13 +31,7 @@ func ZizmorExecutable() string {
 }
 
 func ZizmorAvailable() bool {
-	path := ZizmorExecutable()
-	if path == "zizmor" {
-		_, err := exec.LookPath("zizmor")
-		return err == nil
-	}
-	st, err := os.Stat(path)
-	return err == nil && !st.IsDir()
+	return toolinstall.ToolAvailable("zizmor")
 }
 
 func SetZizmorExecutableForTest(path string) func() {

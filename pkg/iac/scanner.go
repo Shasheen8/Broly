@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/Shasheen8/Broly/pkg/core"
+	"github.com/Shasheen8/Broly/pkg/toolinstall"
 )
 
 type IaCScanner struct{}
@@ -16,7 +17,11 @@ func (s *IaCScanner) Type() core.ScanType { return core.ScanTypeIaC }
 
 func (s *IaCScanner) Init(_ *core.Config) error {
 	if !CheckovAvailable() {
-		return fmt.Errorf("checkov not found — install with 'pip install checkov'")
+		path, err := toolinstall.EnsureTool("checkov", "checkov")
+		if err != nil {
+			return err
+		}
+		checkovResolved = path
 	}
 	return nil
 }
