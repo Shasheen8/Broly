@@ -74,8 +74,8 @@ broly scan /path/to/project                       # specific path
 broly scan --secrets                              # secrets only
 broly scan --sca                                  # SCA only
 broly scan --sast                                 # SAST only (requires TOGETHER_API_KEY)
-broly scan --workflow                             # GitHub Actions workflow scanning (requires zizmor)
-broly scan --iac                                  # IaC scanning: Terraform, K8s, Helm, CloudFormation (requires checkov)
+broly scan --workflow                             # GitHub Actions workflow scanning (auto-installs zizmor)
+broly scan --iac                                  # IaC scanning: Terraform, K8s, Helm, CloudFormation (auto-installs checkov)
 broly scan --supply-chain                         # audit deps against known-malicious package feeds (requires depx)
 
 # AI enhancements
