@@ -78,6 +78,7 @@ broly scan --ai-sca-reachability                  # check if vulnerable deps are
 broly scan --package-intelligence                 # detect hallucinated/non-existent packages
 broly scan --ai-triage                            # verdict (TP/FP) + fix suggestion per finding
 broly scan --ai-triage --explain                  # + one-sentence attack scenario per finding
+broly scan --ai-triage --adversarial              # + adversarial verify on critical SAST TPs
 
 # Container scanning (pulls and analyzes images — full OS package/CVE pass)
 broly scan --container alpine:3.19                # explicit image: pull + scan
@@ -171,6 +172,26 @@ Example difference:
 |          |                              | ' OR 1=1 -- to       |                                           |
 |          |                              | bypass login or dump |                                           |
 |          |                              | data.                |                                           |
+```
+
+### Adversarial Verification
+
+`--adversarial` adds a second AI pass on **critical SAST true positives only**. It requires `--ai-triage` (it runs after triage so it has verdicts to work with).
+
+Two-stage process:
+
+1. **Falsification filter** — fast single-prompt check: does the visible code directly disprove the finding? (hardcoded safe literal, code never reaches sink, visible upstream sanitization). If `DISPROVEN: YES`, the finding is immediately downgraded to `FALSE_POSITIVE` with `AdversarialVerdict: FALSIFIED`.
+
+2. **Full adversarial verify** — if the falsification filter doesn't disprove it, an agent loop (≤3 rounds) with repo tools traces data flow across files, hunts for auth gates, framework protections, or test-only paths. Returns:
+   - `CONFIRMED` — an external entry point can reach the sink with real impact (finding stays `TRUE_POSITIVE`)
+   - `DISPUTED` — no reachable exploit path or visible defenses neutralize it (downgraded to `FALSE_POSITIVE`)
+
+When a finding is downgraded, the verdict flips to `FALSE_POSITIVE` with `HIGH` confidence and the adversarial reason replaces the verdict reason. The table output shows `adversarial confirmed`, `adversarial disputed`, or `adversarial falsified` next to the verdict.
+
+Use:
+
+```bash
+broly scan . --sast --ai-triage --adversarial
 ```
 
 ---

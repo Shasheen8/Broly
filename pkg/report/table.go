@@ -651,6 +651,16 @@ func sastVerdictCell(f core.Finding, clr color) string {
 	if f.Confidence != "" {
 		parts = append(parts, clr.s(gray, fmt.Sprintf("(confidence: %s)", f.Confidence)))
 	}
+	if adv := strings.TrimSpace(f.AdversarialVerdict); adv != "" {
+		advColor := gray
+		switch adv {
+		case "CONFIRMED":
+			advColor = red
+		case "DISPUTED", "FALSIFIED":
+			advColor = green
+		}
+		parts = append(parts, clr.s(advColor, "adversarial "+strings.ToLower(adv)))
+	}
 	if reason := strings.TrimSpace(f.VerdictReason); reason != "" {
 		parts = append(parts, clr.s(gray, reason))
 	}

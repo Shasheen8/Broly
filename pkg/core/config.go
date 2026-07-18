@@ -1,11 +1,11 @@
 package core
 
 type Config struct {
-	Targets       []string `yaml:"targets" json:"targets"`
-	EnableSAST    bool     `yaml:"enable_sast" json:"enable_sast"`
-	EnableSCA     bool     `yaml:"enable_sca" json:"enable_sca"`
-	EnableSecrets  bool   `yaml:"enable_secrets" json:"enable_secrets"`
-	EnableWorkflow bool `yaml:"enable_workflow" json:"enable_workflow"`
+	Targets        []string `yaml:"targets" json:"targets"`
+	EnableSAST     bool     `yaml:"enable_sast" json:"enable_sast"`
+	EnableSCA      bool     `yaml:"enable_sca" json:"enable_sca"`
+	EnableSecrets  bool     `yaml:"enable_secrets" json:"enable_secrets"`
+	EnableWorkflow bool     `yaml:"enable_workflow" json:"enable_workflow"`
 
 	Workers     int   `yaml:"workers" json:"workers"`
 	MaxFileSize int64 `yaml:"max_file_size" json:"max_file_size"`
@@ -33,6 +33,7 @@ type Config struct {
 	AIFilterSecrets        bool     `yaml:"ai_filter_secrets" json:"ai_filter_secrets"`
 	AISCAReachability      bool     `yaml:"ai_sca_reachability" json:"ai_sca_reachability"`
 	AITriage               bool     `yaml:"ai_triage" json:"ai_triage"`
+	Adversarial            bool     `yaml:"adversarial" json:"adversarial"`
 	Explain                bool     `yaml:"explain" json:"explain"`
 	BaselineFile           string   `yaml:"baseline_file" json:"baseline_file"`
 	AdditionalSuppressions []string `yaml:"additional_suppressions" json:"additional_suppressions"`

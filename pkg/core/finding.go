@@ -76,20 +76,23 @@ type Finding struct {
 	LayerIndex  int    `json:"layer_index,omitempty"`
 	BaseImage   string `json:"base_image,omitempty"`
 
-	CWE         []string  `json:"cwe,omitempty"`
-	References  []string  `json:"references,omitempty"`
-	Tags        []string  `json:"tags,omitempty"`
-	Fingerprint string    `json:"fingerprint"`
-	OrgMatchKey string    `json:"org_match_key,omitempty"`
-	BaselineMatchKey string `json:"baseline_match_key,omitempty"`
-	UsageDeltaKey    string `json:"usage_delta_key,omitempty"`
-	Timestamp   time.Time `json:"timestamp"`
+	CWE              []string  `json:"cwe,omitempty"`
+	References       []string  `json:"references,omitempty"`
+	Tags             []string  `json:"tags,omitempty"`
+	Fingerprint      string    `json:"fingerprint"`
+	OrgMatchKey      string    `json:"org_match_key,omitempty"`
+	BaselineMatchKey string    `json:"baseline_match_key,omitempty"`
+	UsageDeltaKey    string    `json:"usage_delta_key,omitempty"`
+	Timestamp        time.Time `json:"timestamp"`
 
 	Verdict       string `json:"verdict,omitempty"`        // TRUE_POSITIVE, FALSE_POSITIVE, (empty = not triaged)
 	VerdictReason string `json:"verdict_reason,omitempty"` // one-sentence explanation
 	FixSuggestion string `json:"fix_suggestion,omitempty"` // minimal targeted remediation guidance
 	FixCode       string `json:"fix_code,omitempty"`       // concrete code fix snippet from LLM
 	Explanation   string `json:"explanation,omitempty"`
+
+	AdversarialVerdict string `json:"adversarial_verdict,omitempty"` // CONFIRMED, DISPUTED, FALSIFIED
+	AdversarialReason  string `json:"adversarial_reason,omitempty"`
 }
 
 // FileContext returns up to radius lines on each side of lineNum, with line numbers.
@@ -401,7 +404,7 @@ func lineBucketKeyPart(line int) string {
 	}
 	// Coarse buckets tolerate modest edits above or below the finding while
 	// Fingerprint remains the exact path/line-sensitive identity.
-	return fmt.Sprintf("%d", ((line - 1) / 20) + 1)
+	return fmt.Sprintf("%d", ((line-1)/20)+1)
 }
 
 func stableWorkflowFamily(f Finding) string {

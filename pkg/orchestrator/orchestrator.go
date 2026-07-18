@@ -143,17 +143,26 @@ func (o *Orchestrator) Run(ctx context.Context) (*core.ScanResult, error) {
 	// AI triage: verdict + fix suggestion for SAST findings.
 	// Agentic triage (repo tool use) is auto-enabled for high-severity SAST
 	// findings when a clone dir is available.
+	var triager *triage.Triager
 	if o.config.AITriage && len(findings) > 0 {
 		cloneDir := o.config.PathStripPrefix
 		if cloneDir == "" && len(o.config.Targets) > 0 {
 			cloneDir = o.config.Targets[0]
 		}
-		t := triage.New(o.config.AIModel, o.config.Explain, cloneDir)
-		if t != nil {
-			findings = t.Run(ctx, findings)
+		triager = triage.New(o.config.AIModel, o.config.Explain, cloneDir)
+		if triager != nil {
+			findings = triager.Run(ctx, findings)
 		} else {
 			core.Warnf("TOGETHER_API_KEY not set - AI triage disabled")
 		}
+	}
+
+	// Adversarial verification: two-stage falsification + agent verify on
+	// critical SAST true positives only. Opt-in via --adversarial.
+	if o.config.Adversarial && o.config.AITriage && triager != nil && len(findings) > 0 {
+		advCtx, advCancel := context.WithTimeout(ctx, 10*time.Minute)
+		defer advCancel()
+		findings = triager.RunAdversarial(advCtx, findings)
 	}
 
 	scanTypes := make([]core.ScanType, 0, len(o.scanners))
