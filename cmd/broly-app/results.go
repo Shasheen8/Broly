@@ -213,8 +213,12 @@ func buildCommentBody(result *core.ScanResult) string {
 			if f.Confidence != "" {
 				conf = " · Confidence: " + f.Confidence
 			}
-			fmt.Fprintf(&b, "| %s&nbsp;%s | %s | %s | %s | %s&nbsp;%s%s |\n",
-				icon, f.Severity, strings.ToUpper(string(f.Type)), issue, loc, vIcon, f.Verdict, conf)
+			advSuffix := ""
+			if f.Severity == core.SeverityCritical && f.AdversarialVerdict == "CONFIRMED" {
+				advSuffix = " · ⚔️ Adversarial confirmed"
+			}
+			fmt.Fprintf(&b, "| %s&nbsp;%s | %s | %s | %s | %s&nbsp;%s%s%s |\n",
+				icon, f.Severity, strings.ToUpper(string(f.Type)), issue, loc, vIcon, f.Verdict, conf, advSuffix)
 		} else {
 			fmt.Fprintf(&b, "| %s&nbsp;%s | %s | %s | %s |\n",
 				icon, f.Severity, strings.ToUpper(string(f.Type)), issue, loc)
@@ -293,6 +297,39 @@ func buildCommentBody(result *core.ScanResult) string {
 
 	if len(result.Findings) > limit {
 		fmt.Fprintf(&b, "\n> Showing top %d of %d findings.\n", limit, len(result.Findings))
+	}
+
+	// Exploit chains section.
+	if len(result.ExploitChains) > 0 {
+		b.WriteString("\n### ⛓️ Exploit Chains\n\n")
+		for _, c := range result.ExploitChains {
+			fmt.Fprintf(&b, "<details><summary>%s (%s)</summary>\n\n", c.Title, c.Severity)
+			for _, step := range c.Steps {
+				fmt.Fprintf(&b, "%s\n", step)
+			}
+			if c.Narrative != "" {
+				fmt.Fprintf(&b, "\n> %s\n", c.Narrative)
+			}
+			b.WriteString("\n</details>\n")
+		}
+	}
+
+	// Dismissed false positives (adversarial DISPUTED/FALSIFIED).
+	var dismissed []core.Finding
+	for _, f := range result.Findings {
+		if f.AdversarialVerdict == "DISPUTED" || f.AdversarialVerdict == "FALSIFIED" {
+			dismissed = append(dismissed, f)
+		}
+	}
+	if len(dismissed) > 0 {
+		b.WriteString("\n### 🟢 Dismissed by Adversarial Review\n\n")
+		for _, f := range dismissed {
+			reason := f.AdversarialReason
+			if reason == "" {
+				reason = "Adversarial review disproved exploitability."
+			}
+			fmt.Fprintf(&b, "- **%s** · %s: %s\n", f.RuleName, strings.ToLower(f.AdversarialVerdict), reason)
+		}
 	}
 
 	b.WriteString("\n> [Broly](https://github.com/Shasheen8/Broly) — Secrets · SCA · SAST · Powered by Together AI\n")

@@ -105,7 +105,7 @@ broly scan --incremental                          # skip unchanged SAST files si
 ```
 
 > [!NOTE]
-> **GitHub Actions security (zizmor)** is not in this repo — no `pkg/workflow` scanner and `broly-app` does not run workflow scans either. If `enable_workflow: true` is in `.broly.yaml`, `broly scan` exits with an error (the message mentions `broly-app`; that path is not implemented here). Use a hosted Broly deployment or another tool for Actions static analysis.
+> **GitHub Actions security (zizmor)** and **IaC scanning (checkov)** require their respective binaries. Install with `pip install zizmor checkov`. The `--workflow` and `--iac` flags auto-detect whether the tools are available.
 
 ---
 
@@ -281,13 +281,16 @@ Inputs: `min_severity`, `scanners` (`all` | `sast` | `sca` | `secrets`), and `ai
 
 ### Optional: `broly-app` (local GitHub App)
 
-`cmd/broly-app` is a webhook server for testing the **full PR experience** locally. It is not the production hosted service (no DynamoDB, org registry, zizmor, etc.).
+`cmd/broly-app` is a webhook server for testing the **full PR experience** locally. It runs the same pipeline as the CLI — agentic SAST triage, adversarial verification, exploit chains, workflow/IaC scanning, and supply-chain audit — all against a local clone.
 
 On each pull request it:
 
-- Clones the PR head and runs **secrets + SCA** on the repo
-- Runs **SAST** on changed code files only when `TOGETHER_API_KEY` is set (with AI triage enabled)
-- Posts a **check run** (summary + file annotations) and a **PR comment** (severity table, triage verdicts, collapsible fix suggestions, false-positive checkboxes)
+- Clones the PR head and runs **secrets + SCA + workflow + IaC** on the repo (auto-detected based on tool availability)
+- Runs **SAST** on changed code files only when `TOGETHER_API_KEY` is set (with agentic AI triage)
+- Runs **adversarial verification** on critical SAST true positives (CONFIRMED/DISPUTED/FALSIFIED)
+- Synthesizes **exploit chains** linking cross-scanner true positives
+- Runs **supply-chain audit** when `depx` is available
+- Posts a **check run** (summary + file annotations) and a **PR comment** (severity table, triage verdicts, adversarial status, collapsible fix suggestions, exploit chains, dismissed false positives, false-positive checkboxes)
 
 Checkboxes in the PR comment are handled by [`.github/workflows/feedback.yml`](.github/workflows/feedback.yml): a maintainer checks a box, and the workflow commits the fingerprint to `.broly-baseline.yaml` on the PR branch.
 

@@ -13,11 +13,15 @@ import (
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/google/go-github/v69/github"
 
+	"github.com/Shasheen8/Broly/pkg/ai"
+	"github.com/Shasheen8/Broly/pkg/chain"
 	"github.com/Shasheen8/Broly/pkg/core"
+	"github.com/Shasheen8/Broly/pkg/iac"
 	"github.com/Shasheen8/Broly/pkg/orchestrator"
 	"github.com/Shasheen8/Broly/pkg/sast"
 	"github.com/Shasheen8/Broly/pkg/sca"
 	"github.com/Shasheen8/Broly/pkg/secrets"
+	"github.com/Shasheen8/Broly/pkg/workflow"
 )
 
 func (a *App) scanPR(ctx context.Context, client *github.Client, req scanRequest) {
@@ -167,6 +171,23 @@ var codeExts = map[string]bool{
 	".java": true, ".rb": true, ".php": true, ".cs": true, ".rs": true,
 	".c": true, ".cpp": true, ".h": true, ".hpp": true, ".kt": true,
 	".swift": true, ".sh": true, ".bash": true,
+	// IaC + workflow files for changed-file filtering.
+	".tf": true, ".yaml": true, ".yml": true, ".json": true,
+}
+
+// isScannablePath returns true for code files plus workflow/IaC definition paths.
+func isScannablePath(filename string) bool {
+	ext := strings.ToLower(filepath.Ext(filename))
+	if codeExts[ext] {
+		return true
+	}
+	base := strings.ToLower(filepath.Base(filename))
+	switch base {
+	case "action.yml", "action.yaml", "chart.yaml", "chart.yml",
+		"values.yaml", "values.yml", "Dockerfile", "Makefile":
+		return true
+	}
+	return strings.Contains(strings.ToLower(filename), ".github/workflows/")
 }
 
 // getChangedFiles returns the list of code files changed in a PR.
@@ -184,8 +205,7 @@ func getChangedFiles(ctx context.Context, client *github.Client, req scanRequest
 
 	var changed []string
 	for _, f := range files {
-		ext := strings.ToLower(filepath.Ext(f.GetFilename()))
-		if codeExts[ext] {
+		if isScannablePath(f.GetFilename()) {
 			changed = append(changed, f.GetFilename())
 		}
 	}
@@ -198,18 +218,29 @@ func runBrolyScan(ctx context.Context, dir string, changedFiles []string) (*core
 	hasAI := os.Getenv("TOGETHER_API_KEY") != ""
 
 	cfg := &core.Config{
-		Targets:       []string{dir},
-		EnableSecrets: true,
-		EnableSCA:     true,
-		AITriage:      hasAI,
-		Explain:       hasAI,
-		Workers:       4,
-		Quiet:         true,
+		Targets:        []string{dir},
+		EnableSecrets:  true,
+		EnableSCA:      true,
+		EnableWorkflow: workflow.ZizmorAvailable(),
+		EnableIaC:      iac.CheckovAvailable(),
+		SupplyChain:    sca.DepxAvailable(),
+		AITriage:       hasAI,
+		Adversarial:    hasAI,
+		ExploitChains:  hasAI,
+		Explain:        hasAI,
+		Workers:        4,
+		Quiet:          true,
 	}
 
 	orch := orchestrator.New(cfg)
 	orch.Register(secrets.NewSecretsScanner())
 	orch.Register(sca.NewSCAScanner())
+	if cfg.EnableWorkflow {
+		orch.Register(workflow.NewWorkflowScanner())
+	}
+	if cfg.EnableIaC {
+		orch.Register(iac.NewIaCScanner())
+	}
 
 	start := time.Now()
 	result, err := orch.Run(ctx)
@@ -227,18 +258,32 @@ func runBrolyScan(ctx context.Context, dir string, changedFiles []string) (*core
 			}
 		}
 		sastCfg := &core.Config{
-			Targets:    sastTargets,
-			EnableSAST: true,
-			AITriage:   true,
-			Explain:    true,
-			Workers:    4,
-			Quiet:      true,
+			Targets:       sastTargets,
+			EnableSAST:    true,
+			AITriage:      true,
+			Adversarial:   true,
+			ExploitChains: false, // chains run on combined findings below
+			Explain:       true,
+			Workers:       4,
+			Quiet:         true,
 		}
 		sastOrch := orchestrator.New(sastCfg)
 		sastOrch.Register(sast.NewSASTScanner())
 		sastResult, err := sastOrch.Run(ctx)
 		if err == nil {
 			result.Findings = append(result.Findings, sastResult.Findings...)
+		}
+	}
+
+	// Exploit chains: link cross-scanner true positives on the combined set.
+	if hasAI && len(result.Findings) >= 2 {
+		client, ok := ai.New("")
+		if ok {
+			chainCtx, chainCancel := context.WithTimeout(ctx, 5*time.Minute)
+			defer chainCancel()
+			chains, findings := chain.BuildExploitChains(chainCtx, client, result.Findings)
+			result.Findings = findings
+			result.ExploitChains = chains
 		}
 	}
 
@@ -260,8 +305,7 @@ func getCommitFiles(ctx context.Context, client *github.Client, req scanRequest)
 
 	var changed []string
 	for _, f := range commit.Files {
-		ext := strings.ToLower(filepath.Ext(f.GetFilename()))
-		if codeExts[ext] {
+		if isScannablePath(f.GetFilename()) {
 			changed = append(changed, f.GetFilename())
 		}
 	}
