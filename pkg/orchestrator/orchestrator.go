@@ -141,8 +141,14 @@ func (o *Orchestrator) Run(ctx context.Context) (*core.ScanResult, error) {
 	findings, additionalSuppressed = suppressByFingerprint(findings, o.config.AdditionalSuppressions)
 
 	// AI triage: verdict + fix suggestion for SAST findings.
+	// Agentic triage (repo tool use) is auto-enabled for high-severity SAST
+	// findings when a clone dir is available.
 	if o.config.AITriage && len(findings) > 0 {
-		t := triage.New(o.config.AIModel, o.config.Explain, o.config.PathStripPrefix)
+		cloneDir := o.config.PathStripPrefix
+		if cloneDir == "" && len(o.config.Targets) > 0 {
+			cloneDir = o.config.Targets[0]
+		}
+		t := triage.New(o.config.AIModel, o.config.Explain, cloneDir)
 		if t != nil {
 			findings = t.Run(ctx, findings)
 		} else {

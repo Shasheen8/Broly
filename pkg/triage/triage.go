@@ -4,34 +4,35 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
-	"path/filepath"
 	"strings"
 	"sync"
 
 	"github.com/Shasheen8/Broly/pkg/ai"
 	"github.com/Shasheen8/Broly/pkg/core"
+	"github.com/Shasheen8/Broly/pkg/reposearch"
+	"github.com/Shasheen8/Broly/pkg/scanignore"
 )
 
 const (
-	promptVersionSAST             = "sast-v1"
-	promptVersionSASTExplain      = "sast-explain-v1"
-	promptVersionWorkflow         = "workflow-v1"
-	promptVersionWorkflowExplain  = "workflow-explain-v1"
-	promptVersionSCA              = "sca-v1"
-	promptVersionSCAExplain       = "sca-explain-v1"
-	promptVersionContainer        = "container-v1"
-	promptVersionContainerExplain = "container-explain-v1"
+	promptVersionSAST             = "sast-v2"
+	promptVersionSASTExplain      = "sast-explain-v2"
+	promptVersionWorkflow         = "workflow-v2"
+	promptVersionWorkflowExplain  = "workflow-explain-v2"
+	promptVersionSCA              = "sca-v2"
+	promptVersionSCAExplain       = "sca-explain-v2"
+	promptVersionContainer        = "container-v2"
+	promptVersionContainerExplain = "container-explain-v2"
 )
 
 func safeAbsPath(cloneDir, relPath string) string {
 	if cloneDir == "" {
 		return relPath
 	}
-	joined := filepath.Join(cloneDir, relPath)
-	if !strings.HasPrefix(joined, cloneDir+string(filepath.Separator)) && joined != cloneDir {
+	abs, err := reposearch.ResolveAbsPath(cloneDir, relPath)
+	if err != nil {
 		return ""
 	}
-	return joined
+	return abs
 }
 
 // vulnExample holds a BAD/GOOD code pair for a vulnerability class.
@@ -136,7 +137,7 @@ func pickBadGoodExample(f *core.Finding) string {
 }
 
 // buildSASTTriagePrompt constructs the triage prompt for SAST/secrets/dockerfile findings.
-func buildSASTTriagePrompt(f *core.Finding, codeCtx string, explain bool) string {
+func buildSASTTriagePrompt(f *core.Finding, codeCtx string, explain bool, agentic bool, orgReasons []string) string {
 	var sb strings.Builder
 
 	sb.WriteString("You are a security expert triaging a code vulnerability finding.\n\n")
@@ -155,17 +156,28 @@ func buildSASTTriagePrompt(f *core.Finding, codeCtx string, explain bool) string
 	if example := pickBadGoodExample(f); example != "" {
 		sb.WriteString(example)
 	}
+	appendOrgFPReasonContext(&sb, orgReasons)
 
 	sb.WriteString(`
 Triage rules — read carefully:
 - Default verdict is TRUE_POSITIVE. Only emit FALSE_POSITIVE when the visible code is provably safe.
 - A FALSE_POSITIVE verdict requires HIGH confidence backed by concrete visible-code evidence. If you would mark FALSE_POSITIVE with LOW or MEDIUM confidence, mark TRUE_POSITIVE instead — uncertainty is not enough to dismiss a flagged vulnerability.
-- Treat any function parameter, request value, environment variable, or external input as attacker-controllable unless the visible code sanitizes it before reaching the sink.
-- Do NOT FP based on filename or directory (e.g. "test.py", "examples/", "fixtures/"). Security-test fixtures are intentionally vulnerable and must be reported.
-- Do NOT FP because the function isn't called from an obvious entry point in the visible slice — cross-file reachability is not visible to you.
+- Treat any function parameter, request value, environment variable, or external input as attacker-controllable unless the visible code sanitizes it before reaching the sink.`)
+
+	if agentic {
+		sb.WriteString(`
+- Use repo tools to trace cross-file data flow before deciding. Do not guess about code you have not read.`)
+	} else {
+		sb.WriteString(`
+- Do NOT FP because the function isn't called from an obvious entry point in the visible slice — cross-file reachability is not visible to you.`)
+	}
+
+	sb.WriteString(`
+- Test-only paths (tests/, __tests__/, *.test.ts, *_test.go, fixtures/, mocks/): for credential-like findings (apiKey, token, refresh_token, mock hosts), default FALSE_POSITIVE when the literal clearly indicates a mock (contains test/mock/example/fake/from-disk, sk-test-*, or similar). Do not mark production config under src/ as FP just because the variable name says "token".
+- Intentional vulnerable fixtures in security regression repos are still TRUE_POSITIVE — but ordinary unit tests with sk-test-mock-key style values are FALSE_POSITIVE.
 - Concrete FP patterns (these ARE false positives):
   * The value being interpolated/concatenated is a hardcoded string literal, not a variable.
-  * The "secret" is an obvious placeholder (e.g., "REPLACE_ME", "TODO", all-zero key, well-known docs example used to demo the API).
+  * The "secret" is an obvious placeholder (e.g., "REPLACE_ME", "refresh-login-test", "sk-codex-apikey-from-disk", all-zero key).
   * The detected operation is not actually a sink (e.g., the SQL string is logged or returned as text but never executed).
 
 Fix guidance constraints:
@@ -177,7 +189,8 @@ Fix guidance constraints:
 Respond with exactly:
 VERDICT: TRUE_POSITIVE or FALSE_POSITIVE
 CONFIDENCE: HIGH or MEDIUM or LOW
-REASON: One sentence.`)
+REASON: One sentence.
+FP_REASON: Required one sentence when verdict is FALSE_POSITIVE (may repeat REASON).`)
 
 	if explain {
 		sb.WriteString("\nEXPLANATION: One sentence. Concrete attack vector and real-world impact specific to this code — not generic advice.")
@@ -188,7 +201,7 @@ REASON: One sentence.`)
 	return sb.String()
 }
 
-func buildWorkflowTriagePrompt(f *core.Finding, codeCtx string, explain bool) string {
+func buildWorkflowTriagePrompt(f *core.Finding, codeCtx string, explain bool, orgReasons []string) string {
 	var sb strings.Builder
 
 	sb.WriteString("You are a security expert triaging a GitHub Actions workflow finding from zizmor.\n\n")
@@ -211,6 +224,8 @@ func buildWorkflowTriagePrompt(f *core.Finding, codeCtx string, explain bool) st
 		sb.WriteString("\n```\n")
 	}
 
+	appendOrgFPReasonContext(&sb, orgReasons)
+
 	sb.WriteString(`
 Triage rules:
 - These findings come from static GitHub Actions analysis. Default to TRUE_POSITIVE unless the visible YAML clearly shows the flagged issue is already remediated.
@@ -226,7 +241,8 @@ Fix guidance constraints:
 Respond with exactly:
 VERDICT: TRUE_POSITIVE or FALSE_POSITIVE
 CONFIDENCE: HIGH or MEDIUM or LOW
-REASON: One sentence.`)
+REASON: One sentence.
+FP_REASON: Required one sentence when verdict is FALSE_POSITIVE (may repeat REASON).`)
 
 	if explain {
 		sb.WriteString("\nEXPLANATION: One sentence. Concrete abuse scenario for this workflow misconfiguration.")
@@ -238,17 +254,25 @@ REASON: One sentence.`)
 }
 
 type Triager struct {
-	client   *ai.Client
-	explain  bool
-	cloneDir string
+	client       *ai.Client
+	explain      bool
+	cloneDir     string
+	orgFPReasons OrgFPReasonLookup
+	repoOnce     sync.Once
+	repo         *reposearch.Repo
+	repoErr      error
 }
 
-func New(model string, explain bool, cloneDir string) *Triager {
+func New(model string, explain bool, cloneDir string, orgFPReasons ...OrgFPReasonLookup) *Triager {
 	c, ok := ai.New(model)
 	if !ok {
 		return nil
 	}
-	return &Triager{client: c, explain: explain, cloneDir: cloneDir}
+	t := &Triager{client: c, explain: explain, cloneDir: cloneDir}
+	if len(orgFPReasons) > 0 {
+		t.orgFPReasons = orgFPReasons[0]
+	}
+	return t
 }
 
 func (t *Triager) ModelName() string {
@@ -262,24 +286,27 @@ func (t *Triager) PromptVersion(f core.Finding) string {
 	if t == nil {
 		return ""
 	}
-	return PromptVersion(f, t.explain)
+	return PromptVersion(f, t.explain, t.cloneDir)
 }
 
 func (t *Triager) PromptHash(f core.Finding) string {
 	if t == nil {
 		return ""
 	}
-	prompt := promptForFinding(&f, t.explain, t.cloneDir)
+	prompt := promptForFindingAgentic(&f, t.explain, t.cloneDir, orgFPReasonsForFinding(&f, t.orgFPReasons))
 	sum := sha256.Sum256([]byte(prompt))
 	return fmt.Sprintf("%x", sum[:])
 }
 
 func (t *Triager) Run(ctx context.Context, findings []core.Finding) []core.Finding {
-	out := make([]core.Finding, len(findings))
-	copy(out, findings)
+	out := append([]core.Finding(nil), findings...)
+	repo, repoErr := t.openRepo()
+	if repoErr != nil && t.cloneDir != "" {
+		core.Warnf("repo search unavailable for agentic triage: %v", repoErr)
+	}
 
 	var wg sync.WaitGroup
-	sem := make(chan struct{}, 4)
+	sem := make(chan struct{}, 2)
 
 	for i := range out {
 		if !Eligible(out[i]) {
@@ -290,7 +317,7 @@ func (t *Triager) Run(ctx context.Context, findings []core.Finding) []core.Findi
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
-			verdict, confidence, reason, explanation, recommendation, codeFix := triageFinding(ctx, t.client, &out[i], t.explain, t.cloneDir)
+			verdict, confidence, reason, explanation, recommendation, codeFix := t.triageFinding(ctx, &out[i], repo)
 			out[i].Verdict = verdict
 			out[i].Confidence = confidence
 			out[i].VerdictReason = reason
@@ -305,7 +332,13 @@ func (t *Triager) Run(ctx context.Context, findings []core.Finding) []core.Findi
 	return out
 }
 
-func PromptVersion(f core.Finding, explain bool) string {
+func PromptVersion(f core.Finding, explain bool, cloneDir string) string {
+	if AgenticEligible(&f, cloneDir) {
+		if explain {
+			return promptVersionSASTAgenticExplain
+		}
+		return promptVersionSASTAgentic
+	}
 	switch f.Type {
 	case core.ScanTypeContainer:
 		if explain {
@@ -330,21 +363,21 @@ func PromptVersion(f core.Finding, explain bool) string {
 	}
 }
 
-func promptForFinding(f *core.Finding, explain bool, cloneDir string) string {
+func promptForFinding(f *core.Finding, explain bool, cloneDir string, orgReasons []string) string {
 	var prompt string
 
 	switch f.Type {
 	case core.ScanTypeContainer:
-		prompt = buildContainerPrompt(f, explain)
+		prompt = buildContainerPrompt(f, explain, orgReasons)
 	case core.ScanTypeSCA:
-		prompt = buildSCAPrompt(f, explain)
+		prompt = buildSCAPrompt(f, explain, orgReasons)
 	case core.ScanTypeWorkflow:
 		var codeCtx string
 		absPath := safeAbsPath(cloneDir, f.FilePath)
 		if absPath != "" {
 			codeCtx = core.FileContext(absPath, f.StartLine, 12)
 		}
-		prompt = buildWorkflowTriagePrompt(f, codeCtx, explain)
+		prompt = buildWorkflowTriagePrompt(f, codeCtx, explain, orgReasons)
 	default:
 		var codeCtx string
 		absPath := safeAbsPath(cloneDir, f.FilePath)
@@ -359,32 +392,35 @@ func promptForFinding(f *core.Finding, explain bool, cloneDir string) string {
 				codeCtx = core.FileContext(absPath, f.StartLine, 8)
 			}
 		}
-		prompt = buildSASTTriagePrompt(f, codeCtx, explain)
+		prompt = buildSASTTriagePrompt(f, codeCtx, explain, false, orgReasons)
 	}
 	return prompt
 }
 
-func triageFinding(ctx context.Context, client *ai.Client, f *core.Finding, explain bool, cloneDir string) (verdict, confidence, reason, explanation, recommendation, codeFix string) {
-	prompt := promptForFinding(f, explain, cloneDir)
-	resp, err := client.Complete(ctx, prompt, 4096)
+func (t *Triager) triageFinding(ctx context.Context, f *core.Finding, repo *reposearch.Repo) (verdict, confidence, reason, explanation, recommendation, codeFix string) {
+	if v, c, r, ok := autoTestCredentialVerdict(f, t.cloneDir); ok {
+		return v, c, r, "", "", "N/A"
+	}
+	orgReasons := orgFPReasonsForFinding(f, t.orgFPReasons)
+	prompt := promptForFindingAgentic(f, t.explain, t.cloneDir, orgReasons)
+	resp, err := completeWithOptionalAgent(ctx, t.client, prompt, 4096, f, t.cloneDir, repo)
 	if err != nil {
 		return "", "", "AI triage unavailable: " + err.Error(), "", "", ""
 	}
 
 	verdict, confidence, reason, explanation, recommendation, codeFix = parseTriageResponse(resp)
+	reason = finalizeFalsePositiveReason(verdict, reason)
 
-	// Deterministic prefilter regex matches have a near-zero FP rate by
-	// construction. Don't let an AI verdict that isn't HIGH-confidence flip a
-	// genuine critical to FALSE_POSITIVE — require strong evidence to override.
 	if strings.HasPrefix(f.RuleID, "broly.prefilter.") &&
-		verdict == "FALSE_POSITIVE" && confidence != "HIGH" {
+		verdict == "FALSE_POSITIVE" && confidence != "HIGH" &&
+		!(scanignore.IsTestFile(f.FilePath) && isCredentialFinding(f)) {
 		verdict = "TRUE_POSITIVE"
-		reason = "Deterministic regex match; AI triage lacked HIGH-confidence evidence to override. " + reason
+		reason = SanitizeFPReasonText("Deterministic regex match; AI triage lacked HIGH-confidence evidence to override. " + reason)
 	}
 	return verdict, confidence, reason, explanation, recommendation, codeFix
 }
 
-func buildContainerPrompt(f *core.Finding, explain bool) string {
+func buildContainerPrompt(f *core.Finding, explain bool, orgReasons []string) string {
 	fixInfo := "Fixed in: " + f.FixedVersion
 	if f.FixedVersion == "" {
 		fixInfo = "No patched version available."
@@ -395,6 +431,9 @@ func buildContainerPrompt(f *core.Finding, explain bool) string {
 		explainLine = "\nEXPLANATION: One sentence. Concrete attack scenario specific to this package vulnerability."
 	}
 
+	var orgContext strings.Builder
+	appendOrgFPReasonContext(&orgContext, orgReasons)
+
 	return fmt.Sprintf(`You are a security expert triaging a container image vulnerability.
 
 Vulnerability: %s
@@ -403,7 +442,7 @@ Ecosystem:     %s
 Severity:      %s
 Description:   %s
 CVE:           %s
-%s
+%s%s
 
 Triage rules:
 - Default verdict is TRUE_POSITIVE. A vulnerable package in a container image is a real risk even if the vulnerable code path is not obviously called from the app — runtime dependencies, init scripts, or transitive calls may reach it.
@@ -413,7 +452,8 @@ Triage rules:
 Respond with exactly:
 VERDICT: TRUE_POSITIVE or FALSE_POSITIVE
 CONFIDENCE: HIGH or MEDIUM or LOW
-REASON: One sentence.%s
+REASON: One sentence.
+FP_REASON: Required one sentence when verdict is FALSE_POSITIVE (may repeat REASON).%s
 FIX:
 <mitigation or upgrade command, or N/A if false positive>`,
 		f.RuleID,
@@ -423,11 +463,12 @@ FIX:
 		f.Description,
 		f.CVE,
 		fixInfo,
+		orgContext.String(),
 		explainLine,
 	)
 }
 
-func buildSCAPrompt(f *core.Finding, explain bool) string {
+func buildSCAPrompt(f *core.Finding, explain bool, orgReasons []string) string {
 	fixInfo := "Fixed in: " + f.FixedVersion
 	if f.FixedVersion == "" {
 		fixInfo = "No patched version available."
@@ -438,6 +479,9 @@ func buildSCAPrompt(f *core.Finding, explain bool) string {
 		explainLine = "\nEXPLANATION: One sentence. Concrete attack scenario for this dependency vulnerability."
 	}
 
+	var orgContext strings.Builder
+	appendOrgFPReasonContext(&orgContext, orgReasons)
+
 	return fmt.Sprintf(`You are a security expert triaging a dependency vulnerability in a software project.
 
 Vulnerability: %s
@@ -447,7 +491,7 @@ Severity:      %s
 Description:   %s
 CVE:           %s
 Lockfile:      %s
-%s
+%s%s
 
 Triage rules:
 - Default verdict is TRUE_POSITIVE. A vulnerable dependency is a real risk unless you have HIGH-confidence evidence that the vulnerable function is unreachable.
@@ -457,7 +501,8 @@ Triage rules:
 Respond with exactly:
 VERDICT: TRUE_POSITIVE or FALSE_POSITIVE
 CONFIDENCE: HIGH or MEDIUM or LOW
-REASON: One sentence.%s
+REASON: One sentence.
+FP_REASON: Required one sentence when verdict is FALSE_POSITIVE (may repeat REASON).%s
 FIX:
 <upgrade command or workaround, or N/A if false positive>`,
 		f.RuleID,
@@ -468,12 +513,14 @@ FIX:
 		f.CVE,
 		f.FilePath,
 		fixInfo,
+		orgContext.String(),
 		explainLine,
 	)
 }
 
 func parseTriageResponse(resp string) (verdict, confidence, reason, explanation, recommendation, codeFix string) {
 	var fixLines []string
+	var fpReason string
 	inCodeFix := false
 	sawCodeFix := false
 
@@ -507,6 +554,11 @@ func parseTriageResponse(resp string) (verdict, confidence, reason, explanation,
 		}
 		if hasLabel && label == "REASON" {
 			reason = val
+			inCodeFix = false
+			continue
+		}
+		if hasLabel && label == "FP_REASON" {
+			fpReason = val
 			inCodeFix = false
 			continue
 		}
@@ -566,10 +618,10 @@ func parseTriageResponse(resp string) (verdict, confidence, reason, explanation,
 
 	if sawCodeFix {
 		codeFix = strings.Join(fixLines, "\n")
-		return verdict, confidence, reason, explanation, recommendation, codeFix
+		return verdict, confidence, mergeParsedReason(reason, fpReason), explanation, recommendation, codeFix
 	}
 	recommendation = strings.Join(fixLines, "\n")
-	return verdict, confidence, reason, explanation, recommendation, ""
+	return verdict, confidence, mergeParsedReason(reason, fpReason), explanation, recommendation, ""
 }
 
 func triageLabelValue(line string) (label, value string, ok bool) {
