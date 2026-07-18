@@ -608,8 +608,8 @@ func printBanner() {
 
   Berserker Vulnerability Scanner %s
   Secrets - SCA - SAST - Workflow - IaC - Supply Chain
-  Powered by Together AI
-`, ver)
+  Powered by Together AI (%s)
+`, ver, ai.DefaultModel)
 	fmt.Fprint(os.Stderr, banner)
 }
 
