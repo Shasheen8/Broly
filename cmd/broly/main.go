@@ -68,6 +68,7 @@ QUICK START
   broly scan . --workflow --iac          # IaC + workflow scanning
   broly scan . --ai-triage --adversarial  # Full adversarial pipeline
   broly sbom                              # Generate CycloneDX SBOM
+  broly update                            # Update to latest version
 
 Built in Go for speed. Designed for local developer runs and CI.`,
 		SilenceUsage:  true,
@@ -78,6 +79,7 @@ Built in Go for speed. Designed for local developer runs and CI.`,
 	root.AddCommand(sbomCmd())
 	root.AddCommand(versionCmd())
 	root.AddCommand(validateCmd())
+	root.AddCommand(updateCmd())
 
 	if err := root.Execute(); err != nil {
 		if lines := completionMessage(err); len(lines) > 0 {
