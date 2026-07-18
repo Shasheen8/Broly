@@ -90,6 +90,7 @@ func scanCmd() *cobra.Command {
 		aiSCAReachability   bool
 		aiTriage            bool
 		adversarial         bool
+		exploitChains       bool
 		explain             bool
 		baselineFile        string
 		incremental         bool
@@ -187,6 +188,9 @@ By default secrets, SCA, and SAST are enabled and the current directory is scann
 			if f.Changed("adversarial") {
 				cfg.Adversarial = adversarial
 			}
+			if f.Changed("exploit-chains") {
+				cfg.ExploitChains = exploitChains
+			}
 			if f.Changed("explain") {
 				cfg.Explain = explain
 			}
@@ -212,6 +216,9 @@ By default secrets, SCA, and SAST are enabled and the current directory is scann
 
 			if cfg.Adversarial && !cfg.AITriage {
 				return fmt.Errorf("--adversarial requires --ai-triage")
+			}
+			if cfg.ExploitChains && !cfg.AITriage {
+				return fmt.Errorf("--exploit-chains requires --ai-triage")
 			}
 
 			finalizeScannerSelection(
@@ -250,6 +257,7 @@ By default secrets, SCA, and SAST are enabled and the current directory is scann
 	flags.BoolVar(&aiSCAReachability, "ai-sca-reachability", false, "Use AI to analyze reachability of vulnerable dependencies (requires TOGETHER_API_KEY)")
 	flags.BoolVar(&aiTriage, "ai-triage", false, "Use AI to triage findings: TRUE/FALSE positive verdict + fix suggestion (requires TOGETHER_API_KEY)")
 	flags.BoolVar(&adversarial, "adversarial", false, "Run adversarial verification on critical SAST true positives (requires --ai-triage)")
+	flags.BoolVar(&exploitChains, "exploit-chains", false, "Synthesize exploit chains linking cross-scanner true positives (requires --ai-triage)")
 	flags.BoolVar(&explain, "explain", false, "Add a plain-language attack scenario per finding (use with --ai-triage)")
 	flags.BoolVarP(&quiet, "quiet", "q", false, "Suppress progress output while keeping warnings visible")
 	flags.StringVar(&baselineFile, "baseline", "", "Baseline file for suppress/require rules")

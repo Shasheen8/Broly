@@ -79,6 +79,7 @@ broly scan --package-intelligence                 # detect hallucinated/non-exis
 broly scan --ai-triage                            # verdict (TP/FP) + fix suggestion per finding
 broly scan --ai-triage --explain                  # + one-sentence attack scenario per finding
 broly scan --ai-triage --adversarial              # + adversarial verify on critical SAST TPs
+broly scan --ai-triage --exploit-chains           # + exploit chains linking cross-scanner TPs
 
 # Container scanning (pulls and analyzes images — full OS package/CVE pass)
 broly scan --container alpine:3.19                # explicit image: pull + scan
@@ -192,6 +193,27 @@ Use:
 
 ```bash
 broly scan . --sast --ai-triage --adversarial
+```
+
+### Exploit Chains
+
+`--exploit-chains` synthesizes multi-step attack narratives by linking 2-4 cross-scanner true positives. It requires `--ai-triage` (it builds on triage verdicts).
+
+Eligibility: at least 2 high-confidence `TRUE_POSITIVE` findings (or adversarial-confirmed) from **different scanner types** — SAST plus SCA, Secrets, Container, or Workflow. Known malicious packages are always eligible.
+
+The LLM is prompted with the eligible findings (capped at 30 by severity/priority) and returns up to 4 chains. Each chain is validated:
+
+- Fingerprints must resolve to real findings (by fingerprint, rule ID, or prompt index)
+- No invented files, lines, or packages
+- Severity capped at the highest linked finding's severity
+- No overlapping chains (each finding appears in at most one chain)
+
+Findings in a chain get `ChainID` and `ChainedFrom` fields. Chains appear in JSON/SARIF output and in the terminal table as a `Exploit Chains` section with title, severity, steps, and narrative.
+
+Use:
+
+```bash
+broly scan . --ai-triage --exploit-chains
 ```
 
 ---

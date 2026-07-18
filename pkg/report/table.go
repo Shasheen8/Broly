@@ -102,6 +102,7 @@ func (f *TableFormatter) Format(w io.Writer, result *core.ScanResult) error {
 	}
 
 	printSummary(w, clr, result)
+	printExploitChains(w, clr, result)
 	return nil
 }
 
@@ -574,6 +575,49 @@ func printSummary(w io.Writer, clr color, result *core.ScanResult) {
 	}
 	summaryLine(w, clr, "")
 	fmt.Fprintf(w, "  %s\n\n", clr.s(cyan, "╚══════════════════════════════════════════════════════╝"))
+}
+
+func printExploitChains(w io.Writer, clr color, result *core.ScanResult) {
+	if len(result.ExploitChains) == 0 {
+		return
+	}
+	fmt.Fprintf(w, "\n  %s %s\n\n",
+		clr.s(bold+red, "⛓  Exploit Chains"),
+		clr.s(gray, fmt.Sprintf("(%d chain%s)", len(result.ExploitChains), plural(len(result.ExploitChains)))),
+	)
+	for i, c := range result.ExploitChains {
+		sevColor := chainSeverityColor(c.Severity, clr)
+		fmt.Fprintf(w, "  %s  %s\n",
+			clr.s(bold, fmt.Sprintf("#%d", i+1)),
+			clr.s(bold+sevColor, c.Title),
+		)
+		fmt.Fprintf(w, "       %s  %s\n",
+			clr.s(gray, "severity:"),
+			clr.s(sevColor, c.Severity.String()),
+		)
+		for _, step := range c.Steps {
+			fmt.Fprintf(w, "       %s %s\n", clr.s(dim+cyan, "→"), clr.s(white, step))
+		}
+		if c.Narrative != "" {
+			fmt.Fprintf(w, "       %s %s\n", clr.s(gray, "narrative:"), clr.s(gray, c.Narrative))
+		}
+		fmt.Fprintln(w)
+	}
+}
+
+func chainSeverityColor(sev core.Severity, clr color) string {
+	switch sev {
+	case core.SeverityCritical:
+		return bold + brightRed
+	case core.SeverityHigh:
+		return bold + orange
+	case core.SeverityMedium:
+		return bold + yellow
+	case core.SeverityLow:
+		return bold + blue
+	default:
+		return gray
+	}
 }
 
 func formatLocation(f core.Finding) string {

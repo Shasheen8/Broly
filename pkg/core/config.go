@@ -34,6 +34,7 @@ type Config struct {
 	AISCAReachability      bool     `yaml:"ai_sca_reachability" json:"ai_sca_reachability"`
 	AITriage               bool     `yaml:"ai_triage" json:"ai_triage"`
 	Adversarial            bool     `yaml:"adversarial" json:"adversarial"`
+	ExploitChains          bool     `yaml:"exploit_chains" json:"exploit_chains"`
 	Explain                bool     `yaml:"explain" json:"explain"`
 	BaselineFile           string   `yaml:"baseline_file" json:"baseline_file"`
 	AdditionalSuppressions []string `yaml:"additional_suppressions" json:"additional_suppressions"`

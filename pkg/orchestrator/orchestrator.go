@@ -8,7 +8,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Shasheen8/Broly/pkg/ai"
 	"github.com/Shasheen8/Broly/pkg/baseline"
+	"github.com/Shasheen8/Broly/pkg/chain"
 	"github.com/Shasheen8/Broly/pkg/core"
 	"github.com/Shasheen8/Broly/pkg/suppress"
 	"github.com/Shasheen8/Broly/pkg/triage"
@@ -165,6 +167,18 @@ func (o *Orchestrator) Run(ctx context.Context) (*core.ScanResult, error) {
 		findings = triager.RunAdversarial(advCtx, findings)
 	}
 
+	// Exploit chain synthesis: LLM links 2-4 cross-scanner true positives
+	// into multi-step attack narratives. Opt-in via --exploit-chains.
+	var exploitChains []core.ExploitChain
+	if o.config.ExploitChains && o.config.AITriage && len(findings) > 0 {
+		client, ok := ai.New(o.config.AIModel)
+		if !ok {
+			core.Warnf("TOGETHER_API_KEY not set - exploit chains disabled")
+		} else {
+			exploitChains, findings = chain.BuildExploitChains(ctx, client, findings)
+		}
+	}
+
 	scanTypes := make([]core.ScanType, 0, len(o.scanners))
 	typeSet := make(map[core.ScanType]bool)
 	for _, s := range o.scanners {
@@ -176,6 +190,7 @@ func (o *Orchestrator) Run(ctx context.Context) (*core.ScanResult, error) {
 
 	return &core.ScanResult{
 		Findings:        findings,
+		ExploitChains:   exploitChains,
 		ScanTypes:       scanTypes,
 		Metrics:         core.ScanMetrics{FindingsCount: len(findings), ScannerDurations: scannerDurations},
 		SuppressedCount: inlineSuppressed + baselineSuppressed + additionalSuppressed,

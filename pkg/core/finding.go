@@ -93,6 +93,9 @@ type Finding struct {
 
 	AdversarialVerdict string `json:"adversarial_verdict,omitempty"` // CONFIRMED, DISPUTED, FALSIFIED
 	AdversarialReason  string `json:"adversarial_reason,omitempty"`
+
+	ChainID     string   `json:"chain_id,omitempty"`
+	ChainedFrom []string `json:"chained_from,omitempty"`
 }
 
 // FileContext returns up to radius lines on each side of lineNum, with line numbers.
@@ -441,8 +444,23 @@ func stableSASTFamily(f Finding) string {
 	return strings.ToLower(strings.TrimSpace(f.Severity.String()))
 }
 
+func (f Finding) IsMaliciousPackage() bool {
+	return strings.HasPrefix(f.RuleID, "sca.malicious.")
+}
+
+type ExploitChain struct {
+	ID           string   `json:"id"`
+	Title        string   `json:"title"`
+	Fingerprints []string `json:"fingerprints"`
+	Steps        []string `json:"steps"`
+	Narrative    string   `json:"narrative"`
+	Severity     Severity `json:"severity"`
+	Derived      bool     `json:"derived_severity"`
+}
+
 type ScanResult struct {
 	Findings        []Finding        `json:"findings"`
+	ExploitChains   []ExploitChain   `json:"exploit_chains,omitempty"`
 	Metrics         ScanMetrics      `json:"metrics"`
 	Duration        time.Duration    `json:"duration_ns"`
 	ScanTypes       []ScanType       `json:"scan_types"`
