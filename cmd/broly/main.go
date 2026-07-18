@@ -548,13 +548,21 @@ func sbomCmd() *cobra.Command {
 }
 
 func versionCmd() *cobra.Command {
-	return &cobra.Command{
+	var short bool
+	cmd := &cobra.Command{
 		Use:   "version",
 		Short: "Print version information",
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Println(formatVersionInfo(currentVersionInfo()))
+			info := currentVersionInfo()
+			if short {
+				fmt.Println(info.Version)
+				return
+			}
+			fmt.Println(formatVersionInfo(info))
 		},
 	}
+	cmd.Flags().BoolVar(&short, "short", false, "Print only the version string")
+	return cmd
 }
 
 func validateCmd() *cobra.Command {
