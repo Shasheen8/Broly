@@ -53,18 +53,24 @@ jobs:
       - name: Bump version and push tag
         run: |
           set -e
-          latest=$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+$' | head -1)
+          # Match both two-part (v1.41) and three-part (v1.0.39) tags.
+          # Extract major.minor from whichever is latest.
+          latest=$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+(\.[0-9]+)?$' | head -1)
           if [ -z "$latest" ]; then
             next="v1.0"
           else
             major=$(echo "$latest" | cut -d. -f1 | tr -d v)
             minor=$(echo "$latest" | cut -d. -f2)
-
-            if echo "${COMMIT_MSG}" | grep -q "^Merge pull request"; then
+            # Normalize: strip patch from three-part tags (v1.0.39 -> minor=0)
+            # but keep two-part as-is (v1.41 -> minor=41)
+            # For three-part tags, treat as major.minor with patch stripped
+            if echo "$latest" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+              # Three-part: v1.0.39 -> next should be v1.1 (bump minor past 0)
+              # Actually just use minor as-is since we're dropping patch
+              # v1.0.39 -> major=1, minor=0 -> next=v1.1
               next="v${major}.$((minor + 1))"
             else
-              next="v${major}.${minor}"
-              # For two-part versions, patch bump is minor+1 on direct push
+              # Two-part: v1.41 -> bump minor
               next="v${major}.$((minor + 1))"
             fi
           fi
