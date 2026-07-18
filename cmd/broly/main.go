@@ -40,9 +40,36 @@ func main() {
 	root := &cobra.Command{
 		Use:   "broly",
 		Short: "Broly - Berserker Vulnerability Scanner",
-		Long: `Broly is a fast vulnerability scanner for secrets, SCA, SAST, containers,
-and license policy checks. Built in Go for speed and designed for both local
-developer runs and CI.`,
+		Long: `Broly is a CLI-first berserker code security scanner.
+
+SCANNERS
+  secrets        487 Titus rules, Hyperscan locally (Go regex in CI)
+  sca            osv-scalibr + osv.dev, 20 ecosystems
+  sast           Together AI LLM, 17 regex prefilter patterns
+  workflow       zizmor for GitHub Actions static analysis
+  iac            checkov for Terraform, Kubernetes, Helm, CloudFormation
+  supply-chain   depx for known-malicious package detection
+  container      go-containerregistry + osv.dev
+  license        File-based detection, 13 license types
+  sbom           CycloneDX 1.5 or SPDX 2.3
+
+AI FEATURES (require TOGETHER_API_KEY)
+  --ai-triage              Verdict (TP/FP) + fix suggestion per finding
+  --ai-triage --explain    + attack scenario per finding
+  --adversarial            Adversarial verify on critical SAST TPs
+  --exploit-chains         Link cross-scanner TPs into attack narratives
+  --ai-filter-secrets      Filter secrets false positives with AI
+  --ai-sca-reachability    Check if vulnerable deps are actually called
+  --package-intelligence   Detect hallucinated/non-existent packages
+
+QUICK START
+  broly scan                              # secrets + SCA + SAST
+  broly scan . --sast --ai-triage         # SAST with AI triage
+  broly scan . --workflow --iac          # IaC + workflow scanning
+  broly scan . --ai-triage --adversarial  # Full adversarial pipeline
+  broly sbom                              # Generate CycloneDX SBOM
+
+Built in Go for speed. Designed for local developer runs and CI.`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
@@ -108,7 +135,44 @@ func scanCmd() *cobra.Command {
 		Use:   "scan [paths...]",
 		Short: "Scan targets for security findings",
 		Long: `Run Broly's scan engines against the specified paths.
-By default secrets, SCA, and SAST are enabled and the current directory is scanned.`,
+By default secrets, SCA, and SAST are enabled and the current directory is scanned.
+
+SCANNERS
+  --secrets              Enable secrets scanning
+  --sca                  Enable SCA scanning
+  --sast                 Enable SAST scanning (requires TOGETHER_API_KEY)
+  --workflow             Enable GitHub Actions workflow scanning (requires zizmor)
+  --iac                  Enable IaC scanning: Terraform, K8s, Helm, CloudFormation (requires checkov)
+  --supply-chain         Audit deps against known-malicious package feeds (requires depx)
+  --container <image>    Scan a container image (image:tag, path/to/image.tar)
+
+AI ENHANCEMENTS (require TOGETHER_API_KEY)
+  --ai-triage            Verdict (TP/FP) + fix suggestion per finding
+  --explain              Add a plain-language attack scenario per finding
+  --adversarial          Adversarial verify on critical SAST TPs (requires --ai-triage)
+  --exploit-chains       Synthesize exploit chains linking cross-scanner TPs (requires --ai-triage)
+  --ai-filter-secrets    Filter secrets false positives with AI
+  --ai-sca-reachability  Check if vulnerable deps are actually called
+  --package-intelligence Detect hallucinated/non-existent packages
+
+OUTPUT
+  -f, --format <fmt>     Output format: table, json, sarif (default: table)
+  -o, --output <file>    Write output to file (default: stdout)
+  --min-severity <sev>   Minimum severity: info, low, medium, high, critical
+
+FILTERING & SUPPRESSION
+  --exclude <paths>       Paths to exclude from scanning
+  --languages <langs>     Limit SAST to specific languages (go,python,javascript)
+  --baseline <file>       Baseline file for suppress/require rules
+  --incremental           Only re-scan SAST files changed since last run
+  --config <file>         Config file path (default: .broly.yaml)
+
+OTHER
+  --workers <n>           Number of parallel workers (default: 8)
+  --no-redact             Disable secret redaction in output
+  --offline               Run SCA in offline mode (skip OSV API)
+  -q, --quiet             Suppress progress output
+  --sast-slice-files <n>  Max supporting files per SAST slice (default: 2)`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
 				args = []string{"."}
@@ -319,8 +383,9 @@ func runScan(cfg *core.Config) error {
 	defer cancel()
 
 	if !cfg.Quiet {
-		fmt.Fprintf(os.Stderr, "broly v%s - scanning %s\n", version, strings.Join(cfg.Targets, ", "))
-		fmt.Fprintf(os.Stderr, "scanners: %s | workers: %d\n\n", strings.Join(configuredScannerNames(cfg), ", "), cfg.Workers)
+		printBanner(version)
+		fmt.Fprintf(os.Stderr, "  scanning %s\n", strings.Join(cfg.Targets, ", "))
+		fmt.Fprintf(os.Stderr, "  scanners: %s | workers: %d\n\n", strings.Join(configuredScannerNames(cfg), ", "), cfg.Workers)
 	}
 
 	report.Version = version
@@ -521,6 +586,21 @@ func configuredScannerNames(cfg *core.Config) []string {
 		scanners = append(scanners, "license")
 	}
 	return scanners
+}
+
+func printBanner(ver string) {
+	banner := fmt.Sprintf(`
+  ██████╗ ██████╗ ███████╗██╗  ██╗ █████╗ ██╗     
+  ██╔══██╗██╔══██╗██╔════╝██║  ██║██╔══██╗██║     
+  ██████╔╝██████╔╝█████╗  ███████║███████║██║     
+  ██╔═══╝ ██╔══██╗██╔══╝  ██╔══██║██╔══██║██║     
+  ██║     ██████╔╝███████╗██║  ██║██║  ██║███████╗
+  ╚═╝     ╚═════╝ ╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝
+  Berserker Vulnerability Scanner v%s
+  Secrets · SCA · SAST · Workflow · IaC · Supply Chain
+  Powered by Together AI
+`, ver)
+	fmt.Fprint(os.Stderr, banner)
 }
 
 func scanCompletionError(result *core.ScanResult) error {
