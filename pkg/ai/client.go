@@ -11,7 +11,7 @@ import (
 	"golang.org/x/time/rate"
 )
 
-const DefaultModel = "Qwen/Qwen3.5-9B"
+const DefaultModel = "zai-org/GLM-5.2"
 
 var globalLimiter = rate.NewLimiter(rate.Limit(10), 20)
 

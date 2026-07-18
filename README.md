@@ -29,7 +29,7 @@ Secrets · SCA · SAST · Workflow · IaC · Containers · SBOM · Supply Chain.
 |---------|--------|----------|
 | **Secrets** | [Titus](https://github.com/praetorian-inc/titus) · 487 rules · Hyperscan locally (Go regex in CI) | `--ai-filter-secrets` reduces false positives |
 | **SCA** | [osv-scalibr](https://github.com/google/osv-scalibr) + [osv.dev](https://osv.dev) · 20 ecosystems | `--ai-sca-reachability` · `--package-intelligence` for hallucinated deps |
-| **SAST** | [Together AI](https://together.ai) · `Qwen/Qwen3.5-9B` · 17 regex prefilter patterns | Slice-aware multi-file analysis · includes `Dockerfile`, `Containerfile`, and Compose files when `--sast` is enabled |
+| **SAST** | [Together AI](https://together.ai) · `zai-org/GLM-5.2` · 17 regex prefilter patterns | Slice-aware multi-file analysis · includes `Dockerfile`, `Containerfile`, and Compose files when `--sast` is enabled |
 | **Container** | [go-containerregistry](https://github.com/google/go-containerregistry) + [osv.dev](https://osv.dev) | Pulls and scans registry, local daemon, or tarball images · auto-discovers base images from Dockerfiles and Compose under scan targets |
 | **License** | File-based detection · 13 license types | Only runs when `allowed_licenses` or `denied_licenses` is set in `.broly.yaml` |
 | **Workflow** | [zizmor](https://docs.zizmor.sh/) · GitHub Actions static analysis | `--workflow` scans `.github/workflows/` and composite actions |
