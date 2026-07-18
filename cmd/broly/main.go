@@ -383,7 +383,7 @@ func runScan(cfg *core.Config) error {
 	defer cancel()
 
 	if !cfg.Quiet {
-		printBanner(version)
+		printBanner()
 		fmt.Fprintf(os.Stderr, "  scanning %s\n", strings.Join(cfg.Targets, ", "))
 		fmt.Fprintf(os.Stderr, "  scanners: %s | workers: %d\n\n", strings.Join(configuredScannerNames(cfg), ", "), cfg.Workers)
 	}
@@ -588,16 +588,21 @@ func configuredScannerNames(cfg *core.Config) []string {
 	return scanners
 }
 
-func printBanner(ver string) {
+func printBanner() {
+	info := currentVersionInfo()
+	ver := info.Version
+	if ver == "" || ver == "dev" {
+		ver = "dev"
+	}
 	banner := fmt.Sprintf(`
-  ██████╗ ██████╗ ███████╗██╗  ██╗ █████╗ ██╗     
-  ██╔══██╗██╔══██╗██╔════╝██║  ██║██╔══██╗██║     
-  ██████╔╝██████╔╝█████╗  ███████║███████║██║     
-  ██╔═══╝ ██╔══██╗██╔══╝  ██╔══██║██╔══██║██║     
-  ██║     ██████╔╝███████╗██║  ██║██║  ██║███████╗
-  ╚═╝     ╚═════╝ ╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝
-  Berserker Vulnerability Scanner v%s
-  Secrets · SCA · SAST · Workflow · IaC · Supply Chain
+    ____  ____  ____  ____  __
+   / __ )/ __ \/ __ \/ /\ \/ /
+  / __  / /_/ / / / / /  \  / 
+ / /_/ / _, _/ /_/ / /___/ /  
+/_____/_/ |_|\____/_____/_/   
+
+  Berserker Vulnerability Scanner %s
+  Secrets - SCA - SAST - Workflow - IaC - Supply Chain
   Powered by Together AI
 `, ver)
 	fmt.Fprint(os.Stderr, banner)
