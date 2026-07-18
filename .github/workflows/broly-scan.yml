@@ -8,9 +8,11 @@ name: Broly Security Scan
 #       secrets: inherit
 #
 # Optional inputs:
-#   min_severity   — info | low | medium | high | critical  (default: low)
-#   scanners       — all | sast | sca | secrets             (default: all)
-#   ai_triage      — true | false                           (default: false)
+#   min_severity   - info | low | medium | high | critical  (default: low)
+#   scanners       - all | sast | sca | secrets             (default: all)
+#   ai_triage      - true | false                           (default: false)
+#   workflow       - true | false                           (default: false)
+#   iac            - true | false                           (default: false)
 
 on:
   workflow_call:
@@ -25,6 +27,14 @@ on:
         default: "all"
       ai_triage:
         description: "Enable AI triage (TP/FP verdict + fix)"
+        type: boolean
+        default: false
+      workflow:
+        description: "Enable GitHub Actions workflow scanning (auto-installs zizmor)"
+        type: boolean
+        default: false
+      iac:
+        description: "Enable IaC scanning (auto-installs checkov)"
         type: boolean
         default: false
     secrets:
@@ -82,6 +92,14 @@ jobs:
             *)       SCAN_FLAGS="--secrets --sca" ;;   # all (SAST added below if key present)
           esac
 
+          # Add workflow/iac flags
+          if [ "${INPUT_WORKFLOW}" = "true" ]; then
+            SCAN_FLAGS="${SCAN_FLAGS} --workflow"
+          fi
+          if [ "${INPUT_IAC}" = "true" ]; then
+            SCAN_FLAGS="${SCAN_FLAGS} --iac"
+          fi
+
           # Add SAST when key is present and scanners=all or scanners=sast
           SAST_FLAGS=""
           if [ -n "${AI_API_KEY}" ]; then
@@ -99,6 +117,8 @@ jobs:
           AI_API_KEY: ${{ secrets.ai_api_key }}
           INPUT_SCANNERS: ${{ inputs.scanners }}
           INPUT_AI_TRIAGE: ${{ inputs.ai_triage }}
+          INPUT_WORKFLOW: ${{ inputs.workflow }}
+          INPUT_IAC: ${{ inputs.iac }}
 
       - name: Scan PR diff
         if: github.event_name == 'pull_request' && steps.diff.outputs.has_code == 'true'
@@ -219,7 +239,7 @@ jobs:
                 rows,
                 note,
                 '',
-                '> [Broly](https://github.com/Shasheen8/Broly) — Secrets · SCA · SAST · Powered by Together AI',
+                '> [Broly](https://github.com/Shasheen8/Broly) - Secrets - SCA - SAST - Powered by Together AI',
               ].join('\n');
             }
             const { data: comments } = await github.rest.issues.listComments({

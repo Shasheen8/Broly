@@ -270,9 +270,13 @@ jobs:
     uses: Shasheen8/Broly/.github/workflows/broly-scan.yml@main
     secrets:
       ai_api_key: ${{ secrets.AI_API_KEY }}
+    with:
+      ai_triage: true
+      workflow: true
+      iac: true
 ```
 
-Inputs: `min_severity`, `scanners` (`all` | `sast` | `sca` | `secrets`), and `ai_triage`. On pull requests it runs **secrets + SCA** on the full tree (and **pulls base images** referenced in Dockerfiles/Compose, same as local `broly scan`), runs **SAST** on changed code files only when `ai_api_key` is set, uploads SARIF to the GitHub Security tab, and posts a **summary PR comment** (findings table only - no fix blocks or false-positive checkboxes). Push/workflow_dispatch runs a full-repo scan with the same scanner selection rules.
+Inputs: `min_severity`, `scanners` (`all` | `sast` | `sca` | `secrets`), `ai_triage`, `workflow`, and `iac`. On pull requests it runs **secrets + SCA** on the full tree (and **pulls base images** referenced in Dockerfiles/Compose, same as local `broly scan`), runs **SAST** on changed code files only when `ai_api_key` is set, uploads SARIF to the GitHub Security tab, and posts a **summary PR comment** (findings table only - no fix blocks or false-positive checkboxes). Push/workflow_dispatch runs a full-repo scan with the same scanner selection rules.
 
 ### Optional: `broly-app` (local GitHub App)
 

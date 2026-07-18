@@ -38,9 +38,9 @@ jobs:
 
   tag:
     # Versioning rules:
-    #   PR merge  → bump minor (v1.1.0 → v1.2.0)
-    #   Direct push to main → bump patch (v1.0.0 → v1.0.1)
-    #   Breaking changes → tag manually (v2.0.0)
+    #   PR merge  -> bump minor (v1.40 -> v1.41)
+    #   Direct push to main -> bump patch (v1.41 -> v1.42)
+    #   Breaking changes -> tag manually (v2.0)
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: build
     runs-on: ubuntu-latest
@@ -53,21 +53,22 @@ jobs:
       - name: Bump version and push tag
         run: |
           set -e
-          latest=$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+          latest=$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+$' | head -1)
           if [ -z "$latest" ]; then
-            next="v1.0.0"
+            next="v1.0"
           else
             major=$(echo "$latest" | cut -d. -f1 | tr -d v)
             minor=$(echo "$latest" | cut -d. -f2)
-            patch=$(echo "$latest" | cut -d. -f3)
 
             if echo "${COMMIT_MSG}" | grep -q "^Merge pull request"; then
-              next="v${major}.$((minor + 1)).0"
+              next="v${major}.$((minor + 1))"
             else
-              next="v${major}.${minor}.$((patch + 1))"
+              next="v${major}.${minor}"
+              # For two-part versions, patch bump is minor+1 on direct push
+              next="v${major}.$((minor + 1))"
             fi
           fi
-          echo "Latest: ${latest:-none} → Next: ${next}"
+          echo "Latest: ${latest:-none} -> Next: ${next}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git tag "$next"
