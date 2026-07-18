@@ -121,6 +121,26 @@ Each scanner outputs an aligned table in the terminal. Supports JSON (`-f json`)
 
 `--ai-triage --explain` adds one more thing: a plain-language attack scenario or impact sentence. The table format stays the same, but each finding becomes more verbose.
 
+#### Agentic Triage (auto-enabled)
+
+When `--ai-triage` is used against a local directory (the default `.` target), high-severity SAST findings are automatically triaged with **agentic repo tool use**. The AI can read related files, search the repository, and trace cross-file data flow before deciding a verdict — instead of relying only on the visible code snippet.
+
+Three tools are available to the model:
+
+- `repo_file_read` — read any file in the repo with optional line range
+- `repo_code_search` — search repo text (uses `git grep` when available)
+- `repo_find_files` — find tracked files by basename pattern
+
+The agent loop runs up to 5 rounds with a maximum of 8 tool executions. Tool results are capped at 16K characters. All file content is redacted for secrets before being returned to the model.
+
+No extra flags are needed — agentic triage activates automatically when:
+
+1. `--ai-triage` is enabled
+2. The scan target is a directory (not a single file)
+3. The finding is SAST with severity >= high
+
+If the repo directory can't be opened (e.g., permission error), triage silently falls back to the non-agentic single-prompt mode.
+
 Use:
 
 ```bash
