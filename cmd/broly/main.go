@@ -23,6 +23,7 @@ import (
 	"github.com/Shasheen8/Broly/pkg/sbom"
 	"github.com/Shasheen8/Broly/pkg/sca"
 	"github.com/Shasheen8/Broly/pkg/secrets"
+	"github.com/Shasheen8/Broly/pkg/workflow"
 )
 
 var (
@@ -71,6 +72,7 @@ func scanCmd() *cobra.Command {
 		enableSAST          bool
 		enableSCA           bool
 		enableSecrets       bool
+		enableWorkflow      bool
 		workers             int
 		minSeverity         string
 		excludePaths        []string
@@ -209,9 +211,8 @@ By default secrets, SCA, and SAST are enabled and the current directory is scann
 			if f.Changed("sast-slice-files") {
 				cfg.SASTSliceFiles = sastSliceFiles
 			}
-
-			if cfg.EnableWorkflow {
-				return fmt.Errorf("workflow scanning runs in broly-app only (GitHub App); it is not available in the broly CLI")
+			if f.Changed("workflow") {
+				cfg.EnableWorkflow = enableWorkflow
 			}
 
 			if cfg.Adversarial && !cfg.AITriage {
@@ -239,6 +240,7 @@ By default secrets, SCA, and SAST are enabled and the current directory is scann
 	flags.BoolVar(&enableSAST, "sast", false, "Enable SAST scanning")
 	flags.BoolVar(&enableSCA, "sca", false, "Enable SCA scanning")
 	flags.BoolVar(&enableSecrets, "secrets", false, "Enable secrets scanning")
+	flags.BoolVar(&enableWorkflow, "workflow", false, "Enable GitHub Actions workflow scanning (requires zizmor)")
 	flags.IntVar(&workers, "workers", 8, "Number of parallel workers")
 	flags.StringVar(&minSeverity, "min-severity", "info", "Minimum severity: info, low, medium, high, critical")
 	flags.StringSliceVar(&excludePaths, "exclude", nil, "Paths to exclude from scanning")
@@ -294,7 +296,7 @@ func finalizeScannerSelection(cfg *core.Config, cliSAST, enableSAST, cliSCA, ena
 		cfg.EnableSecrets = enableSecrets
 	}
 
-	if !cfg.EnableSAST && !cfg.EnableSCA && !cfg.EnableSecrets && cfg.ContainerImage == "" {
+	if !cfg.EnableSAST && !cfg.EnableSCA && !cfg.EnableSecrets && !cfg.EnableWorkflow && cfg.ContainerImage == "" {
 		cfg.EnableSAST = true
 		cfg.EnableSCA = true
 		cfg.EnableSecrets = true
@@ -321,6 +323,9 @@ func runScan(cfg *core.Config) error {
 	}
 	if cfg.EnableSAST {
 		orch.Register(sast.NewSASTScanner())
+	}
+	if cfg.EnableWorkflow {
+		orch.Register(workflow.NewWorkflowScanner())
 	}
 	if cfg.ContainerImage != "" {
 		orch.Register(container.NewContainerScanner())
@@ -479,7 +484,7 @@ func validateCmd() *cobra.Command {
 }
 
 func configuredScannerNames(cfg *core.Config) []string {
-	scanners := make([]string, 0, 5)
+	scanners := make([]string, 0, 6)
 	if cfg.EnableSecrets {
 		scanners = append(scanners, "secrets")
 	}
@@ -488,6 +493,9 @@ func configuredScannerNames(cfg *core.Config) []string {
 	}
 	if cfg.EnableSAST {
 		scanners = append(scanners, "sast")
+	}
+	if cfg.EnableWorkflow {
+		scanners = append(scanners, "workflow")
 	}
 	if cfg.ContainerImage != "" {
 		scanners = append(scanners, "container")

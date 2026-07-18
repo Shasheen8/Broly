@@ -71,6 +71,7 @@ broly scan /path/to/project                       # specific path
 broly scan --secrets                              # secrets only
 broly scan --sca                                  # SCA only
 broly scan --sast                                 # SAST only (requires TOGETHER_API_KEY)
+broly scan --workflow                             # GitHub Actions workflow scanning (requires zizmor)
 
 # AI enhancements
 broly scan --ai-filter-secrets                    # filter secrets false positives with AI
@@ -215,6 +216,21 @@ Use:
 ```bash
 broly scan . --ai-triage --exploit-chains
 ```
+
+### Workflow Scanning
+
+`--workflow` scans GitHub Actions workflows (`.github/workflows/*.yml`) and composite action manifests (`action.yml`/`action.yaml`) using [zizmor](https://docs.zizmor.sh/). It requires the `zizmor` binary to be installed:
+
+```bash
+pip install zizmor          # or: uv tool install zizmor
+```
+
+```bash
+broly scan . --workflow
+broly scan . --workflow --ai-triage       # with AI verdict + fix
+```
+
+Findings include severity, snippet, and rule-specific remediation suggestions. Rule IDs are prefixed with `zizmor.` (e.g., `zizmor.unpinned-uses`, `zizmor.template-injection`).
 
 ---
 
