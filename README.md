@@ -12,7 +12,7 @@
 Secrets · SCA · SAST · Workflow · IaC · Containers · SBOM · Supply Chain. AI-powered findings. Run locally or in CI with one binary.
 
 <a href="https://github.com/Shasheen8/Broly/actions/workflows/ci.yml"><img src="https://github.com/Shasheen8/Broly/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-<a href="https://github.com/Shasheen8/Broly"><img src="https://img.shields.io/badge/Go-1.26-00ADD8?style=flat&logo=go" alt="Go"></a>
+<a href="https://github.com/Shasheen8/Broly"><img src="https://img.shields.io/badge/Go-1.26.4-00ADD8?style=flat&logo=go" alt="Go"></a>
 <a href="https://github.com/Shasheen8/Broly/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=flat" alt="License"></a>
 <a href="https://github.com/Shasheen8/Broly/releases"><img src="https://img.shields.io/badge/Release-latest-blue?style=flat" alt="Release"></a>
 <a href="https://together.ai"><img src="https://img.shields.io/badge/Powered%20by-Together%20AI-blueviolet?style=flat" alt="Together AI"></a>
