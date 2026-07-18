@@ -124,7 +124,28 @@ func adversarialCodeContext(f *core.Finding, cloneDir string) string {
 	if absPath == "" {
 		return ""
 	}
-	return core.FileContext(absPath, f.StartLine, 12)
+	switch f.Type {
+	case core.ScanTypeSecrets:
+		ctx := core.FileContextSafe(absPath, f.StartLine, f.EndLine, 12)
+		if f.Redacted != "" {
+			ctx += "\nRedacted secret value: " + f.Redacted
+		}
+		return ctx
+	case core.ScanTypeWorkflow:
+		var sb strings.Builder
+		if f.Snippet != "" {
+			sb.WriteString(f.Snippet)
+		}
+		if ctx := core.FileContext(absPath, f.StartLine, 12); ctx != "" {
+			if sb.Len() > 0 {
+				sb.WriteString("\n")
+			}
+			sb.WriteString(ctx)
+		}
+		return sb.String()
+	default:
+		return core.FileContext(absPath, f.StartLine, 12)
+	}
 }
 
 func appendAdversarialFindingDetails(sb *strings.Builder, f *core.Finding) {

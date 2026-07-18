@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -20,6 +21,7 @@ import (
 	"github.com/Shasheen8/Broly/pkg/orchestrator"
 	"github.com/Shasheen8/Broly/pkg/sast"
 	"github.com/Shasheen8/Broly/pkg/sca"
+	"github.com/Shasheen8/Broly/pkg/scanignore"
 	"github.com/Shasheen8/Broly/pkg/secrets"
 	"github.com/Shasheen8/Broly/pkg/workflow"
 )
@@ -28,7 +30,7 @@ func (a *App) scanPR(ctx context.Context, client *github.Client, req scanRequest
 	a.scanSem <- struct{}{}
 	defer func() { <-a.scanSem }()
 
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
 
 	repo := req.owner + "/" + req.repo
@@ -38,6 +40,7 @@ func (a *App) scanPR(ctx context.Context, client *github.Client, req scanRequest
 	dir, cleanup, err := cloneRepo(ctx, client, req)
 	if err != nil {
 		slog.Error("clone failed", "repo", repo, "pr", req.prNumber, "err", err)
+		postCheckRunError(ctx, client, req, fmt.Sprintf("Clone failed: %v", err))
 		return
 	}
 	defer cleanup()
@@ -49,6 +52,7 @@ func (a *App) scanPR(ctx context.Context, client *github.Client, req scanRequest
 	result, err := runBrolyScan(ctx, dir, changed)
 	if err != nil {
 		slog.Error("scan failed", "repo", repo, "pr", req.prNumber, "err", err)
+		postCheckRunError(ctx, client, req, fmt.Sprintf("Scan failed: %v", err))
 		return
 	}
 
@@ -76,7 +80,7 @@ func (a *App) scanPush(ctx context.Context, client *github.Client, req scanReque
 	a.scanSem <- struct{}{}
 	defer func() { <-a.scanSem }()
 
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
 
 	repo := req.owner + "/" + req.repo
@@ -112,8 +116,18 @@ func (a *App) scanPush(ctx context.Context, client *github.Client, req scanReque
 	)
 }
 
+// validGitSHAPattern matches a full or abbreviated git commit SHA (hex
+// only). Rejecting anything else before it reaches exec.Command closes off
+// git's argument-injection surface (e.g. a ref string starting with "-"
+// being parsed as a flag like --upload-pack=<command>).
+var validGitSHAPattern = regexp.MustCompile(`^[0-9a-f]{7,64}$`)
+
 // cloneRepo does a shallow clone at the given SHA using the installation token.
 func cloneRepo(ctx context.Context, client *github.Client, req scanRequest) (string, func(), error) {
+	if !validGitSHAPattern.MatchString(req.headSHA) {
+		return "", nil, fmt.Errorf("invalid head SHA %q", req.headSHA)
+	}
+
 	dir, err := os.MkdirTemp("", "broly-scan-*")
 	if err != nil {
 		return "", nil, err
@@ -128,33 +142,43 @@ func cloneRepo(ctx context.Context, client *github.Client, req scanRequest) (str
 	}
 
 	cloneURL := fmt.Sprintf("https://x-access-token:%s@github.com/%s/%s.git", token, req.owner, req.repo)
+	redactToken := func(out []byte) string {
+		return redactSecret(out, token)
+	}
 
 	// Shallow clone at a specific SHA: git init + fetch + checkout (--branch doesn't accept SHAs).
 	cmd := exec.CommandContext(ctx, "git", "init", dir)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		cleanup()
-		return "", nil, fmt.Errorf("git init: %s: %w", out, err)
+		return "", nil, fmt.Errorf("git init: %s: %w", redactToken(out), err)
 	}
 
 	cmd = exec.CommandContext(ctx, "git", "-C", dir, "remote", "add", "origin", cloneURL)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		cleanup()
-		return "", nil, fmt.Errorf("git remote add: %s: %w", out, err)
+		return "", nil, fmt.Errorf("git remote add: %s: %w", redactToken(out), err)
 	}
 
 	cmd = exec.CommandContext(ctx, "git", "-C", dir, "fetch", "--depth=1", "origin", req.headSHA)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		cleanup()
-		return "", nil, fmt.Errorf("git fetch: %s: %w", out, err)
+		return "", nil, fmt.Errorf("git fetch: %s: %w", redactToken(out), err)
 	}
 
 	cmd = exec.CommandContext(ctx, "git", "-C", dir, "checkout", "FETCH_HEAD")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		cleanup()
-		return "", nil, fmt.Errorf("git checkout: %s: %w", out, err)
+		return "", nil, fmt.Errorf("git checkout: %s: %w", redactToken(out), err)
 	}
 
 	return dir, cleanup, nil
+}
+
+func redactSecret(out []byte, secret string) string {
+	if secret == "" {
+		return string(out)
+	}
+	return strings.ReplaceAll(string(out), secret, "REDACTED")
 }
 
 func installationToken(ctx context.Context, client *github.Client) (string, error) {
@@ -197,19 +221,56 @@ func getChangedFiles(ctx context.Context, client *github.Client, req scanRequest
 	}
 
 	opts := &github.ListOptions{PerPage: 100}
-	files, _, err := client.PullRequests.ListFiles(ctx, req.owner, req.repo, req.prNumber, opts)
-	if err != nil {
-		slog.Error("list PR files", "err", err)
-		return nil
-	}
-
 	var changed []string
-	for _, f := range files {
-		if isScannablePath(f.GetFilename()) {
-			changed = append(changed, f.GetFilename())
+	for {
+		files, resp, err := client.PullRequests.ListFiles(ctx, req.owner, req.repo, req.prNumber, opts)
+		if err != nil {
+			slog.Error("list PR files", "err", err)
+			return changed
 		}
+		for _, f := range files {
+			fn := f.GetFilename()
+			if isScannablePath(fn) && !scanignore.PathHasIgnoredDir(fn) {
+				changed = append(changed, fn)
+			}
+		}
+		if resp.NextPage == 0 {
+			break
+		}
+		opts.Page = resp.NextPage
 	}
 	return changed
+}
+
+func cleanRepoRelativePath(rel string) (string, error) {
+	cleanRel := filepath.Clean(rel)
+	if cleanRel == "." || filepath.IsAbs(cleanRel) || strings.HasPrefix(cleanRel, ".."+string(filepath.Separator)) || cleanRel == ".." {
+		return "", fmt.Errorf("changed path escapes repo: %s", rel)
+	}
+	return cleanRel, nil
+}
+
+func validateRepoPathTarget(dir, rel string) error {
+	root, err := filepath.EvalSymlinks(dir)
+	if err != nil {
+		return err
+	}
+	fullPath := filepath.Join(dir, rel)
+	resolved, err := filepath.EvalSymlinks(fullPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	relative, err := filepath.Rel(root, resolved)
+	if err != nil {
+		return err
+	}
+	if relative == ".." || filepath.IsAbs(relative) || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+		return fmt.Errorf("changed path resolves outside repo: %s", rel)
+	}
+	return nil
 }
 
 // runBrolyScan runs the Broly orchestrator on the given directory.
@@ -218,18 +279,26 @@ func runBrolyScan(ctx context.Context, dir string, changedFiles []string) (*core
 	hasAI := os.Getenv("TOGETHER_API_KEY") != ""
 
 	cfg := &core.Config{
-		Targets:        []string{dir},
-		EnableSecrets:  true,
-		EnableSCA:      true,
-		EnableWorkflow: workflow.ZizmorAvailable(),
-		EnableIaC:      iac.CheckovAvailable(),
-		SupplyChain:    sca.DepxAvailable(),
-		AITriage:       hasAI,
-		Adversarial:    hasAI,
-		ExploitChains:  hasAI,
-		Explain:        hasAI,
-		Workers:        4,
-		Quiet:          true,
+		Targets:       []string{dir},
+		EnableSecrets: true,
+		EnableSCA:     true,
+		AITriage:      hasAI,
+		Adversarial:   hasAI,
+		ExploitChains: false, // chains run on combined findings below
+		Explain:       hasAI,
+		Workers:       4,
+		Quiet:         true,
+	}
+
+	// Only register workflow/IaC scanners when relevant files exist.
+	if workflow.ZizmorAvailable() && (len(changedFiles) == 0 || workflow.TouchesWorkflowDefinitions(changedFiles)) {
+		cfg.EnableWorkflow = true
+	}
+	if iac.CheckovAvailable() && (len(changedFiles) == 0 || iac.TouchesIaCDefinitions(changedFiles)) {
+		cfg.EnableIaC = true
+	}
+	if sca.DepxAvailable() {
+		cfg.SupplyChain = true
 	}
 
 	orch := orchestrator.New(cfg)
@@ -254,7 +323,16 @@ func runBrolyScan(ctx context.Context, dir string, changedFiles []string) (*core
 		if len(changedFiles) > 0 {
 			sastTargets = make([]string, 0, len(changedFiles))
 			for _, f := range changedFiles {
-				sastTargets = append(sastTargets, filepath.Join(dir, f))
+				cleanRel, err := cleanRepoRelativePath(f)
+				if err != nil {
+					slog.Warn("changed path escapes repo", "path", f, "err", err)
+					continue
+				}
+				if err := validateRepoPathTarget(dir, cleanRel); err != nil {
+					slog.Warn("changed path resolves outside repo", "path", f, "err", err)
+					continue
+				}
+				sastTargets = append(sastTargets, filepath.Join(dir, cleanRel))
 			}
 		}
 		sastCfg := &core.Config{
@@ -262,7 +340,7 @@ func runBrolyScan(ctx context.Context, dir string, changedFiles []string) (*core
 			EnableSAST:    true,
 			AITriage:      true,
 			Adversarial:   true,
-			ExploitChains: false, // chains run on combined findings below
+			ExploitChains: false,
 			Explain:       true,
 			Workers:       4,
 			Quiet:         true,
@@ -276,8 +354,8 @@ func runBrolyScan(ctx context.Context, dir string, changedFiles []string) (*core
 	}
 
 	// Exploit chains: link cross-scanner true positives on the combined set.
-	if hasAI && len(result.Findings) >= 2 {
-		client, ok := ai.New("")
+	if hasAI && chain.Eligible(result.Findings) {
+		client, ok := ai.New(ai.DefaultModel)
 		if ok {
 			chainCtx, chainCancel := context.WithTimeout(ctx, 5*time.Minute)
 			defer chainCancel()
@@ -305,8 +383,9 @@ func getCommitFiles(ctx context.Context, client *github.Client, req scanRequest)
 
 	var changed []string
 	for _, f := range commit.Files {
-		if isScannablePath(f.GetFilename()) {
-			changed = append(changed, f.GetFilename())
+		fn := f.GetFilename()
+		if isScannablePath(fn) && !scanignore.PathHasIgnoredDir(fn) {
+			changed = append(changed, fn)
 		}
 	}
 	return changed
@@ -331,8 +410,10 @@ func filterToChangedFiles(findings []core.Finding, changed []string) []core.Find
 func stripPrefix(result *core.ScanResult, dir string) {
 	prefix := dir + "/"
 	for i := range result.Findings {
-		if strings.HasPrefix(result.Findings[i].FilePath, prefix) {
-			result.Findings[i].FilePath = strings.TrimPrefix(result.Findings[i].FilePath, prefix)
+		original := result.Findings[i].FilePath
+		result.Findings[i].FilePath = strings.TrimPrefix(result.Findings[i].FilePath, prefix)
+		if result.Findings[i].FilePath != original {
+			result.Findings[i].ComputeIdentityKeys()
 		}
 	}
 }

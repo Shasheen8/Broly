@@ -12,6 +12,7 @@ import (
 	"github.com/Shasheen8/Broly/pkg/baseline"
 	"github.com/Shasheen8/Broly/pkg/chain"
 	"github.com/Shasheen8/Broly/pkg/core"
+	"github.com/Shasheen8/Broly/pkg/sast"
 	"github.com/Shasheen8/Broly/pkg/sca"
 	"github.com/Shasheen8/Broly/pkg/suppress"
 	"github.com/Shasheen8/Broly/pkg/triage"
@@ -106,6 +107,7 @@ func (o *Orchestrator) Run(ctx context.Context) (*core.ScanResult, error) {
 
 	// Post-processing pipeline.
 	normalizeFindingPaths(findings, o.config.PathStripPrefix)
+	sast.EnrichFindings(findings)
 	findings = deduplicateFindings(findings)
 
 	// Compute priority scores.
@@ -316,9 +318,24 @@ func suppressByFingerprint(findings []core.Finding, fingerprints []string) ([]co
 	filtered := make([]core.Finding, 0, len(findings))
 	var count int
 	for _, finding := range findings {
-		if suppressed[finding.Fingerprint] {
+		if !finding.BaselineSuppressible() {
+			filtered = append(filtered, finding)
+			continue
+		}
+		if finding.Fingerprint != "" && suppressed[finding.Fingerprint] {
 			count++
 			continue
+		}
+		if finding.BaselineMatchKey != "" && suppressed[finding.BaselineMatchKey] {
+			count++
+			continue
+		}
+		if finding.PackageName != "" && finding.PackageVersion != "" &&
+			(finding.Type == core.ScanTypeSCA || finding.Type == core.ScanTypeContainer) {
+			if key := core.PackageGroupBaselineMatchKey(finding); key != "" && suppressed[key] {
+				count++
+				continue
+			}
 		}
 		filtered = append(filtered, finding)
 	}

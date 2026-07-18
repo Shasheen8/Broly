@@ -46,6 +46,23 @@ func postCheckRun(ctx context.Context, client *github.Client, req scanRequest, r
 	}
 }
 
+func postCheckRunError(ctx context.Context, client *github.Client, req scanRequest, msg string) {
+	_, _, err := client.Checks.CreateCheckRun(ctx, req.owner, req.repo, github.CreateCheckRunOptions{
+		Name:        "Broly Security Scan",
+		HeadSHA:     req.headSHA,
+		Status:      github.Ptr("completed"),
+		Conclusion:  github.Ptr("neutral"),
+		CompletedAt: &github.Timestamp{Time: time.Now()},
+		Output: &github.CheckRunOutput{
+			Title:   github.Ptr("Broly: scan error"),
+			Summary: github.Ptr(fmt.Sprintf("⚠️ %s", msg)),
+		},
+	})
+	if err != nil {
+		slog.Error("create error check run", "err", err)
+	}
+}
+
 func postPRComment(ctx context.Context, client *github.Client, req scanRequest, result *core.ScanResult) {
 	if req.prNumber == 0 {
 		return
@@ -53,20 +70,30 @@ func postPRComment(ctx context.Context, client *github.Client, req scanRequest, 
 
 	body := buildCommentBody(result)
 
-	// Look for existing Broly comment to update in-place.
-	comments, _, err := client.Issues.ListComments(ctx, req.owner, req.repo, req.prNumber, &github.IssueListCommentsOptions{
-		ListOptions: github.ListOptions{PerPage: 50},
-	})
-	if err != nil {
-		slog.Error("list comments", "err", err)
-	}
-
+	// Look for existing Broly comment to update in-place (paginate).
 	var existingID int64
-	for _, c := range comments {
-		if strings.Contains(c.GetBody(), "<!-- broly-scan -->") {
-			existingID = c.GetID()
+	var err error
+	opts := &github.IssueListCommentsOptions{
+		ListOptions: github.ListOptions{PerPage: 100},
+	}
+	for {
+		var comments []*github.IssueComment
+		var resp *github.Response
+		comments, resp, err = client.Issues.ListComments(ctx, req.owner, req.repo, req.prNumber, opts)
+		if err != nil {
+			slog.Error("list comments", "err", err)
 			break
 		}
+		for _, c := range comments {
+			if strings.Contains(c.GetBody(), "<!-- broly-scan -->") {
+				existingID = c.GetID()
+				break
+			}
+		}
+		if existingID != 0 || resp.NextPage == 0 {
+			break
+		}
+		opts.Page = resp.NextPage
 	}
 
 	if existingID != 0 {
@@ -218,10 +245,10 @@ func buildCommentBody(result *core.ScanResult) string {
 				advSuffix = " · ⚔️ Adversarial confirmed"
 			}
 			fmt.Fprintf(&b, "| %s&nbsp;%s | %s | %s | %s | %s&nbsp;%s%s%s |\n",
-				icon, f.Severity, strings.ToUpper(string(f.Type)), issue, loc, vIcon, f.Verdict, conf, advSuffix)
+				icon, f.Severity, f.Type.Label(), issue, loc, vIcon, f.Verdict, conf, advSuffix)
 		} else {
 			fmt.Fprintf(&b, "| %s&nbsp;%s | %s | %s | %s |\n",
-				icon, f.Severity, strings.ToUpper(string(f.Type)), issue, loc)
+				icon, f.Severity, f.Type.Label(), issue, loc)
 		}
 	}
 
@@ -314,21 +341,59 @@ func buildCommentBody(result *core.ScanResult) string {
 		}
 	}
 
-	// Dismissed false positives (adversarial DISPUTED/FALSIFIED).
+	// Supply chain threats section.
+	var supplyChainFindings []core.Finding
+	for _, f := range result.Findings {
+		if f.IsMaliciousPackage() {
+			supplyChainFindings = append(supplyChainFindings, f)
+		}
+	}
+	if len(supplyChainFindings) > 0 {
+		b.WriteString("\n### 🦠 Supply Chain Threats\n\n")
+		for _, f := range supplyChainFindings {
+			loc := ""
+			if f.FilePath != "" {
+				loc = f.FilePath
+				if f.StartLine > 0 {
+					loc += fmt.Sprintf(":%d", f.StartLine)
+				}
+			}
+			desc := f.Description
+			if desc == "" {
+				desc = f.Title
+			}
+			fmt.Fprintf(&b, "- 🔴 **%s** (%s) in %s: %s\n", f.PackageName, f.RuleID, loc, desc)
+			for _, ref := range f.References {
+				fmt.Fprintf(&b, "  - [%s](%s)\n", ref, ref)
+			}
+		}
+		b.WriteString("\n> These are not CVEs — they are known-malicious packages. Remove them immediately.\n")
+	}
+
+	// Dismissed false positives (adversarial + high-confidence triage).
 	var dismissed []core.Finding
 	for _, f := range result.Findings {
 		if f.AdversarialVerdict == "DISPUTED" || f.AdversarialVerdict == "FALSIFIED" {
 			dismissed = append(dismissed, f)
+		} else if f.Verdict == "FALSE_POSITIVE" && f.Confidence == "HIGH" {
+			dismissed = append(dismissed, f)
 		}
 	}
 	if len(dismissed) > 0 {
-		b.WriteString("\n### 🟢 Dismissed by Adversarial Review\n\n")
+		b.WriteString("\n### 🟢 Dismissed False Positives\n\n")
 		for _, f := range dismissed {
 			reason := f.AdversarialReason
 			if reason == "" {
-				reason = "Adversarial review disproved exploitability."
+				reason = f.VerdictReason
 			}
-			fmt.Fprintf(&b, "- **%s** · %s: %s\n", f.RuleName, strings.ToLower(f.AdversarialVerdict), reason)
+			if reason == "" {
+				reason = "Marked as false positive."
+			}
+			source := "triage"
+			if f.AdversarialVerdict == "DISPUTED" || f.AdversarialVerdict == "FALSIFIED" {
+				source = strings.ToLower(f.AdversarialVerdict)
+			}
+			fmt.Fprintf(&b, "- **%s** · %s: %s\n", f.RuleName, source, reason)
 		}
 	}
 

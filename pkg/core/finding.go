@@ -260,6 +260,26 @@ func (f *Finding) ComputeOrgMatchKey() {
 			f.PackageVersion,
 			f.Ecosystem,
 		)
+	case ScanTypeSAST, ScanTypeDockerfile:
+		parts = requiredKeyParts(
+			string(f.Type),
+			stableSASTFamily(*f),
+		)
+	case ScanTypeSecrets:
+		secretValue := strings.TrimSpace(f.Redacted)
+		if secretValue == "" {
+			secretValue = strings.TrimSpace(f.Snippet)
+		}
+		parts = requiredKeyParts(
+			string(f.Type),
+			f.RuleID,
+			rawHashKeyPart(secretValue),
+		)
+	case ScanTypeWorkflow:
+		parts = requiredKeyParts(
+			string(f.Type),
+			stableWorkflowFamily(*f),
+		)
 	case ScanTypeIaC:
 		parts = requiredKeyParts(
 			string(f.Type),
@@ -358,6 +378,30 @@ func (f *Finding) ComputeBaselineMatchKey() {
 		return
 	}
 	f.BaselineMatchKey = hashKeyParts(parts)
+}
+
+// PackageGroupBaselineMatchKey is a RuleID-free baseline key for collapsed
+// SCA/container package rows. Advisory churn (new worst CVE) must not break
+// repo-local dismissals of the package group.
+func PackageGroupBaselineMatchKey(f Finding) string {
+	parts := requiredKeyParts(
+		"v1",
+		"pkg-group",
+		string(f.Type),
+		f.PackageName,
+		f.PackageVersion,
+		f.Ecosystem,
+	)
+	if parts == nil {
+		return ""
+	}
+	if path := normalizePathKeyPart(f.FilePath); path != "" {
+		parts = append(parts, path)
+	}
+	if artifact := normalizePathKeyPart(f.ArtifactPath); artifact != "" {
+		parts = append(parts, artifact)
+	}
+	return hashKeyParts(parts)
 }
 
 // ComputeUsageDeltaKey sets a PR-time exposure key used to answer whether a PR
@@ -481,6 +525,10 @@ func stableSASTFamily(f Finding) string {
 
 func (f Finding) IsMaliciousPackage() bool {
 	return strings.HasPrefix(f.RuleID, "sca.malicious.")
+}
+
+func (f Finding) BaselineSuppressible() bool {
+	return !f.IsMaliciousPackage()
 }
 
 type ExploitChain struct {
