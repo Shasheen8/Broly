@@ -420,31 +420,34 @@ func runScan(cfg *core.Config) error {
 	}
 
 	// Auto-scan Dockerfile base images, skipping any explicit --container.
+	// Only auto-discover when SCA is enabled (container scanning is an SCA extension).
 	scanned := map[string]bool{}
 	if cfg.ContainerImage != "" {
 		scanned[cfg.ContainerImage] = true
 	}
-	for _, target := range cfg.Targets {
-		info, err := os.Stat(target)
-		if err != nil || !info.IsDir() {
-			continue
-		}
-		for _, rel := range container.FindContainerSpecs(target) {
-			content, ok := container.ReadDockerfile(target, rel)
-			if !ok {
+	if cfg.EnableSCA {
+		for _, target := range cfg.Targets {
+			info, err := os.Stat(target)
+			if err != nil || !info.IsDir() {
 				continue
 			}
-			for _, img := range container.ImagesFromFile(rel, content) {
-				if scanned[img] {
+			for _, rel := range container.FindContainerSpecs(target) {
+				content, ok := container.ReadDockerfile(target, rel)
+				if !ok {
 					continue
 				}
-				scanned[img] = true
-				cr, err := scanContainerImage(ctx, cfg, img, rel)
-				if err != nil {
-					core.Warnf("container scan of %s failed: %v", img, err)
-					continue
+				for _, img := range container.ImagesFromFile(rel, content) {
+					if scanned[img] {
+						continue
+					}
+					scanned[img] = true
+					cr, err := scanContainerImage(ctx, cfg, img, rel)
+					if err != nil {
+						core.Warnf("container scan of %s failed: %v", img, err)
+						continue
+					}
+					result.Findings = append(result.Findings, cr.Findings...)
 				}
-				result.Findings = append(result.Findings, cr.Findings...)
 			}
 		}
 	}
