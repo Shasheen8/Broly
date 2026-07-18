@@ -87,7 +87,7 @@ broly scan --ai-triage --explain                  # + one-sentence attack scenar
 broly scan --ai-triage --adversarial              # + adversarial verify on critical SAST TPs
 broly scan --ai-triage --exploit-chains           # + exploit chains linking cross-scanner TPs
 
-# Container scanning (pulls and analyzes images — full OS package/CVE pass)
+# Container scanning (pulls and analyzes images - full OS package/CVE pass)
 broly scan --container alpine:3.19                # explicit image: pull + scan
 broly scan --container ./image.tar              # tarball
 broly scan .                                      # default scan also walks targets for Dockerfile / Compose and pulls each referenced base image
@@ -131,17 +131,17 @@ Each scanner outputs an aligned table in the terminal. Supports JSON (`-f json`)
 
 #### Agentic Triage (auto-enabled)
 
-When `--ai-triage` is used against a local directory (the default `.` target), high-severity SAST findings are automatically triaged with **agentic repo tool use**. The AI can read related files, search the repository, and trace cross-file data flow before deciding a verdict — instead of relying only on the visible code snippet.
+When `--ai-triage` is used against a local directory (the default `.` target), high-severity SAST findings are automatically triaged with **agentic repo tool use**. The AI can read related files, search the repository, and trace cross-file data flow before deciding a verdict - instead of relying only on the visible code snippet.
 
 Three tools are available to the model:
 
-- `repo_file_read` — read any file in the repo with optional line range
-- `repo_code_search` — search repo text (uses `git grep` when available)
-- `repo_find_files` — find tracked files by basename pattern
+- `repo_file_read` - read any file in the repo with optional line range
+- `repo_code_search` - search repo text (uses `git grep` when available)
+- `repo_find_files` - find tracked files by basename pattern
 
 The agent loop runs up to 5 rounds with a maximum of 8 tool executions. Tool results are capped at 16K characters. All file content is redacted for secrets before being returned to the model.
 
-No extra flags are needed — agentic triage activates automatically when:
+No extra flags are needed - agentic triage activates automatically when:
 
 1. `--ai-triage` is enabled
 2. The scan target is a directory (not a single file)
@@ -187,11 +187,11 @@ Example difference:
 
 Two-stage process:
 
-1. **Falsification filter** — fast single-prompt check: does the visible code directly disprove the finding? (hardcoded safe literal, code never reaches sink, visible upstream sanitization). If `DISPROVEN: YES`, the finding is immediately downgraded to `FALSE_POSITIVE` with `AdversarialVerdict: FALSIFIED`.
+1. **Falsification filter** - fast single-prompt check: does the visible code directly disprove the finding? (hardcoded safe literal, code never reaches sink, visible upstream sanitization). If `DISPROVEN: YES`, the finding is immediately downgraded to `FALSE_POSITIVE` with `AdversarialVerdict: FALSIFIED`.
 
-2. **Full adversarial verify** — if the falsification filter doesn't disprove it, an agent loop (≤3 rounds) with repo tools traces data flow across files, hunts for auth gates, framework protections, or test-only paths. Returns:
-   - `CONFIRMED` — an external entry point can reach the sink with real impact (finding stays `TRUE_POSITIVE`)
-   - `DISPUTED` — no reachable exploit path or visible defenses neutralize it (downgraded to `FALSE_POSITIVE`)
+2. **Full adversarial verify** - if the falsification filter doesn't disprove it, an agent loop (≤3 rounds) with repo tools traces data flow across files, hunts for auth gates, framework protections, or test-only paths. Returns:
+   - `CONFIRMED` - an external entry point can reach the sink with real impact (finding stays `TRUE_POSITIVE`)
+   - `DISPUTED` - no reachable exploit path or visible defenses neutralize it (downgraded to `FALSE_POSITIVE`)
 
 When a finding is downgraded, the verdict flips to `FALSE_POSITIVE` with `HIGH` confidence and the adversarial reason replaces the verdict reason. The table output shows `adversarial confirmed`, `adversarial disputed`, or `adversarial falsified` next to the verdict.
 
@@ -205,7 +205,7 @@ broly scan . --sast --ai-triage --adversarial
 
 `--exploit-chains` synthesizes multi-step attack narratives by linking 2-4 cross-scanner true positives. It requires `--ai-triage` (it builds on triage verdicts).
 
-Eligibility: at least 2 high-confidence `TRUE_POSITIVE` findings (or adversarial-confirmed) from **different scanner types** — SAST plus SCA, Secrets, Container, or Workflow. Known malicious packages are always eligible.
+Eligibility: at least 2 high-confidence `TRUE_POSITIVE` findings (or adversarial-confirmed) from **different scanner types** - SAST plus SCA, Secrets, Container, or Workflow. Known malicious packages are always eligible.
 
 The LLM is prompted with the eligible findings (capped at 30 by severity/priority) and returns up to 4 chains. Each chain is validated:
 
@@ -272,11 +272,11 @@ jobs:
       ai_api_key: ${{ secrets.AI_API_KEY }}
 ```
 
-Inputs: `min_severity`, `scanners` (`all` | `sast` | `sca` | `secrets`), and `ai_triage`. On pull requests it runs **secrets + SCA** on the full tree (and **pulls base images** referenced in Dockerfiles/Compose, same as local `broly scan`), runs **SAST** on changed code files only when `ai_api_key` is set, uploads SARIF to the GitHub Security tab, and posts a **summary PR comment** (findings table only — no fix blocks or false-positive checkboxes). Push/workflow_dispatch runs a full-repo scan with the same scanner selection rules.
+Inputs: `min_severity`, `scanners` (`all` | `sast` | `sca` | `secrets`), and `ai_triage`. On pull requests it runs **secrets + SCA** on the full tree (and **pulls base images** referenced in Dockerfiles/Compose, same as local `broly scan`), runs **SAST** on changed code files only when `ai_api_key` is set, uploads SARIF to the GitHub Security tab, and posts a **summary PR comment** (findings table only - no fix blocks or false-positive checkboxes). Push/workflow_dispatch runs a full-repo scan with the same scanner selection rules.
 
 ### Optional: `broly-app` (local GitHub App)
 
-`cmd/broly-app` is a webhook server for testing the **full PR experience** locally. It runs the same pipeline as the CLI — agentic SAST triage, adversarial verification, exploit chains, workflow/IaC scanning, and supply-chain audit — all against a local clone.
+`cmd/broly-app` is a webhook server for testing the **full PR experience** locally. It runs the same pipeline as the CLI - agentic SAST triage, adversarial verification, exploit chains, workflow/IaC scanning, and supply-chain audit - all against a local clone.
 
 On each pull request it:
 
