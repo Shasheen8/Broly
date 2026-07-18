@@ -1,8 +1,19 @@
-min_severity: low
-exclude_paths:
-  - vendor
-  - .git
-  - node_modules
-  - testdata
-workers: 8
-baseline_file: .broly-baseline.yaml
+# Broly project configuration.
+# Auto-loaded from repo root. CLI flags always override values here.
+# See https://github.com/Shasheen8/Broly for full documentation.
+#
+# min_severity: low            # info, low, medium, high, critical
+# exclude_paths:               # paths to skip during scanning
+#   - vendor
+#   - .git
+# workers: 8                   # parallel scanner workers
+# enable_workflow: false       # scan GitHub Actions workflows (auto-installs zizmor)
+# enable_iac: false            # scan IaC files (auto-installs checkov)
+# supply_chain: false          # audit deps against known-malicious package feeds
+#
+# License policy (findings only emitted when configured):
+# allowed_licenses:
+#   - MIT
+#   - Apache-2.0
+# denied_licenses:
+#   - GPL-3.0

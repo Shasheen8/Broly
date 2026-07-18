@@ -1,3 +1,19 @@
-suppress: []
-
-require: []
+# Broly baseline file for suppressing known false positives and requiring specific findings.
+# Use this to silence findings you have reviewed and confirmed are not real issues,
+# and to enforce that certain vulnerabilities are always detected.
+#
+# suppress:  silences findings by fingerprint (won't show in output)
+# require:   fails the scan if a finding is NOT detected (enforces security checks)
+#
+# To find a finding's fingerprint, run: broly scan -f json | jq '.findings[].fingerprint'
+# You can also suppress inline in source code:  # broly:ignore
+# Or target a specific rule:                     # broly:ignore SQL-INJECTION
+#
+# suppress:
+#   - fingerprint: "abc123..."
+#     reason: "test fixture, not a real secret"
+#
+# require:
+#   - rule_id: "SQL-INJECTION"
+#     file: "api/handlers.py"
+#     reason: "SQL injection in user lookup must be detected every scan"
