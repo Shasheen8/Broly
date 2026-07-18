@@ -45,6 +45,7 @@ type Config struct {
 	CachePath              string   `yaml:"cache_path" json:"cache_path"`
 	Quiet                  bool     `yaml:"quiet" json:"quiet"`
 	ContainerImage         string   `yaml:"container_image" json:"container_image"`
+	AutoContainers         bool     `yaml:"auto_containers" json:"auto_containers"`
 	SASTSliceFiles         int      `yaml:"sast_slice_files" json:"sast_slice_files"`
 	AllowedLicenses        []string `yaml:"allowed_licenses" json:"allowed_licenses"`
 	DeniedLicenses         []string `yaml:"denied_licenses" json:"denied_licenses"`

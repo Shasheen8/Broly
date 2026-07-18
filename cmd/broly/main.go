@@ -130,6 +130,7 @@ func scanCmd() *cobra.Command {
 		incremental         bool
 		cachePath           string
 		containerImage      string
+		autoContainers      bool
 		sastSliceFiles      int
 	)
 
@@ -147,6 +148,7 @@ SCANNERS
   --iac                  Enable IaC scanning: Terraform, K8s, Helm, CloudFormation (requires checkov)
   --supply-chain         Audit deps against known-malicious package feeds (requires depx)
   --container <image>    Scan a container image (image:tag, path/to/image.tar)
+  --auto-containers      Auto-discover and scan Dockerfile base images
 
 AI ENHANCEMENTS (require TOGETHER_API_KEY)
   --ai-triage            Verdict (TP/FP) + fix suggestion per finding
@@ -280,6 +282,9 @@ OTHER
 			if f.Changed("container") {
 				cfg.ContainerImage = containerImage
 			}
+			if f.Changed("auto-containers") {
+				cfg.AutoContainers = autoContainers
+			}
 			if f.Changed("sast-slice-files") {
 				cfg.SASTSliceFiles = sastSliceFiles
 			}
@@ -343,6 +348,7 @@ OTHER
 	flags.BoolVar(&incremental, "incremental", false, "Only re-scan SAST files changed since last run")
 	flags.StringVar(&cachePath, "cache-path", "", "Path to incremental scan cache (default: .broly-cache.json)")
 	flags.StringVar(&containerImage, "container", "", "Container image to scan (image:tag, path/to/image.tar)")
+	flags.BoolVar(&autoContainers, "auto-containers", false, "Auto-discover and scan Dockerfile base images")
 	flags.IntVar(&sastSliceFiles, "sast-slice-files", 0, "Max supporting files per SAST slice (default: 2)")
 
 	return cmd
@@ -373,7 +379,7 @@ func finalizeScannerSelection(cfg *core.Config, cliSAST, enableSAST, cliSCA, ena
 		cfg.EnableSecrets = enableSecrets
 	}
 
-	if !cfg.EnableSAST && !cfg.EnableSCA && !cfg.EnableSecrets && !cfg.EnableWorkflow && !cfg.EnableIaC && cfg.ContainerImage == "" {
+	if !cfg.EnableSAST && !cfg.EnableSCA && !cfg.EnableSecrets && !cfg.EnableWorkflow && !cfg.EnableIaC && cfg.ContainerImage == "" && !cfg.AutoContainers && !cfg.SupplyChain {
 		cfg.EnableSAST = true
 		cfg.EnableSCA = true
 		cfg.EnableSecrets = true
@@ -422,12 +428,11 @@ func runScan(cfg *core.Config) error {
 	}
 
 	// Auto-scan Dockerfile base images, skipping any explicit --container.
-	// Only auto-discover when SCA is enabled (container scanning is an SCA extension).
 	scanned := map[string]bool{}
 	if cfg.ContainerImage != "" {
 		scanned[cfg.ContainerImage] = true
 	}
-	if cfg.EnableSCA {
+	if cfg.AutoContainers {
 		for _, target := range cfg.Targets {
 			info, err := os.Stat(target)
 			if err != nil || !info.IsDir() {
@@ -584,8 +589,11 @@ func configuredScannerNames(cfg *core.Config) []string {
 	if cfg.EnableIaC {
 		scanners = append(scanners, "iac")
 	}
-	if cfg.ContainerImage != "" {
-		scanners = append(scanners, "container")
+	if cfg.SupplyChain {
+		scanners = append(scanners, "supply-chain")
+	}
+	if cfg.ContainerImage != "" || cfg.AutoContainers {
+		scanners = append(scanners, "containers")
 	}
 	if len(cfg.AllowedLicenses) > 0 || len(cfg.DeniedLicenses) > 0 {
 		scanners = append(scanners, "license")
