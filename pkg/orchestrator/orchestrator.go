@@ -12,6 +12,7 @@ import (
 	"github.com/Shasheen8/Broly/pkg/baseline"
 	"github.com/Shasheen8/Broly/pkg/chain"
 	"github.com/Shasheen8/Broly/pkg/core"
+	"github.com/Shasheen8/Broly/pkg/sca"
 	"github.com/Shasheen8/Broly/pkg/suppress"
 	"github.com/Shasheen8/Broly/pkg/triage"
 )
@@ -141,6 +142,23 @@ func (o *Orchestrator) Run(ctx context.Context) (*core.ScanResult, error) {
 		findings, baselineSuppressed = bl.Suppress(findings)
 	}
 	findings, additionalSuppressed = suppressByFingerprint(findings, o.config.AdditionalSuppressions)
+
+	// Supply chain audit: check dependencies against known-malicious package
+	// feeds via depx. Opt-in via --supply-chain.
+	if o.config.SupplyChain && len(o.config.Targets) > 0 {
+		scanRoot := o.config.Targets[0]
+		scCtx, scCancel := context.WithTimeout(ctx, 5*time.Minute)
+		defer scCancel()
+		malicious, err := sca.AuditMaliciousPackages(scCtx, scanRoot)
+		if err != nil {
+			core.Warnf("supply chain audit failed: %v", err)
+		} else if len(malicious) > 0 {
+			for i := range malicious {
+				malicious[i].ComputeIdentityKeys()
+			}
+			findings = append(findings, malicious...)
+		}
+	}
 
 	// AI triage: verdict + fix suggestion for SAST findings.
 	// Agentic triage (repo tool use) is auto-enabled for high-severity SAST

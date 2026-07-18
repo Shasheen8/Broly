@@ -73,6 +73,7 @@ broly scan --sca                                  # SCA only
 broly scan --sast                                 # SAST only (requires TOGETHER_API_KEY)
 broly scan --workflow                             # GitHub Actions workflow scanning (requires zizmor)
 broly scan --iac                                  # IaC scanning: Terraform, K8s, Helm, CloudFormation (requires checkov)
+broly scan --supply-chain                         # audit deps against known-malicious package feeds (requires depx)
 
 # AI enhancements
 broly scan --ai-filter-secrets                    # filter secrets false positives with AI
@@ -247,6 +248,20 @@ broly scan . --iac --ai-triage          # with AI verdict + fix
 ```
 
 Findings include severity (mapped from AWS Security Hub / CIS risk levels), code snippet, resource name, and rule-specific remediation. Rule IDs are prefixed with `broly.iac.` (e.g., `broly.iac.CKV_AWS_20`).
+
+### Supply Chain Audit
+
+`--supply-chain` audits dependencies against known-malicious package feeds using [depx](https://github.com/anomaly/depx). Requires the `depx` binary:
+
+```bash
+# install depx (see https://github.com/anomaly/depx)
+```
+
+```bash
+broly scan . --supply-chain
+```
+
+Malicious-package findings are always `CRITICAL` severity and never baseline-suppressible. Rule IDs are prefixed with `sca.malicious.` (e.g., `sca.malicious.known_bad_package`, `sca.malicious.typosquat`). References link to the OpenSSF malicious-packages advisory when available.
 
 ---
 

@@ -36,6 +36,7 @@ type Config struct {
 	AITriage               bool     `yaml:"ai_triage" json:"ai_triage"`
 	Adversarial            bool     `yaml:"adversarial" json:"adversarial"`
 	ExploitChains          bool     `yaml:"exploit_chains" json:"exploit_chains"`
+	SupplyChain            bool     `yaml:"supply_chain" json:"supply_chain"`
 	Explain                bool     `yaml:"explain" json:"explain"`
 	BaselineFile           string   `yaml:"baseline_file" json:"baseline_file"`
 	AdditionalSuppressions []string `yaml:"additional_suppressions" json:"additional_suppressions"`
