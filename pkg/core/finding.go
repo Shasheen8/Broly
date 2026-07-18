@@ -19,6 +19,7 @@ const (
 	ScanTypeContainer  ScanType = "container"
 	ScanTypeLicense    ScanType = "license"
 	ScanTypeWorkflow   ScanType = "workflow"
+	ScanTypeIaC        ScanType = "iac"
 )
 
 func (t ScanType) Label() string {
@@ -31,6 +32,8 @@ func (t ScanType) Label() string {
 		return "SAST"
 	case ScanTypeWorkflow:
 		return "GH Actions"
+	case ScanTypeIaC:
+		return "IaC"
 	case ScanTypeDockerfile:
 		return "DOCKERFILE"
 	case ScanTypeContainer:
@@ -215,6 +218,10 @@ func (f *Finding) ComputeFingerprint() {
 		data = fmt.Sprintf("%s:%s:%s:%s:%d",
 			f.Type, f.RuleID, f.FilePath, snippet, f.StartLine,
 		)
+	case ScanTypeIaC:
+		data = fmt.Sprintf("%s:%s:%s:%d:%s",
+			f.Type, f.RuleID, f.FilePath, f.StartLine, f.ArtifactPath,
+		)
 	default:
 		data = fmt.Sprintf("%s:%s:%s:%s:%d",
 			f.Type, f.RuleID, f.FilePath, f.Snippet, f.StartLine,
@@ -252,6 +259,12 @@ func (f *Finding) ComputeOrgMatchKey() {
 			f.PackageName,
 			f.PackageVersion,
 			f.Ecosystem,
+		)
+	case ScanTypeIaC:
+		parts = requiredKeyParts(
+			string(f.Type),
+			f.RuleID,
+			iacResourceType(f.ArtifactPath),
 		)
 	default:
 		f.OrgMatchKey = ""
@@ -318,6 +331,14 @@ func (f *Finding) ComputeBaselineMatchKey() {
 			"v1",
 			string(f.Type),
 			stableWorkflowFamily(*f),
+			normalizePathKeyPart(f.FilePath),
+			lineBucketKeyPart(f.StartLine),
+		)
+	case ScanTypeIaC:
+		parts = requiredKeyParts(
+			"v1",
+			string(f.Type),
+			f.RuleID,
 			normalizePathKeyPart(f.FilePath),
 			lineBucketKeyPart(f.StartLine),
 		)
@@ -415,6 +436,20 @@ func stableWorkflowFamily(f Finding) string {
 		return normalized
 	}
 	return stableSASTFamily(f)
+}
+
+func iacResourceType(resource string) string {
+	resource = strings.TrimSpace(resource)
+	if resource == "" {
+		return ""
+	}
+	if i := strings.IndexByte(resource, '.'); i > 0 {
+		return resource[:i]
+	}
+	if i := strings.IndexByte(resource, '/'); i > 0 {
+		return resource[:i]
+	}
+	return resource
 }
 
 func stableSASTFamily(f Finding) string {

@@ -84,7 +84,7 @@ func (f *TableFormatter) Format(w io.Writer, result *core.ScanResult) error {
 
 	printBanner(w, clr)
 
-	for _, scanType := range []core.ScanType{core.ScanTypeSecrets, core.ScanTypeSCA, core.ScanTypeSAST, core.ScanTypeWorkflow, core.ScanTypeDockerfile, core.ScanTypeContainer, core.ScanTypeLicense} {
+	for _, scanType := range []core.ScanType{core.ScanTypeSecrets, core.ScanTypeSCA, core.ScanTypeSAST, core.ScanTypeWorkflow, core.ScanTypeIaC, core.ScanTypeDockerfile, core.ScanTypeContainer, core.ScanTypeLicense} {
 		findings, ok := byScanType[scanType]
 		if !ok {
 			continue

@@ -6,6 +6,7 @@ type Config struct {
 	EnableSCA      bool     `yaml:"enable_sca" json:"enable_sca"`
 	EnableSecrets  bool     `yaml:"enable_secrets" json:"enable_secrets"`
 	EnableWorkflow bool     `yaml:"enable_workflow" json:"enable_workflow"`
+	EnableIaC      bool     `yaml:"enable_iac" json:"enable_iac"`
 
 	Workers     int   `yaml:"workers" json:"workers"`
 	MaxFileSize int64 `yaml:"max_file_size" json:"max_file_size"`

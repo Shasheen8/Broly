@@ -72,6 +72,7 @@ broly scan --secrets                              # secrets only
 broly scan --sca                                  # SCA only
 broly scan --sast                                 # SAST only (requires TOGETHER_API_KEY)
 broly scan --workflow                             # GitHub Actions workflow scanning (requires zizmor)
+broly scan --iac                                  # IaC scanning: Terraform, K8s, Helm, CloudFormation (requires checkov)
 
 # AI enhancements
 broly scan --ai-filter-secrets                    # filter secrets false positives with AI
@@ -231,6 +232,21 @@ broly scan . --workflow --ai-triage       # with AI verdict + fix
 ```
 
 Findings include severity, snippet, and rule-specific remediation suggestions. Rule IDs are prefixed with `zizmor.` (e.g., `zizmor.unpinned-uses`, `zizmor.template-injection`).
+
+### IaC Scanning
+
+`--iac` scans infrastructure-as-code files using [checkov](https://www.checkov.io/). Supports Terraform, Kubernetes, Helm, and CloudFormation. Requires the `checkov` binary:
+
+```bash
+pip install checkov          # or: pipx install checkov
+```
+
+```bash
+broly scan . --iac
+broly scan . --iac --ai-triage          # with AI verdict + fix
+```
+
+Findings include severity (mapped from AWS Security Hub / CIS risk levels), code snippet, resource name, and rule-specific remediation. Rule IDs are prefixed with `broly.iac.` (e.g., `broly.iac.CKV_AWS_20`).
 
 ---
 

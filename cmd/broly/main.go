@@ -16,6 +16,7 @@ import (
 	"github.com/Shasheen8/Broly/pkg/ai"
 	"github.com/Shasheen8/Broly/pkg/container"
 	"github.com/Shasheen8/Broly/pkg/core"
+	"github.com/Shasheen8/Broly/pkg/iac"
 	"github.com/Shasheen8/Broly/pkg/license"
 	"github.com/Shasheen8/Broly/pkg/orchestrator"
 	"github.com/Shasheen8/Broly/pkg/report"
@@ -73,6 +74,7 @@ func scanCmd() *cobra.Command {
 		enableSCA           bool
 		enableSecrets       bool
 		enableWorkflow      bool
+		enableIaC           bool
 		workers             int
 		minSeverity         string
 		excludePaths        []string
@@ -214,6 +216,9 @@ By default secrets, SCA, and SAST are enabled and the current directory is scann
 			if f.Changed("workflow") {
 				cfg.EnableWorkflow = enableWorkflow
 			}
+			if f.Changed("iac") {
+				cfg.EnableIaC = enableIaC
+			}
 
 			if cfg.Adversarial && !cfg.AITriage {
 				return fmt.Errorf("--adversarial requires --ai-triage")
@@ -241,6 +246,7 @@ By default secrets, SCA, and SAST are enabled and the current directory is scann
 	flags.BoolVar(&enableSCA, "sca", false, "Enable SCA scanning")
 	flags.BoolVar(&enableSecrets, "secrets", false, "Enable secrets scanning")
 	flags.BoolVar(&enableWorkflow, "workflow", false, "Enable GitHub Actions workflow scanning (requires zizmor)")
+	flags.BoolVar(&enableIaC, "iac", false, "Enable IaC scanning: Terraform, Kubernetes, Helm, CloudFormation (requires checkov)")
 	flags.IntVar(&workers, "workers", 8, "Number of parallel workers")
 	flags.StringVar(&minSeverity, "min-severity", "info", "Minimum severity: info, low, medium, high, critical")
 	flags.StringSliceVar(&excludePaths, "exclude", nil, "Paths to exclude from scanning")
@@ -296,7 +302,7 @@ func finalizeScannerSelection(cfg *core.Config, cliSAST, enableSAST, cliSCA, ena
 		cfg.EnableSecrets = enableSecrets
 	}
 
-	if !cfg.EnableSAST && !cfg.EnableSCA && !cfg.EnableSecrets && !cfg.EnableWorkflow && cfg.ContainerImage == "" {
+	if !cfg.EnableSAST && !cfg.EnableSCA && !cfg.EnableSecrets && !cfg.EnableWorkflow && !cfg.EnableIaC && cfg.ContainerImage == "" {
 		cfg.EnableSAST = true
 		cfg.EnableSCA = true
 		cfg.EnableSecrets = true
@@ -326,6 +332,9 @@ func runScan(cfg *core.Config) error {
 	}
 	if cfg.EnableWorkflow {
 		orch.Register(workflow.NewWorkflowScanner())
+	}
+	if cfg.EnableIaC {
+		orch.Register(iac.NewIaCScanner())
 	}
 	if cfg.ContainerImage != "" {
 		orch.Register(container.NewContainerScanner())
@@ -496,6 +505,9 @@ func configuredScannerNames(cfg *core.Config) []string {
 	}
 	if cfg.EnableWorkflow {
 		scanners = append(scanners, "workflow")
+	}
+	if cfg.EnableIaC {
+		scanners = append(scanners, "iac")
 	}
 	if cfg.ContainerImage != "" {
 		scanners = append(scanners, "container")
