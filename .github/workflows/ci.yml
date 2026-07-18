@@ -40,10 +40,10 @@ jobs:
         run: go vet ./...
 
   tag:
-    # Versioning rules:
-    #   PR merge  -> bump minor (v1.40 -> v1.41)
-    #   Direct push to main -> bump patch (v1.41 -> v1.42)
-    #   Breaking changes -> tag manually (v2.0)
+    # Versioning: v1.MINOR.0 (patch always 0, minor is the real version number)
+    # Old tags used v1.0.PATCH format (v1.0.40). New tags use v1.MINOR.0 (v1.41.0).
+    # The minor number continues from the old patch number.
+    # Go modules require three-part semver tags (v1.41.0, not v1.41).
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: build
     runs-on: ubuntu-latest
@@ -56,20 +56,23 @@ jobs:
       - name: Bump version and push tag
         run: |
           set -e
-          # Match both two-part (v1.41) and three-part (v1.0.39) tags.
-          latest=$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+(\.[0-9]+)?$' | head -1)
+          latest=$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.0$' | head -1)
           if [ -z "$latest" ]; then
-            next="v1.0"
+            # Fall back to old three-part tags (v1.0.40)
+            latest=$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+          fi
+          if [ -z "$latest" ]; then
+            next="v1.0.0"
           else
             major=$(echo "$latest" | cut -d. -f1 | tr -d v)
-            if echo "$latest" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
-              # Three-part: v1.0.39 -> patch becomes minor -> v1.40
-              patch=$(echo "$latest" | cut -d. -f3)
-              next="v${major}.$((patch + 1))"
+            minor=$(echo "$latest" | cut -d. -f2)
+            patch=$(echo "$latest" | cut -d. -f3)
+            if [ "$minor" -eq 0 ]; then
+              # Old format: v1.0.40 -> next is v1.41.0 (patch becomes minor)
+              next="v${major}.$((patch + 1)).0"
             else
-              # Two-part: v1.40 -> bump minor
-              minor=$(echo "$latest" | cut -d. -f2)
-              next="v${major}.$((minor + 1))"
+              # New format: v1.41.0 -> next is v1.42.0 (bump minor)
+              next="v${major}.$((minor + 1)).0"
             fi
           fi
           echo "Latest: ${latest:-none} -> Next: ${next}"
