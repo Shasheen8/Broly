@@ -33,6 +33,7 @@ type SASTScanner struct {
 	fileCache    *cache.Cache
 	incremental  bool
 	sliceFiles   int
+	vulnClasses  []string
 }
 
 func NewSASTScanner() *SASTScanner {
@@ -67,6 +68,8 @@ func (s *SASTScanner) Init(cfg *core.Config) error {
 	if s.sliceFiles <= 0 {
 		s.sliceFiles = defaultMaxContextFiles
 	}
+
+	s.vulnClasses = cfg.VulnClasses
 
 	s.incremental = cfg.Incremental
 	if s.incremental {
@@ -248,7 +251,7 @@ func (s *SASTScanner) scanFile(ctx context.Context, index *repoIndex, root, path
 		}
 		return false
 	}
-	prompt := buildPrompt(slice)
+	prompt := buildPrompt(slice, s.vulnClasses)
 
 	response, err := s.client.complete(ctx, prompt)
 	if err != nil {

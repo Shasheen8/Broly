@@ -24,6 +24,7 @@ import (
 	"github.com/Shasheen8/Broly/pkg/sbom"
 	"github.com/Shasheen8/Broly/pkg/sca"
 	"github.com/Shasheen8/Broly/pkg/secrets"
+	"github.com/Shasheen8/Broly/pkg/vulnclass"
 	"github.com/Shasheen8/Broly/pkg/workflow"
 )
 
@@ -134,6 +135,10 @@ func scanCmd() *cobra.Command {
 		sastSliceFiles      int
 	)
 
+	// vulnClassFlags holds one bool flag per registered vulnerability class
+	// (e.g. --idor, --xss), keyed by class name.
+	vulnClassFlags := make(map[string]*bool, len(vulnclass.All))
+
 	cmd := &cobra.Command{
 		Use:   "scan [paths...]",
 		Short: "Scan targets for security findings",
@@ -159,6 +164,7 @@ AI ENHANCEMENTS (require TOGETHER_API_KEY)
   --ai-sca-reachability  Check if vulnerable deps are actually called
   --package-intelligence Detect hallucinated/non-existent packages
 
+` + vulnClassHelpSection() + `
 OUTPUT
   -f, --format <fmt>     Output format: table, json, sarif (default: table)
   -o, --output <file>    Write output to file (default: stdout)
@@ -288,6 +294,17 @@ OTHER
 			if f.Changed("sast-slice-files") {
 				cfg.SASTSliceFiles = sastSliceFiles
 			}
+
+			// Vuln-class focus flags (e.g. --idor, --xss) override config file.
+			var requestedClasses []string
+			for _, vc := range vulnclass.All {
+				if *vulnClassFlags[vc.Name] {
+					requestedClasses = append(requestedClasses, vc.Name)
+				}
+			}
+			if len(requestedClasses) > 0 {
+				cfg.VulnClasses = requestedClasses
+			}
 			if f.Changed("workflow") {
 				cfg.EnableWorkflow = enableWorkflow
 			}
@@ -351,7 +368,24 @@ OTHER
 	flags.BoolVar(&autoContainers, "auto-containers", false, "Auto-discover and scan Dockerfile base images")
 	flags.IntVar(&sastSliceFiles, "sast-slice-files", 0, "Max supporting files per SAST slice (default: 2)")
 
+	for _, vc := range vulnclass.All {
+		vulnClassFlags[vc.Name] = flags.Bool(vc.Flag, false,
+			fmt.Sprintf("Focus scan on %s (%s)", vc.Title, strings.Join(vc.CWEs, ", ")))
+	}
+
 	return cmd
+}
+
+// vulnClassHelpSection renders the VULN CLASS FOCUS help section from the
+// vulnclass registry so the help text can never drift from the registered
+// classes and their CWE lists.
+func vulnClassHelpSection() string {
+	var sb strings.Builder
+	sb.WriteString("VULN CLASS FOCUS (showcase specific vulnerability detection)\n")
+	for _, vc := range vulnclass.All {
+		fmt.Fprintf(&sb, "  --%-21s %s (%s)\n", vc.Flag, vc.Title, strings.Join(vc.CWEs, "/"))
+	}
+	return sb.String()
 }
 
 // loadConfigFile reads .broly.yaml (or the specified path) and returns a Config with those values.
@@ -393,7 +427,11 @@ func runScan(cfg *core.Config) error {
 	if !cfg.Quiet {
 		printBanner()
 		fmt.Fprintf(os.Stderr, "  scanning %s\n", strings.Join(cfg.Targets, ", "))
-		fmt.Fprintf(os.Stderr, "  scanners: %s | workers: %d\n\n", strings.Join(configuredScannerNames(cfg), ", "), cfg.Workers)
+		fmt.Fprintf(os.Stderr, "  scanners: %s | workers: %d\n", strings.Join(configuredScannerNames(cfg), ", "), cfg.Workers)
+		for _, line := range vulnclass.InfoLines(cfg.VulnClasses) {
+			fmt.Fprintln(os.Stderr, line)
+		}
+		fmt.Fprintln(os.Stderr)
 	}
 
 	report.Version = version

@@ -1,6 +1,10 @@
 package sast
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/Shasheen8/Broly/pkg/vulnclass"
+)
 
 const codeFence = "```"
 
@@ -192,7 +196,8 @@ Analyze this Docker Compose file for security misconfigurations and vulnerabilit
 `
 
 // buildPrompt constructs the full security analysis prompt for a bounded analysis slice.
-func buildPrompt(slice analysisSlice) string {
+// vulnClasses optionally focuses the analysis on specific vulnerability classes.
+func buildPrompt(slice analysisSlice, vulnClasses []string) string {
 	var description string
 	var analysis string
 	language := slice.Primary.Language
@@ -230,5 +235,6 @@ func buildPrompt(slice analysisSlice) string {
 
 	return prompt +
 		analysis +
+		vulnclass.FocusSection(vulnClasses) +
 		promptResponseFormat
 }

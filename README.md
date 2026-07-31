@@ -87,6 +87,11 @@ broly scan --ai-triage --explain                  # + one-sentence attack scenar
 broly scan --ai-triage --adversarial              # + adversarial verify on critical SAST TPs
 broly scan --ai-triage --exploit-chains           # + exploit chains linking cross-scanner TPs
 
+# Vulnerability class focus (hunt specific bug classes)
+broly scan . --sast --ai-triage --idor            # IDOR/BOLA only, with AI verdicts
+broly scan . --sast --ai-triage --xss             # XSS only
+broly scan . --sqli --rce                         # combine classes
+
 # Container scanning (pulls and analyzes images - full OS package/CVE pass)
 broly scan --container alpine:3.19                # explicit image: pull + scan
 broly scan --container ./image.tar              # tarball
@@ -222,6 +227,45 @@ Use:
 broly scan . --ai-triage --exploit-chains
 ```
 
+### Vulnerability Class Focus
+
+`--<class>` flags focus the scan on specific vulnerability classes - useful for showcasing detection capability or hunting one bug class at a time:
+
+```bash
+broly scan . --sast --ai-triage --idor
+broly scan . --sast --ai-triage --xss
+broly scan . --sqli --rce --ssrf                    # combine classes
+```
+
+When a class is selected:
+
+- The SAST prompt gets a **focus section** telling the model to hunt only those classes, with per-class guidance (e.g. for IDOR: trace whether an ownership check exists between the user-supplied identifier and the data access - its absence IS the vulnerability)
+- Final findings from **all scanners** are filtered to the selected classes - matched by CWE ID first, then by keyword against rule ID/name/title/description/tags (whole-word matching, so `--rce` does not match "source")
+- An info blurb prints at scan start describing each selected class and how Broly detects it
+
+| Flag | Class | CWEs |
+|------|-------|------|
+| `--idor` | IDOR - Insecure Direct Object Reference | CWE-639, CWE-862, CWE-863 |
+| `--bola` | BOLA - Broken Object Level Authorization | CWE-639, CWE-862, CWE-863 |
+| `--sqli` | SQL Injection | CWE-89 |
+| `--xss` | Cross-Site Scripting | CWE-79, CWE-80 |
+| `--rce` | Remote Code / Command Execution | CWE-78, CWE-94, CWE-77, CWE-95 |
+| `--ssrf` | Server-Side Request Forgery | CWE-918 |
+| `--xxe` | XML External Entity Injection | CWE-611 |
+| `--path-traversal` | Path Traversal | CWE-22, CWE-23, CWE-73 |
+| `--deserialization` | Insecure Deserialization | CWE-502 |
+| `--open-redirect` | Open Redirect | CWE-601 |
+| `--weak-crypto` | Weak Cryptography | CWE-327, CWE-328, CWE-330, CWE-321 |
+| `--hardcoded-secret` | Hardcoded Secrets | CWE-798, CWE-321, CWE-259 |
+
+Also settable in `.broly.yaml` (CLI flags override):
+
+```yaml
+vuln_classes:
+  - idor
+  - xss
+```
+
 ### Workflow Scanning
 
 `--workflow` scans GitHub Actions workflows (`.github/workflows/*.yml`) and composite action manifests (`action.yml`/`action.yaml`) using [zizmor](https://docs.zizmor.sh/). If zizmor is not installed, Broly auto-installs it into `~/.cache/broly/venv/`:
@@ -285,11 +329,17 @@ Inputs: `min_severity`, `scanners` (`all` | `sast` | `sca` | `secrets`), `ai_tri
 On each pull request it:
 
 - Clones the PR head and runs **secrets + SCA + workflow + IaC** on the repo (auto-detected based on tool availability)
-- Runs **SAST** on changed code files only when `TOGETHER_API_KEY` is set (with agentic AI triage)
-- Runs **adversarial verification** on critical SAST true positives (CONFIRMED/DISPUTED/FALSIFIED)
+- Runs **SAST** on changed code files only when `TOGETHER_API_KEY` is set
+- Emits a **base-image advisory** for each changed Dockerfile/Compose `FROM` (compared against the base branch so unchanged images don't re-alert) instead of pulling images - SCA already covers language packages
+- **Scopes findings to the PR diff at line level**: SAST/secrets/IaC/workflow findings must land on a line the PR added or modified (parsed from GitHub's per-file patches); SCA/container findings match at file level, with file-level fallback when no patch is available
+- Runs **AI triage + adversarial verification** after diff scoping, so LLM budget is only spent on findings the PR actually introduced
 - Synthesizes **exploit chains** linking cross-scanner true positives
 - Runs **supply-chain audit** when `depx` is available
 - Posts a **check run** (summary + file annotations) and a **PR comment** (severity table, triage verdicts, adversarial status, collapsible fix suggestions, exploit chains, dismissed false positives, false-positive checkboxes)
+
+Push events run the same pipeline against the pushed commit (commit patches provide the same line-level scoping) and post a **check run** on the commit - no PR comment.
+
+Stage budgets: scan 10m, triage 15m, adversarial 10m, exploit chains 5m.
 
 Checkboxes in the PR comment are handled by [`.github/workflows/feedback.yml`](.github/workflows/feedback.yml): a maintainer checks a box, and the workflow commits the fingerprint to `.broly-baseline.yaml` on the PR branch.
 
@@ -323,6 +373,7 @@ additional_suppressions:                             # optional: suppress by fin
 enable_workflow: false                              # optional: scan GitHub Actions workflows with zizmor
 enable_iac: false                                   # optional: scan IaC files with checkov
 supply_chain: false                                 # optional: audit deps against malicious-package feeds
+vuln_classes: []                                    # optional: focus scan on vuln classes (idor, xss, sqli, ...)
 
 # License policy (findings only emitted when configured)
 allowed_licenses:

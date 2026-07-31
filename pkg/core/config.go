@@ -49,4 +49,9 @@ type Config struct {
 	SASTSliceFiles         int      `yaml:"sast_slice_files" json:"sast_slice_files"`
 	AllowedLicenses        []string `yaml:"allowed_licenses" json:"allowed_licenses"`
 	DeniedLicenses         []string `yaml:"denied_licenses" json:"denied_licenses"`
+
+	// VulnClasses focuses the scan on specific vulnerability classes
+	// (e.g. idor, xss, sqli). SAST prioritizes them and findings are
+	// filtered to matching classes. See pkg/vulnclass.
+	VulnClasses []string `yaml:"vuln_classes" json:"vuln_classes"`
 }

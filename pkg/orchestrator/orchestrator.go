@@ -16,6 +16,7 @@ import (
 	"github.com/Shasheen8/Broly/pkg/sca"
 	"github.com/Shasheen8/Broly/pkg/suppress"
 	"github.com/Shasheen8/Broly/pkg/triage"
+	"github.com/Shasheen8/Broly/pkg/vulnclass"
 )
 
 type Orchestrator struct {
@@ -139,6 +140,7 @@ func (o *Orchestrator) Run(ctx context.Context) (*core.ScanResult, error) {
 	// These always run regardless of baseline load success/failure.
 	findings = filterBySeverity(findings, o.config.MinSeverity)
 	findings = filterByRuleIDs(findings, o.config.IncludeRuleIDs, o.config.ExcludeRuleIDs)
+	findings = vulnclass.Filter(findings, o.config.VulnClasses)
 	findings, inlineSuppressed = suppress.Filter(findings)
 	if bl != nil {
 		findings, baselineSuppressed = bl.Suppress(findings)
