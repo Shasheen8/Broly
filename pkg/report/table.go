@@ -211,7 +211,7 @@ func printScanTypeTable(w io.Writer, clr color, scanType core.ScanType, findings
 		printSCATable(w, clr, findings)
 	case core.ScanTypeContainer:
 		printContainerTable(w, clr, findings)
-	case core.ScanTypeSAST, core.ScanTypeWorkflow:
+	case core.ScanTypeSAST, core.ScanTypeWorkflow, core.ScanTypeIaC:
 		printSASTTable(w, clr, findings)
 	case core.ScanTypeDockerfile:
 		printSASTTable(w, clr, findings)
