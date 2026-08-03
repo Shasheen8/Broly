@@ -28,7 +28,7 @@ Secrets · SCA · SAST · Workflow · IaC · Containers · SBOM · Supply Chain.
 | Scanner | Engine | AI Layer |
 |---------|--------|----------|
 | **Secrets** | [Titus](https://github.com/praetorian-inc/titus) · 487 rules · Hyperscan locally (Go regex in CI) | `--ai-filter-secrets` reduces false positives |
-| **SCA** | [osv-scalibr](https://github.com/google/osv-scalibr) + [osv.dev](https://osv.dev) · 20 ecosystems | `--ai-sca-reachability` · `--package-intelligence` for hallucinated deps |
+| **SCA** | [osv-scalibr](https://github.com/google/osv-scalibr) + [osv.dev](https://osv.dev) · 20 ecosystems | `--ai-sca-reachability` · `--package-intelligence` for hallucinated deps · deduplicates to top-severity vuln per package |
 | **SAST** | [Together AI](https://together.ai) · `zai-org/GLM-5.2` · 17 regex prefilter patterns | Slice-aware multi-file analysis · includes `Dockerfile`, `Containerfile`, and Compose files when `--sast` is enabled |
 | **Container** | [go-containerregistry](https://github.com/google/go-containerregistry) + [osv.dev](https://osv.dev) | Pulls and scans registry, local daemon, or tarball images · auto-discovers base images from Dockerfiles and Compose under scan targets |
 | **License** | File-based detection · 13 license types | Only runs when `allowed_licenses` or `denied_licenses` is set in `.broly.yaml` |
@@ -92,7 +92,7 @@ broly scan . --sast --ai-triage --idor            # IDOR/BOLA only, with AI verd
 broly scan . --sast --ai-triage --xss             # XSS only
 broly scan . --sqli --rce                         # combine classes
 
-# Container scanning (pulls and analyzes images - full OS package/CVE pass)
+# Container scanning (pulls and analyzes images — full OS package/CVE pass)
 broly scan --container alpine:3.19                # explicit image: pull + scan
 broly scan --container ./image.tar              # tarball
 broly scan .                                      # default scan also walks targets for Dockerfile / Compose and pulls each referenced base image
@@ -125,7 +125,7 @@ Each scanner outputs an aligned table in the terminal. Supports JSON (`-f json`)
 
 ### AI Triage
 
-`--ai-triage` adds an AI verdict in the terminal table for **SAST, SCA, and Workflow** findings (secrets, container, and IaC findings are not triaged in the CLI orchestrator):
+`--ai-triage` adds an AI verdict in the terminal table for **SAST, SCA, IaC, and Workflow** findings (secrets and container findings are not triaged in the CLI orchestrator):
 
 - `TRUE_POSITIVE` or `FALSE_POSITIVE`
 - confidence score
@@ -136,17 +136,17 @@ Each scanner outputs an aligned table in the terminal. Supports JSON (`-f json`)
 
 #### Agentic Triage (auto-enabled)
 
-When `--ai-triage` is used against a local directory (the default `.` target), high-severity SAST findings are automatically triaged with **agentic repo tool use**. The AI can read related files, search the repository, and trace cross-file data flow before deciding a verdict - instead of relying only on the visible code snippet.
+When `--ai-triage` is used against a local directory (the default `.` target), high-severity SAST findings are automatically triaged with **agentic repo tool use**. The AI can read related files, search the repository, and trace cross-file data flow before deciding a verdict — instead of relying only on the visible code snippet.
 
 Three tools are available to the model:
 
-- `repo_file_read` - read any file in the repo with optional line range
-- `repo_code_search` - search repo text (uses `git grep` when available)
-- `repo_find_files` - find tracked files by basename pattern
+- `repo_file_read` — read any file in the repo with optional line range
+- `repo_code_search` — search repo text (uses `git grep` when available)
+- `repo_find_files` — find tracked files by basename pattern
 
 The agent loop runs up to 5 rounds with a maximum of 8 tool executions. Tool results are capped at 16K characters. All file content is redacted for secrets before being returned to the model.
 
-No extra flags are needed - agentic triage activates automatically when:
+No extra flags are needed — agentic triage activates automatically when:
 
 1. `--ai-triage` is enabled
 2. The scan target is a directory (not a single file)
@@ -192,11 +192,11 @@ Example difference:
 
 Two-stage process:
 
-1. **Falsification filter** - fast single-prompt check: does the visible code directly disprove the finding? (hardcoded safe literal, code never reaches sink, visible upstream sanitization). If `DISPROVEN: YES`, the finding is immediately downgraded to `FALSE_POSITIVE` with `AdversarialVerdict: FALSIFIED`.
+1. **Falsification filter** — fast single-prompt check: does the visible code directly disprove the finding? (hardcoded safe literal, code never reaches sink, visible upstream sanitization). If `DISPROVEN: YES`, the finding is immediately downgraded to `FALSE_POSITIVE` with `AdversarialVerdict: FALSIFIED`.
 
-2. **Full adversarial verify** - if the falsification filter doesn't disprove it, an agent loop (max 3 rounds) with repo tools traces data flow across files, hunts for auth gates, framework protections, or test-only paths. Returns:
-   - `CONFIRMED` - an external entry point can reach the sink with real impact (finding stays `TRUE_POSITIVE`)
-   - `DISPUTED` - no reachable exploit path or visible defenses neutralize it (downgraded to `FALSE_POSITIVE`)
+2. **Full adversarial verify** — if the falsification filter doesn't disprove it, an agent loop (max 3 rounds) with repo tools traces data flow across files, hunts for auth gates, framework protections, or test-only paths. Returns:
+   - `CONFIRMED` — an external entry point can reach the sink with real impact (finding stays `TRUE_POSITIVE`)
+   - `DISPUTED` — no reachable exploit path or visible defenses neutralize it (downgraded to `FALSE_POSITIVE`)
 
 When a finding is downgraded, the verdict flips to `FALSE_POSITIVE` with `HIGH` confidence and the adversarial reason replaces the verdict reason. The table output shows `adversarial confirmed`, `adversarial disputed`, or `adversarial falsified` next to the verdict.
 
@@ -210,7 +210,7 @@ broly scan . --sast --ai-triage --adversarial
 
 `--exploit-chains` synthesizes multi-step attack narratives by linking 2-4 cross-scanner true positives. It requires `--ai-triage` (it builds on triage verdicts).
 
-Eligibility: at least 2 high-confidence `TRUE_POSITIVE` findings (or adversarial-confirmed) from **different scanner types** - SAST plus SCA, Secrets, Container, or Workflow. Known malicious packages are always eligible.
+Eligibility: at least 2 high-confidence `TRUE_POSITIVE` findings (or adversarial-confirmed) from **different scanner types** — SAST plus SCA, Secrets, Container, or Workflow. Known malicious packages are always eligible.
 
 The LLM is prompted with the eligible findings (capped at 30 by severity/priority) and returns up to 4 chains. Each chain is validated:
 
@@ -229,7 +229,7 @@ broly scan . --ai-triage --exploit-chains
 
 ### Vulnerability Class Focus
 
-`--<class>` flags focus the scan on specific vulnerability classes - useful for showcasing detection capability or hunting one bug class at a time:
+`--<class>` flags focus the scan on specific vulnerability classes — useful for showcasing detection capability or hunting one bug class at a time:
 
 ```bash
 broly scan . --sast --ai-triage --idor
@@ -239,14 +239,14 @@ broly scan . --sqli --rce --ssrf                    # combine classes
 
 When a class is selected:
 
-- The SAST prompt gets a **focus section** telling the model to hunt only those classes, with per-class guidance (e.g. for IDOR: trace whether an ownership check exists between the user-supplied identifier and the data access - its absence IS the vulnerability)
-- Final findings from **all scanners** are filtered to the selected classes - matched by CWE ID first, then by keyword against rule ID/name/title/description/tags (whole-word matching, so `--rce` does not match "source")
+- The SAST prompt gets a **focus section** telling the model to hunt only those classes, with per-class guidance (e.g. for IDOR: trace whether an ownership check exists between the user-supplied identifier and the data access — its absence IS the vulnerability)
+- Final findings from **all scanners** are filtered to the selected classes — matched by CWE ID first, then by keyword against rule ID/name/title/description/tags (whole-word matching, so `--rce` does not match "source")
 - An info blurb prints at scan start describing each selected class and how Broly detects it
 
 | Flag | Class | CWEs |
 |------|-------|------|
-| `--idor` | IDOR - Insecure Direct Object Reference | CWE-639, CWE-862, CWE-863 |
-| `--bola` | BOLA - Broken Object Level Authorization | CWE-639, CWE-862, CWE-863 |
+| `--idor` | IDOR — Insecure Direct Object Reference | CWE-639, CWE-862, CWE-863 |
+| `--bola` | BOLA — Broken Object Level Authorization | CWE-639, CWE-862, CWE-863 |
 | `--sqli` | SQL Injection | CWE-89 |
 | `--xss` | Cross-Site Scripting | CWE-79, CWE-80 |
 | `--rce` | Remote Code / Command Execution | CWE-78, CWE-94, CWE-77, CWE-95 |
@@ -293,7 +293,9 @@ Findings include severity (mapped from AWS Security Hub / CIS risk levels), code
 `--supply-chain` audits dependencies against known-malicious package feeds using [depx](https://github.com/projectdiscovery/depx). Requires the `depx` binary:
 
 ```bash
-# install depx (see https://github.com/projectdiscovery/depx)
+# install depx
+go install github.com/projectdiscovery/depx/v2/cmd/depx@latest
+# or download from https://github.com/projectdiscovery/depx/releases
 ```
 
 ```bash
@@ -320,26 +322,26 @@ jobs:
       iac: true
 ```
 
-Inputs: `min_severity`, `scanners` (`all` | `sast` | `sca` | `secrets`), `ai_triage`, `workflow`, and `iac`. On pull requests it runs **secrets + SCA** on the full tree (and **pulls base images** referenced in Dockerfiles/Compose, same as local `broly scan`), runs **SAST** on changed code files only when `ai_api_key` is set, uploads SARIF to the GitHub Security tab, and posts a **summary PR comment** (findings table only - no fix blocks or false-positive checkboxes). Push/workflow_dispatch runs a full-repo scan with the same scanner selection rules.
+Inputs: `min_severity`, `scanners` (`all` | `sast` | `sca` | `secrets`), `ai_triage`, `workflow`, and `iac`. On pull requests it runs **secrets + SCA** on the full tree (and **pulls base images** referenced in Dockerfiles/Compose, same as local `broly scan`), runs **SAST** on changed code files only when `ai_api_key` is set, uploads SARIF to the GitHub Security tab, and posts a **summary PR comment** (findings table only — no fix blocks or false-positive checkboxes). Push/workflow_dispatch runs a full-repo scan with the same scanner selection rules.
 
 ### Optional: `broly-app` (local GitHub App)
 
-`cmd/broly-app` is a webhook server for testing the **full PR experience** locally. It runs the same pipeline as the CLI - agentic SAST triage, adversarial verification, exploit chains, workflow/IaC scanning, and supply-chain audit - all against a local clone.
+`cmd/broly-app` is a webhook server for testing the **full PR experience** locally. It runs the same pipeline as the CLI — agentic SAST triage, adversarial verification, exploit chains, workflow/IaC scanning, and supply-chain audit — all against a local clone.
 
 On each pull request it:
 
-- Clones the PR head and runs **secrets + SCA + workflow + IaC** on the repo (auto-detected based on tool availability)
+- Clones the PR head and runs **secrets + SCA + workflow + IaC** on the repo (workflow/IaC auto-install on first use; no pre-install needed)
 - Runs **SAST** on changed code files only when `TOGETHER_API_KEY` is set
-- Emits a **base-image advisory** for each changed Dockerfile/Compose `FROM` (compared against the base branch so unchanged images don't re-alert) instead of pulling images - SCA already covers language packages
+- Emits a **base-image advisory** for each changed Dockerfile/Compose `FROM` (compared against the base branch so unchanged images don't re-alert) instead of pulling images — SCA already covers language packages
 - **Scopes findings to the PR diff at line level**: SAST/secrets/IaC/workflow findings must land on a line the PR added or modified (parsed from GitHub's per-file patches); SCA/container findings match at file level, with file-level fallback when no patch is available
 - Runs **AI triage + adversarial verification** after diff scoping, so LLM budget is only spent on findings the PR actually introduced
 - Synthesizes **exploit chains** linking cross-scanner true positives
 - Runs **supply-chain audit** when `depx` is available
 - Posts a **check run** (summary + file annotations) and a **PR comment** (severity table, triage verdicts, adversarial status, collapsible fix suggestions, exploit chains, dismissed false positives, false-positive checkboxes)
 
-Push events run the same pipeline against the pushed commit (commit patches provide the same line-level scoping) and post a **check run** on the commit - no PR comment.
+Push events run the same pipeline against the pushed commit (commit patches provide the same line-level scoping) and post a **check run** on the commit — no PR comment.
 
-Stage budgets: scan 10m, triage 15m, adversarial 10m, exploit chains 5m.
+Stage budgets: scan 3m, triage 3m, adversarial 2m, exploit chains 1m. Findings sorted critical-first in the PR comment. SCA deduplicates to the top-severity vulnerability per package (with total vuln count in the description).
 
 Checkboxes in the PR comment are handled by [`.github/workflows/feedback.yml`](.github/workflows/feedback.yml): a maintainer checks a box, and the workflow commits the fingerprint to `.broly-baseline.yaml` on the PR branch.
 
@@ -348,7 +350,21 @@ APP_ID=... PRIVATE_KEY_PATH=./broly.pem WEBHOOK_SECRET=... TOGETHER_API_KEY=... 
   go run ./cmd/broly-app
 ```
 
-Use [smee.io](https://smee.io) to forward GitHub webhooks to your machine while developing.
+Use [smee.io](https://smee.io) to forward GitHub webhooks to your machine while developing:
+
+1. Create a channel at [smee.io](https://smee.io) and copy the URL
+2. Set the webhook URL in your GitHub App settings to the smee.io URL
+3. Set a webhook secret and use the same value in `WEBHOOK_SECRET` below
+4. Start the proxy and the app:
+
+```bash
+# terminal 1: smee proxy
+npx smee-client --url https://smee.io/your-channel --target http://localhost:8080/webhook
+
+# terminal 2: broly-app
+APP_ID=... PRIVATE_KEY_PATH=./broly.pem WEBHOOK_SECRET=... TOGETHER_API_KEY=... \
+  go run ./cmd/broly-app
+```
 
 ---
 
@@ -400,7 +416,7 @@ suppress:
 require:
   - rule_id: "SQL-INJECTION"
     file: "api/handlers.py"
-    reason: "SQL injection in user lookup - must be detected"
+    reason: "SQL injection in user lookup — must be detected"
 ```
 
 ### Inline suppression
