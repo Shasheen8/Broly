@@ -301,7 +301,7 @@ func buildCommentBody(result *core.ScanResult) string {
 
 	// False positive checkboxes.
 	var fpFindings []core.Finding
-	for _, f := range result.Findings {
+	for _, f := range sorted {
 		if f.Fingerprint != "" {
 			fpFindings = append(fpFindings, f)
 		}

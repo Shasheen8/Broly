@@ -10,7 +10,7 @@ func Eligible(f core.Finding) bool {
 		return false
 	}
 	switch f.Type {
-	case core.ScanTypeSAST, core.ScanTypeSCA, core.ScanTypeWorkflow:
+	case core.ScanTypeSAST, core.ScanTypeSCA, core.ScanTypeWorkflow, core.ScanTypeIaC:
 		return true
 	default:
 		return false
