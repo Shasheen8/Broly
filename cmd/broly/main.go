@@ -54,11 +54,25 @@ SCANNERS
   license        File-based detection, 13 license types
   sbom           CycloneDX 1.5 or SPDX 2.3
 
+VULNERABILITY CLASSES (SAST detects via LLM + regex prefilter)
+  SQL Injection (CWE-89)              --sqli
+  Cross-Site Scripting (CWE-79/80)   --xss
+  Command Injection / RCE (CWE-78)    --rce
+  Server-Side Request Forgery (CWE-918)  --ssrf
+  XML External Entity (CWE-611)      --xxe
+  IDOR (CWE-639/862/863)              --idor
+  BOLA (CWE-639/862/863)              --bola
+  Path Traversal (CWE-22/23/73)      --path-traversal
+  Insecure Deserialization (CWE-502) --deserialization
+  Open Redirect (CWE-601)            --open-redirect
+  Weak Cryptography (CWE-327/328)    --weak-crypto
+  Hardcoded Secrets (CWE-798/321)    --hardcoded-secret
+
 AI FEATURES (require TOGETHER_API_KEY)
   --ai-triage              Verdict (TP/FP) + fix suggestion per finding
   --ai-triage --explain    + attack scenario per finding
-  --adversarial            Adversarial verify on critical SAST TPs
-  --exploit-chains         Link cross-scanner TPs into attack narratives
+  --adversarial            Adversarial verify on critical SAST/IaC TPs
+  --exploit-chains         Link critical cross-scanner TPs into attack narratives
   --ai-filter-secrets      Filter secrets false positives with AI
   --ai-sca-reachability    Check if vulnerable deps are actually called
   --package-intelligence   Detect hallucinated/non-existent packages
@@ -66,6 +80,8 @@ AI FEATURES (require TOGETHER_API_KEY)
 VULN CLASS FOCUS (narrow SAST to a specific vulnerability class)
   --sqli --xss --rce --ssrf --xxe --idor --bola --path-traversal
   --deserialization --open-redirect --weak-crypto --hardcoded-secret
+  Each flag focuses the LLM on one class with tailored detection guidance.
+  Multiple flags can be combined to focus on several classes at once.
 
 QUICK START
   broly scan                              # secrets + SCA + SAST
@@ -194,8 +210,8 @@ SCANNERS
 AI ENHANCEMENTS (require TOGETHER_API_KEY)
   --ai-triage            Verdict (TP/FP) + fix suggestion per finding
   --explain              Add a plain-language attack scenario per finding
-  --adversarial          Adversarial verify on critical SAST TPs (requires --ai-triage)
-  --exploit-chains       Synthesize exploit chains linking cross-scanner TPs (requires --ai-triage)
+  --adversarial          Adversarial verify on critical SAST/IaC TPs (requires --ai-triage)
+  --exploit-chains       Synthesize exploit chains linking critical cross-scanner TPs (requires --ai-triage)
   --ai-filter-secrets    Filter secrets false positives with AI
   --ai-sca-reachability  Check if vulnerable deps are actually called
   --package-intelligence Detect hallucinated/non-existent packages
