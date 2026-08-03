@@ -97,20 +97,7 @@ func BuildExploitChains(ctx context.Context, client llmClient, findings []core.F
 }
 
 func eligibleMix(input []core.Finding) bool {
-	if len(input) < 2 {
-		return false
-	}
-	hasSAST := false
-	hasCompanion := false
-	for _, f := range input {
-		switch f.Type {
-case core.ScanTypeSAST, core.ScanTypeDockerfile, core.ScanTypeIaC:
-		hasSAST = true
-	case core.ScanTypeSCA, core.ScanTypeSecrets, core.ScanTypeContainer, core.ScanTypeWorkflow:
-		hasCompanion = true
-		}
-	}
-	return hasSAST && hasCompanion
+	return len(input) >= 2
 }
 
 func eligibleFindings(findings []core.Finding) []core.Finding {
@@ -194,7 +181,8 @@ Your job is NOT to find new bugs. Identify 2-4 combinations of EXISTING findings
 
 Rules:
 - Only link findings listed below by fingerprint or rule_id.
-- Each chain must include at least 2 findings from different scanner types when possible.
+- Prefer chains that combine findings from different scanner types, but same-type chains are allowed when that is all that exists.
+- Each chain must include at least 2 findings.
 - Do not invent files, lines, packages, or findings.
 - Combined severity must not exceed the highest severity among linked findings.
 - Return at most 4 chains. If no plausible chain exists, return exactly: CHAINS: NONE
