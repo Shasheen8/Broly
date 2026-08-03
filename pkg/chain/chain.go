@@ -104,10 +104,10 @@ func eligibleMix(input []core.Finding) bool {
 	hasCompanion := false
 	for _, f := range input {
 		switch f.Type {
-		case core.ScanTypeSAST, core.ScanTypeDockerfile:
-			hasSAST = true
-		case core.ScanTypeSCA, core.ScanTypeSecrets, core.ScanTypeContainer, core.ScanTypeWorkflow:
-			hasCompanion = true
+case core.ScanTypeSAST, core.ScanTypeDockerfile, core.ScanTypeIaC:
+		hasSAST = true
+	case core.ScanTypeSCA, core.ScanTypeSecrets, core.ScanTypeContainer, core.ScanTypeWorkflow:
+		hasCompanion = true
 		}
 	}
 	return hasSAST && hasCompanion
@@ -124,6 +124,9 @@ func eligibleFindings(findings []core.Finding) []core.Finding {
 }
 
 func findingEligible(f core.Finding) bool {
+	if f.Severity != core.SeverityCritical {
+		return false
+	}
 	if f.IsMaliciousPackage() {
 		return true
 	}

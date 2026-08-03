@@ -27,7 +27,7 @@ func AdversarialEligible(f core.Finding) bool {
 	if strings.TrimSpace(f.Verdict) != "TRUE_POSITIVE" {
 		return false
 	}
-	return f.Type == core.ScanTypeSAST
+	return f.Type == core.ScanTypeSAST || f.Type == core.ScanTypeIaC
 }
 
 func (t *Triager) RunAdversarial(ctx context.Context, findings []core.Finding) []core.Finding {
@@ -135,6 +135,18 @@ func adversarialCodeContext(f *core.Finding, cloneDir string) string {
 		}
 		return ctx
 	case core.ScanTypeWorkflow:
+		var sb strings.Builder
+		if f.Snippet != "" {
+			sb.WriteString(f.Snippet)
+		}
+		if ctx := core.FileContext(absPath, f.StartLine, 12); ctx != "" {
+			if sb.Len() > 0 {
+				sb.WriteString("\n")
+			}
+			sb.WriteString(ctx)
+		}
+		return sb.String()
+	case core.ScanTypeIaC:
 		var sb strings.Builder
 		if f.Snippet != "" {
 			sb.WriteString(f.Snippet)

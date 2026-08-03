@@ -9,7 +9,7 @@ import (
 const codeFence = "```"
 
 // promptIntro is the intro section shared across all prompts (before the code block).
-const promptIntro = `As a cybersecurity expert, analyze the following %s for security vulnerabilities. Only report findings if you have a high level of confidence the finding is exploitable. Do not make assumptions or infer anything that is not explicitly apparent in the code being reviewed.
+const promptIntro = `You are a cybersecurity expert performing a security audit. Analyze the following %s for exploitable vulnerabilities with high precision. Report only vulnerabilities you are confident are exploitable based on the code provided — do not speculate or infer context that is not visible.
 
 File: %s
 Language: %s
@@ -19,11 +19,12 @@ Code:
 
 // promptResponseFormat is the response format shared across all prompts. The parser depends on this structure.
 const promptResponseFormat = `
-## Response Format:
+
+## Response Format
 
 If no vulnerabilities are found, respond with exactly: NO_FINDINGS
 
-Otherwise, for each finding use this exact format (separate multiple findings with a blank line):
+Otherwise, for each finding use this exact format. Separate multiple findings with a blank line and a --- line:
 
 - **Vulnerability Level**: [CRITICAL/HIGH/MEDIUM/LOW/INFO]
 - **Issue**: Brief description of the vulnerability.
@@ -38,14 +39,14 @@ Rules:
 - Focus on vulnerabilities that are proven to be exploitable based on the code provided.
 - Only report findings with high confidence.
 - Do not report informational style warnings or best practices that are not actual vulnerabilities.
-- Concrete FALSE POSITIVE patterns — do NOT report these:
+- Do NOT report these false-positive patterns:
   * String concatenation where the interpolated value is a hardcoded string literal, not a variable.
   * "Secrets" that are obvious placeholders (REPLACE_ME, YOUR_KEY_HERE, TODO, all-zero keys, well-known docs examples).
   * SQL/logging/format operations that are never executed (e.g., the formatted string is only logged or returned as text).
   * Test fixtures, example code, or documentation snippets that are intentionally vulnerable.
 - Do NOT skip a real vulnerability because the filename suggests "test" or "example" — security test fixtures are intentionally vulnerable and must be reported.
+- Output ONLY the findings in the format above. No preamble, no summary, no closing remarks.
 `
-
 // promptCodeAnalysis is the guidance section for general source code analysis.
 const promptCodeAnalysis = `
 

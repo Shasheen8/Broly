@@ -17,9 +17,11 @@ import (
 const (
 	promptVersionSAST             = "sast-v2"
 	promptVersionSASTExplain      = "sast-explain-v2"
-	promptVersionWorkflow         = "workflow-v2"
-	promptVersionWorkflowExplain  = "workflow-explain-v2"
-	promptVersionSCA              = "sca-v2"
+promptVersionWorkflow         = "workflow-v2"
+promptVersionWorkflowExplain  = "workflow-explain-v2"
+promptVersionIaC              = "iac-v1"
+promptVersionIaCExplain       = "iac-explain-v1"
+promptVersionSCA              = "sca-v2"
 	promptVersionSCAExplain       = "sca-explain-v2"
 	promptVersionContainer        = "container-v2"
 	promptVersionContainerExplain = "container-explain-v2"
@@ -254,6 +256,55 @@ FP_REASON: Required one sentence when verdict is FALSE_POSITIVE (may repeat REAS
 	return sb.String()
 }
 
+func buildIaCTriagePrompt(f *core.Finding, codeCtx string, explain bool, orgReasons []string) string {
+	var sb strings.Builder
+
+	sb.WriteString("You are a security expert triaging an infrastructure-as-code finding from checkov.\n\n")
+	fmt.Fprintf(&sb, "Scanner:     IaC (checkov)\n")
+	fmt.Fprintf(&sb, "Rule:        %s\n", f.RuleName)
+	fmt.Fprintf(&sb, "Severity:    %s\n", f.Severity.String())
+	fmt.Fprintf(&sb, "Description: %s\n", f.Description)
+	if f.FilePath != "" {
+		fmt.Fprintf(&sb, "File:        %s:%d\n", f.FilePath, f.StartLine)
+	}
+	if strings.TrimSpace(f.Snippet) != "" {
+		fmt.Fprintf(&sb, "\nFlagged resource:\n```hcl\n%s\n```\n", strings.TrimSpace(f.Snippet))
+	}
+	if strings.TrimSpace(codeCtx) != "" {
+		sb.WriteString("\nIaC context:\n```\n")
+		sb.WriteString(codeCtx)
+		sb.WriteString("\n```\n")
+	}
+
+	appendOrgFPReasonContext(&sb, orgReasons)
+
+	sb.WriteString(`
+Triage rules:
+- Default verdict is TRUE_POSITIVE. Checkov findings map to established cloud security benchmarks. Only emit FALSE_POSITIVE when the visible IaC clearly shows the issue is already remediated or the resource is explicitly non-production (e.g., a Terraform module used solely for ephemeral test environments with no real data).
+- Only mark FALSE_POSITIVE with HIGH confidence when the IaC already includes the missing safeguard (e.g., encryption is enabled, public access is blocked, or the security group is restricted).
+- Do NOT mark FALSE_POSITIVE because the resource "might not be deployed as-is" — assume the IaC is used as written.
+
+Fix guidance constraints:
+- Provide the minimal Terraform/HCL/YAML change to fix the issue.
+- Use valid syntax for the detected IaC format.
+- Do not invent resources or variables not visible in the provided context.
+- If the context is incomplete, say so in CODE_FIX.
+
+Respond with exactly:
+VERDICT: TRUE_POSITIVE or FALSE_POSITIVE
+CONFIDENCE: HIGH or MEDIUM or LOW
+REASON: One sentence.
+FP_REASON: Required one sentence when verdict is FALSE_POSITIVE (may repeat REASON).`)
+
+	if explain {
+		sb.WriteString("\nEXPLANATION: One sentence. Concrete attack scenario for this misconfiguration in a real cloud deployment.")
+	}
+	sb.WriteString("\nRECOMMENDATION: One short sentence with the minimal targeted remediation for this IaC file.")
+	sb.WriteString("\nCODE_FIX:\n<corrected Terraform/HCL snippet, or N/A if false positive>")
+
+	return sb.String()
+}
+
 type Triager struct {
 	client       *ai.Client
 	explain      bool
@@ -358,6 +409,11 @@ func PromptVersion(f core.Finding, explain bool, cloneDir string) string {
 			return promptVersionWorkflowExplain
 		}
 		return promptVersionWorkflow
+	case core.ScanTypeIaC:
+		if explain {
+			return promptVersionIaCExplain
+		}
+		return promptVersionIaC
 	default:
 		if explain {
 			return promptVersionSASTExplain
@@ -381,6 +437,13 @@ func promptForFinding(f *core.Finding, explain bool, cloneDir string, orgReasons
 			codeCtx = core.FileContext(absPath, f.StartLine, 12)
 		}
 		prompt = buildWorkflowTriagePrompt(f, codeCtx, explain, orgReasons)
+	case core.ScanTypeIaC:
+		var codeCtx string
+		absPath := safeAbsPath(cloneDir, f.FilePath)
+		if absPath != "" {
+			codeCtx = core.FileContext(absPath, f.StartLine, 10)
+		}
+		prompt = buildIaCTriagePrompt(f, codeCtx, explain, orgReasons)
 	default:
 		var codeCtx string
 		absPath := safeAbsPath(cloneDir, f.FilePath)
