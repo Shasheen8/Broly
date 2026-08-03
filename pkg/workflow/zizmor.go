@@ -29,6 +29,7 @@ type zizmorLocation struct {
 		Key struct {
 			Local *struct {
 				GivenPath string `json:"given_path"`
+				VerbatimPath string `json:"verbatim_path"`
 			} `json:"Local"`
 			Remote *struct {
 				Path string `json:"path"`
@@ -189,7 +190,11 @@ func primaryZizmorLocation(locs []zizmorLocation) (zizmorLocation, bool) {
 
 func workflowFilePath(loc zizmorLocation) string {
 	if loc.Symbolic.Key.Local != nil {
-		return normalizeWorkflowPath(loc.Symbolic.Key.Local.GivenPath)
+		p := loc.Symbolic.Key.Local.GivenPath
+		if p == "" {
+			p = loc.Symbolic.Key.Local.VerbatimPath
+		}
+		return normalizeWorkflowPath(p)
 	}
 	if loc.Symbolic.Key.Remote != nil {
 		return normalizeWorkflowPath(loc.Symbolic.Key.Remote.Path)
