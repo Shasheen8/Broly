@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sort"
 	"strings"
 	"time"
 
@@ -213,8 +214,18 @@ func buildCommentBody(result *core.ScanResult) string {
 		"TRUE_POSITIVE": "🔺", "FALSE_POSITIVE": "🟢",
 	}
 
+	// Sort findings: critical first, then high, medium, low; SAST before SCA.
+	sorted := make([]core.Finding, len(result.Findings))
+	copy(sorted, result.Findings)
+	sort.SliceStable(sorted, func(i, j int) bool {
+		if sorted[i].Severity != sorted[j].Severity {
+			return sorted[i].Severity < sorted[j].Severity
+		}
+		return sorted[i].Type < sorted[j].Type
+	})
+
 	limit := 30
-	for i, f := range result.Findings {
+	for i, f := range sorted {
 		if i >= limit {
 			break
 		}
