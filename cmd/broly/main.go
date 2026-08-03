@@ -63,13 +63,49 @@ AI FEATURES (require TOGETHER_API_KEY)
   --ai-sca-reachability    Check if vulnerable deps are actually called
   --package-intelligence   Detect hallucinated/non-existent packages
 
+VULN CLASS FOCUS (narrow SAST to a specific vulnerability class)
+  --sqli --xss --rce --ssrf --xxe --idor --bola --path-traversal
+  --deserialization --open-redirect --weak-crypto --hardcoded-secret
+
 QUICK START
   broly scan                              # secrets + SCA + SAST
   broly scan . --sast --ai-triage         # SAST with AI triage
-  broly scan . --workflow --iac          # IaC + workflow scanning
-  broly scan . --ai-triage --adversarial  # Full adversarial pipeline
-  broly sbom                              # Generate CycloneDX SBOM
-  broly update                            # Update to latest version
+  broly scan . --workflow --iac            # IaC + workflow scanning
+  broly scan . --supply-chain             # malicious package audit
+  broly scan . --sqli --ai-triage         # focus on SQL injection only
+  broly scan . --ai-triage --adversarial  # full adversarial pipeline
+  broly scan . -f sarif -o results.sarif   # SARIF for GitHub Security tab
+  broly scan . --container python:3.12    # scan a container image
+  broly scan . --auto-containers          # scan Dockerfile base images
+  broly sbom -f cyclonedx -o sbom.json    # generate CycloneDX SBOM
+  broly update                            # update to latest version
+
+CONFIGURATION
+  broly reads .broly.yaml from the repo root automatically.
+  CLI flags always override config file values.
+
+  .broly.yaml example:
+    min_severity: low
+    exclude_paths: [vendor, .git]
+    workers: 8
+    enable_workflow: true
+    enable_iac: true
+    supply_chain: true
+    vuln_classes: [sqli, xss]           # focus SAST on specific classes
+
+ENVIRONMENT VARIABLES
+  TOGETHER_API_KEY     Required for SAST, AI triage, adversarial, exploit chains
+  GITHUB_TOKEN         Used by secrets validation (--validate) and SCA reachability
+  DEPX_HOME            Override depx cache directory (default: $HOME/.cache/depx)
+
+EXIT CODES
+  0   No findings (clean scan)
+  1   Findings detected (or required baseline missing) — signals CI to fail
+  2   Operational error (bad flags, scan failure, missing tool)
+
+TOOL AUTO-INSTALL
+  zizmor and checkov auto-install into ~/.cache/broly/venv/ on first use.
+  depx must be installed manually: https://github.com/projectdiscovery/depx
 
 Built in Go for speed. Designed for local developer runs and CI.`,
 		SilenceUsage:  true,
@@ -182,7 +218,32 @@ OTHER
   --no-redact             Disable secret redaction in output
   --offline               Run SCA in offline mode (skip OSV API)
   -q, --quiet             Suppress progress output
-  --sast-slice-files <n>  Max supporting files per SAST slice (default: 2)`,
+  --sast-slice-files <n>  Max supporting files per SAST slice (default: 2)
+
+EXAMPLES
+  # Full scan with AI triage and adversarial verification
+  broly scan . --ai-triage --adversarial --exploit-chains
+
+  # SAST only, focused on SQL injection
+  broly scan . --sast --sqli --ai-triage --explain
+
+  # IaC + workflow scanning (auto-installs checkov + zizmor)
+  broly scan . --workflow --iac
+
+  # Supply-chain audit for malicious packages
+  broly scan . --supply-chain
+
+  # SARIF output for GitHub Security tab
+  broly scan . -f sarif -o results.sarif
+
+  # Scan a container image
+  broly scan --container python:3.12-slim
+
+  # Scan with custom config file
+  broly scan . --config .broly-prod.yaml
+
+  # Quiet mode for CI (findings only, no banner)
+  broly scan . -q -f json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
 				args = []string{"."}
