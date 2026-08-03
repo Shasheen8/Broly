@@ -6,9 +6,15 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/togethercomputer/together-go"
 	"golang.org/x/time/rate"
+)
+
+const (
+	maxRetries   = 3
+	retryBaseMs  = 500
 )
 
 const DefaultModel = "zai-org/GLM-5.2"
@@ -74,6 +80,45 @@ func (c *Client) Complete(ctx context.Context, prompt string, maxTokens int) (st
 		Temperature: together.Float(0.1),
 	})
 	if err != nil {
+		if isRetryable(err) {
+			for attempt := 1; attempt <= maxRetries; attempt++ {
+				wait := time.Duration(retryBaseMs*attempt) * time.Millisecond
+				select {
+				case <-ctx.Done():
+					return "", ctx.Err()
+				case <-time.After(wait):
+				}
+				resp, err = c.inner.Chat.Completions.New(ctx, together.ChatCompletionNewParams{
+					Model: together.ChatCompletionNewParamsModel(c.model),
+					Messages: []together.ChatCompletionNewParamsMessageUnion{
+						{
+							OfChatCompletionNewsMessageChatCompletionSystemMessageParam: &together.ChatCompletionNewParamsMessageChatCompletionSystemMessageParam{
+								Role:    "system",
+								Content: "You are a security expert. Follow instructions exactly. Respond with the requested format only — no preamble, no markdown formatting, no extra commentary.",
+							},
+						},
+						{
+							OfChatCompletionNewsMessageChatCompletionUserMessageParam: &together.ChatCompletionNewParamsMessageChatCompletionUserMessageParam{
+								Role: "user",
+								Content: together.ChatCompletionNewParamsMessageChatCompletionUserMessageParamContentUnion{
+									OfString: together.String(prompt),
+								},
+							},
+						},
+					},
+					MaxTokens: together.Int(int64(maxTokens)),
+					Reasoning: together.ChatCompletionNewParamsReasoning{
+						Enabled: together.Bool(false),
+					},
+					Temperature: together.Float(0.1),
+				})
+				if err == nil || !isRetryable(err) {
+					break
+				}
+			}
+		}
+	}
+	if err != nil {
 		return "", fmt.Errorf("together: %w", err)
 	}
 	if len(resp.Choices) == 0 {
@@ -84,4 +129,17 @@ func (c *Client) Complete(ctx context.Context, prompt string, maxTokens int) (st
 		return "", fmt.Errorf("empty content from model")
 	}
 	return content, nil
+}
+
+func isRetryable(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "503") ||
+		strings.Contains(msg, "502") ||
+		strings.Contains(msg, "429") ||
+		strings.Contains(msg, "Service Unavailable") ||
+		strings.Contains(msg, "Bad Gateway") ||
+		strings.Contains(msg, "rate limit")
 }
