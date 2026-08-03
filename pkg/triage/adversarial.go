@@ -3,6 +3,7 @@ package triage
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 	"sync"
 
@@ -51,14 +52,16 @@ func (t *Triager) RunAdversarial(ctx context.Context, findings []core.Finding) [
 	}
 
 	var wg sync.WaitGroup
-	sem := make(chan struct{}, 2)
+	sem := make(chan struct{}, 6)
 	for _, i := range eligible {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
+			slog.Info("adversarial start", "rule", findings[i].RuleName, "file", findings[i].FilePath, "line", findings[i].StartLine)
 			t.runAdversarialFinding(ctx, &out[i], repo)
+			slog.Info("adversarial done", "rule", findings[i].RuleName, "verdict", out[i].AdversarialVerdict)
 		}(i)
 	}
 	wg.Wait()

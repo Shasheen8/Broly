@@ -169,61 +169,83 @@ func (s *SCAScanner) emitFindings(
 		pkg := pkgs[i]
 		eco := pkg.Ecosystem()
 
-		for _, vuln := range vulnList.GetVulns() {
-			id := vuln.GetId()
+		vulns := vulnList.GetVulns()
+		if len(vulns) == 0 {
+			continue
+		}
 
-			var cve string
-			for _, alias := range vuln.GetAliases() {
-				if strings.HasPrefix(alias, "CVE-") {
-					cve = alias
-					break
-				}
+		// Keep only the highest-severity vuln per package; note total count.
+		var topVuln *osvschema.Vulnerability
+		var topSev core.Severity
+		var topCVSS float64
+		for _, v := range vulns {
+			sev, cvss := parseCVSSSeverity(v)
+			if topVuln == nil || sev < topSev || (sev == topSev && cvss > topCVSS) {
+				topVuln = v
+				topSev = sev
+				topCVSS = cvss
 			}
+		}
 
-			var refs []string
-			for _, ref := range vuln.GetReferences() {
-				refs = append(refs, ref.GetUrl())
-			}
+		vuln := topVuln
+		id := vuln.GetId()
 
-			location := ""
-			if len(pkg.Locations) > 0 {
-				location = pkg.Locations[0]
+		var cve string
+		for _, alias := range vuln.GetAliases() {
+			if strings.HasPrefix(alias, "CVE-") {
+				cve = alias
+				break
 			}
+		}
 
-			sev, cvss := parseCVSSSeverity(vuln)
-			finding := core.Finding{
-				Type:           core.ScanTypeSCA,
-				RuleID:         id,
-				RuleName:       id,
-				Severity:       sev,
-				CVSSScore:      cvss,
-				Title:          fmt.Sprintf("%s: %s@%s", id, pkg.Name, pkg.Version),
-				Description:    vuln.GetSummary(),
-				FilePath:       location,
-				StartLine:      1,
-				EndLine:        1,
-				PackageName:    pkg.Name,
-				PackageVersion: pkg.Version,
-				Ecosystem:      eco.String(),
-				FixedVersion:   osvutil.ResolveFixedVersion(ctx, s.osvClient, vuln, s.fixedCache),
-				CVE:            cve,
-				References:     refs,
-				Tags:           []string{"sca", strings.ToLower(eco.String())},
-				Timestamp:      time.Now(),
-			}
-			finding.ComputeIdentityKeys()
+		var refs []string
+		for _, ref := range vuln.GetReferences() {
+			refs = append(refs, ref.GetUrl())
+		}
 
-			// AI reachability analysis.
-			if s.reachability != nil {
-				res := s.reachability.analyze(ctx, finding, []string{scanRoot})
-				annotate(&finding, res)
-			}
+		location := ""
+		if len(pkg.Locations) > 0 {
+			location = pkg.Locations[0]
+		}
 
-			select {
-			case findings <- finding:
-			case <-ctx.Done():
-				return
-			}
+		description := vuln.GetSummary()
+		if len(vulns) > 1 {
+			description = fmt.Sprintf("%s\n\n*(%d total vulnerabilities in %s@%s — showing most severe: %s)*",
+				description, len(vulns), pkg.Name, pkg.Version, id)
+		}
+
+		finding := core.Finding{
+			Type:           core.ScanTypeSCA,
+			RuleID:         id,
+			RuleName:       id,
+			Severity:       topSev,
+			CVSSScore:      topCVSS,
+			Title:          fmt.Sprintf("%s: %s@%s", id, pkg.Name, pkg.Version),
+			Description:    description,
+			FilePath:       location,
+			StartLine:      1,
+			EndLine:        1,
+			PackageName:    pkg.Name,
+			PackageVersion: pkg.Version,
+			Ecosystem:      eco.String(),
+			FixedVersion:   osvutil.ResolveFixedVersion(ctx, s.osvClient, vuln, s.fixedCache),
+			CVE:            cve,
+			References:     refs,
+			Tags:           []string{"sca", strings.ToLower(eco.String())},
+			Timestamp:      time.Now(),
+		}
+		finding.ComputeIdentityKeys()
+
+		// AI reachability analysis.
+		if s.reachability != nil {
+			res := s.reachability.analyze(ctx, finding, []string{scanRoot})
+			annotate(&finding, res)
+		}
+
+		select {
+		case findings <- finding:
+		case <-ctx.Done():
+			return
 		}
 	}
 }

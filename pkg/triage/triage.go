@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"log/slog"
 	"strings"
 	"sync"
 
@@ -306,7 +307,7 @@ func (t *Triager) Run(ctx context.Context, findings []core.Finding) []core.Findi
 	}
 
 	var wg sync.WaitGroup
-	sem := make(chan struct{}, 2)
+	sem := make(chan struct{}, 6)
 
 	for i := range out {
 		if !Eligible(out[i]) {
@@ -317,7 +318,9 @@ func (t *Triager) Run(ctx context.Context, findings []core.Finding) []core.Findi
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
+			slog.Info("triage finding start", "rule", out[i].RuleName, "file", out[i].FilePath, "line", out[i].StartLine)
 			verdict, confidence, reason, explanation, recommendation, codeFix := t.triageFinding(ctx, &out[i], repo)
+			slog.Info("triage finding done", "rule", out[i].RuleName, "verdict", verdict, "confidence", confidence)
 			out[i].Verdict = verdict
 			out[i].Confidence = confidence
 			out[i].VerdictReason = reason

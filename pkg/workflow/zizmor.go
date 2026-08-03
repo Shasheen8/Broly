@@ -51,7 +51,7 @@ func runZizmor(ctx context.Context, target string) ([]core.Finding, error) {
 	if err != nil {
 		return nil, err
 	}
-	cmd := exec.CommandContext(ctx, ZizmorExecutable(), "--format=json-v1", "--no-exit-codes", target)
+	cmd := exec.CommandContext(ctx, ZizmorExecutable(), "--offline", "--format=json-v1", "--no-exit-codes", target)
 	out, err := cmd.Output()
 	if err != nil && len(out) == 0 {
 		if execErr, ok := err.(*exec.Error); ok && execErr.Err == exec.ErrNotFound {

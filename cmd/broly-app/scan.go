@@ -30,10 +30,10 @@ import (
 )
 
 const (
-	scanTimeout        = 10 * time.Minute
-	triageTimeout      = 15 * time.Minute
-	adversarialTimeout = 10 * time.Minute
-	chainTimeout       = 5 * time.Minute
+	scanTimeout        = 3 * time.Minute
+	triageTimeout      = 3 * time.Minute
+	adversarialTimeout = 2 * time.Minute
+	chainTimeout       = 1 * time.Minute
 )
 
 // baseImageAdvisoryRuleID marks the synthetic advisory for a changed Dockerfile
@@ -58,9 +58,11 @@ func (a *App) scanPR(ctx context.Context, client *github.Client, req scanRequest
 		return
 	}
 	defer cleanup()
+	slog.Info("clone complete", "repo", repo, "pr", req.prNumber)
 
 	// Changed files + per-file added-line maps for diff scoping.
 	changed, diffs := getChangedFiles(scanCtx, client, req)
+	slog.Info("diff fetched", "repo", repo, "pr", req.prNumber, "changed_files", len(changed))
 
 	// Base-branch FROM images, so only PR-changed base images get advisories.
 	baseImages := baseBranchDockerfileImages(scanCtx, client, req, changed)
@@ -73,6 +75,7 @@ func (a *App) scanPR(ctx context.Context, client *github.Client, req scanRequest
 		postCheckRunError(scanCtx, client, req, fmt.Sprintf("Scan failed: %v", err))
 		return
 	}
+	slog.Info("scan phase done", "repo", repo, "pr", req.prNumber, "findings", len(result.Findings), "duration_ms", result.Duration.Milliseconds())
 
 	stripPrefix(result, dir)
 
@@ -87,9 +90,12 @@ func (a *App) scanPR(ctx context.Context, client *github.Client, req scanRequest
 	if len(changed) > 0 {
 		result.Findings = filterToPRDiffScope(result.Findings, changed, diffs)
 	}
+	slog.Info("diff scoped", "repo", repo, "pr", req.prNumber, "scoped_findings", len(result.Findings))
 
 	// AI triage + adversarial verification on the diff-scoped set only.
+	triageStart := time.Now()
 	result.Findings = triageFindings(dir, result.Findings)
+	slog.Info("triage complete", "repo", repo, "pr", req.prNumber, "findings", len(result.Findings), "duration_ms", time.Since(triageStart).Milliseconds())
 
 	// Exploit chains link cross-scanner true positives.
 	if chain.Eligible(result.Findings) {
@@ -98,6 +104,7 @@ func (a *App) scanPR(ctx context.Context, client *github.Client, req scanRequest
 		chainCancel()
 		result.Findings = chainedFindings
 		result.ExploitChains = chains
+		slog.Info("exploit chains built", "repo", repo, "pr", req.prNumber, "chains", len(chains))
 	}
 
 	slog.Info("scan complete",
@@ -383,11 +390,11 @@ func runBrolyScan(ctx context.Context, dir string, changedFiles []string) (*core
 		Quiet:         true,
 	}
 
-	// Only register workflow/IaC scanners when relevant files exist.
-	if workflow.ZizmorAvailable() && (len(changedFiles) == 0 || workflow.TouchesWorkflowDefinitions(changedFiles)) {
+	// Register workflow/IaC scanners when relevant files exist; Init() auto-installs.
+	if len(changedFiles) == 0 || workflow.TouchesWorkflowDefinitions(changedFiles) {
 		cfg.EnableWorkflow = true
 	}
-	if iac.CheckovAvailable() && (len(changedFiles) == 0 || iac.TouchesIaCDefinitions(changedFiles)) {
+	if len(changedFiles) == 0 || iac.TouchesIaCDefinitions(changedFiles) {
 		cfg.EnableIaC = true
 	}
 	if sca.DepxAvailable() {
