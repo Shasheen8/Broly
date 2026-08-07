@@ -268,15 +268,47 @@ func matchesClass(f core.Finding, c Class) bool {
 			}
 			continue
 		}
-		if strings.Contains(text, kw) {
+		if containsPhrase(text, kw) {
 			return true
 		}
 	}
 	return false
 }
 
-// isWordKeyword reports whether a keyword is a single alphanumeric word, in
-// which case it must match a whole token (so "rce" cannot match "source").
+// containsPhrase reports whether phrase occurs in text bounded by non-word
+// characters (or the start/end of text) on both sides. This prevents
+// "access control" from matching "bypass access controls" or "access
+// controller". Single-word keywords are handled by the token path above and
+// never reach this function.
+func containsPhrase(text, phrase string) bool {
+	idx := 0
+	for {
+		pos := strings.Index(text[idx:], phrase)
+		if pos < 0 {
+			return false
+		}
+		start := idx + pos
+		end := start + len(phrase)
+		if wordBoundary(text, start) && wordBoundary(text, end) {
+			return true
+		}
+		idx = start + 1
+	}
+}
+
+// wordBoundary reports whether the position at off in text sits on a word
+// boundary (start/end of text, or a non-alphanumeric character on either side).
+func wordBoundary(text string, off int) bool {
+	if off <= 0 || off >= len(text) {
+		return true
+	}
+	prev := rune(text[off-1])
+	next := rune(text[off])
+	isWord := func(r rune) bool {
+		return (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9')
+	}
+	return !isWord(prev) || !isWord(next)
+}
 func isWordKeyword(kw string) bool {
 	for _, r := range kw {
 		if (r < 'a' || r > 'z') && (r < '0' || r > '9') {

@@ -72,6 +72,24 @@ func TestMultiWordKeywordSubstring(t *testing.T) {
 	}
 }
 
+func TestMultiWordKeywordWordBoundary(t *testing.T) {
+	// "access controls" (plural) must NOT match the idor keyword "access control".
+	f := core.Finding{Title: "SQL Injection", Description: "An attacker can bypass access controls to extract data."}
+	if MatchesAny(f, []string{"idor"}) {
+		t.Fatal("'access controls' must not match idor keyword 'access control'")
+	}
+	// A genuine idor mention of "access control" should still match.
+	f2 := core.Finding{Title: "Missing access control on /api/Cards/:id", Description: "No ownership check."}
+	if !MatchesAny(f2, []string{"idor"}) {
+		t.Fatal("'access control' as its own phrase should match idor")
+	}
+	// "object references" (plural) must not match "object reference".
+	f3 := core.Finding{Description: "The function returns object references for cleanup."}
+	if MatchesAny(f3, []string{"idor"}) {
+		t.Fatal("'object references' must not match idor keyword 'object reference'")
+	}
+}
+
 func TestPunctuatedKeywordSubstring(t *testing.T) {
 	f := core.Finding{Description: "subprocess.run(cmd, shell=True) with user input"}
 	if !MatchesAny(f, []string{"rce"}) {
