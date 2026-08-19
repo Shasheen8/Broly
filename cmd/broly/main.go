@@ -129,6 +129,7 @@ Built in Go for speed. Designed for local developer runs and CI.`,
 	}
 
 	root.AddCommand(scanCmd())
+	root.AddCommand(routesCmd())
 	root.AddCommand(sbomCmd())
 	root.AddCommand(versionCmd())
 	root.AddCommand(validateCmd())
