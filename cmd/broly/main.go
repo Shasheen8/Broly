@@ -94,6 +94,7 @@ QUICK START
   broly scan . --container python:3.12    # scan a container image
   broly scan . --auto-containers          # scan Dockerfile base images
   broly sbom -f cyclonedx -o sbom.json    # generate CycloneDX SBOM
+  broly changelog generate --write        # AI-draft a changelog entry
   broly update                            # update to latest version
 
 CONFIGURATION
@@ -131,6 +132,7 @@ Built in Go for speed. Designed for local developer runs and CI.`,
 	root.AddCommand(scanCmd())
 	root.AddCommand(routesCmd())
 	root.AddCommand(sbomCmd())
+	root.AddCommand(changelogCmd())
 	root.AddCommand(versionCmd())
 	root.AddCommand(validateCmd())
 	root.AddCommand(updateCmd())

@@ -77,6 +77,22 @@ broly update                            # update to latest version
 
 ---
 
+## Changelog
+
+Public changelog: **https://shasheen8.github.io/Broly/** ([RSS](https://shasheen8.github.io/Broly/feed.xml))
+
+AI-generated from git history, reviewed by a human, served by GitHub Pages:
+
+```bash
+broly changelog generate --since v1.66.0        # draft to stdout
+broly changelog generate --since v1.66.0 --write # save draft for review
+broly changelog build                            # render site data from entries
+```
+
+Entries live in [`changelog/entries/`](changelog/entries) as editable markdown — the model drafts, you correct and enrich, the site publishes what you approved. Maintainer context that isn't in the commits can be passed with `--notes`.
+
+---
+
 ## AI Features
 
 **AI Triage** (`--ai-triage`) adds a TRUE_POSITIVE / FALSE_POSITIVE verdict, confidence, reasoning, and a targeted code fix for SAST, SCA, IaC, and Workflow findings. Add `--explain` for a plain-language attack scenario per finding.

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Broly Changelog</title>
+  <meta name="description" content="Release notes for Broly, the CLI-first berserker code security scanner.">
+  <link rel="icon" href="broly-logo.png" type="image/png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="glow" aria-hidden="true"></div>
+    <div class="header-inner">
+      <a class="brand" href="#" rel="home">
+        <img src="broly-logo.png" alt="Broly logo" width="44" height="44">
+        <span>
+          <strong>Broly</strong>
+          <em>Changelog</em>
+        </span>
+      </a>
+      <nav class="header-actions">
+        <a class="action" href="feed.xml" title="RSS feed">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M4 11a9 9 0 0 1 9 9h3A12 12 0 0 0 4 8v3zm0-7a16 16 0 0 1 16 16h3A19 19 0 0 0 4 1v3zM6 17a2 2 0 1 1 0 4 2 2 0 0 1 0-4z"/></svg>
+          RSS
+        </a>
+        <a class="action" id="repo-link" href="https://github.com/Shasheen8/Broly" title="Source on GitHub">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M12 1a11 11 0 0 0-3.5 21.4c.5.1.7-.2.7-.5v-1.8c-2.8.6-3.4-1.4-3.4-1.4-.4-1.1-1.1-1.5-1.1-1.5-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.6 2.4 1.1 3 .9.1-.7.4-1.1.6-1.4-2.2-.3-4.6-1.1-4.6-5 0-1.1.4-2 1-2.7-.1-.2-.4-1.3.1-2.6 0 0 .8-.3 2.7 1a9.3 9.3 0 0 1 5 0c1.9-1.3 2.7-1 2.7-1 .5 1.3.2 2.4.1 2.6.6.7 1 1.6 1 2.7 0 3.9-2.4 4.7-4.6 5 .4.3.7.9.7 1.9v2.8c0 .3.2.6.7.5A11 11 0 0 0 12 1z"/></svg>
+          GitHub
+        </a>
+      </nav>
+    </div>
+    <p class="tagline">Berserker code security scanner — every release, in plain terms.</p>
+  </header>
+
+  <main>
+    <div class="filters" id="filters" role="group" aria-label="Filter changes by type"></div>
+    <ol class="timeline" id="timeline"></ol>
+    <div class="state" id="state" hidden></div>
+  </main>
+
+  <footer class="site-footer">
+    <p>Entries drafted by <code>broly changelog</code>, reviewed by a human, rendered by ~150 lines of vanilla JS.</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
