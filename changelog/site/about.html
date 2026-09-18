@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Broly Changelog: About</title>
+  <meta name="description" content="How this changelog is made: the tool, the review workflow, and the design decisions behind it.">
+  <link rel="icon" href="broly-logo.png" type="image/png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="glow" aria-hidden="true"></div>
+    <div class="header-inner">
+      <a class="brand" href="index.html" title="Back to the changelog">
+        <img src="broly-logo.png" alt="Broly logo" width="44" height="44">
+        <span>
+          <strong>Broly</strong>
+          <em>Changelog</em>
+        </span>
+      </a>
+      <nav class="header-actions">
+        <a class="action" href="index.html">Changelog</a>
+        <a class="action" href="feed.xml" title="RSS feed">RSS</a>
+        <a class="action" href="https://github.com/Shasheen8/Broly" title="Source on GitHub">GitHub</a>
+      </nav>
+    </div>
+    <p class="tagline">Why this changelog exists, and how it is made.</p>
+  </header>
+
+  <main class="about">
+    <h1>Broly Changelog</h1>
+<p>Live site: https://shasheen8.github.io/Broly/ | RSS: https://shasheen8.github.io/Broly/feed.xml | About: https://shasheen8.github.io/Broly/about.html</p>
+<p>This file is rendered into the site&#39;s About page by <code>broly changelog build</code>, so the repo README and the public page can never drift apart.</p>
+<p>An AI-generated changelog for <a href="https://github.com/Shasheen8/Broly" rel="noopener">Broly</a>, a CLI-first code security scanner (secrets, SCA, SAST, workflow, IaC, containers, SBOM) with 200+ commits of release history. Broly is an active open-source project that was presented at <strong>DEF CON 34 AppSec Village Arsenal</strong> as &#34;Broly: Rebuilding Code Security With Signal, Speed, and AI&#34;.</p>
+<p>This directory holds both halves of the changelog system:</p>
+<ol>
+<li>A developer-facing tool: the <code>broly changelog</code> subcommand, part of the CLI itself.</li>
+<li>A public-facing static site: <code>site/</code>, deployed to GitHub Pages on every push.</li>
+</ol>
+<pre><code>broly changelog generate --since v1.66.0 --write   # AI drafts an entry
+        (human reviews and edits the markdown)
+broly changelog build                              # entries -&gt; changelog.json + feed.xml
+        (push to main; CI builds and deploys the site)
+</code></pre>
+<hr>
+<h2>Why it is built this way</h2>
+<h3>The tool is a subcommand, not a separate repo</h3>
+<p>Broly is a CLI tool, so its changelog generator is a CLI command. A maintainer who already runs <code>broly scan</code> in this repo writes release notes with <code>broly changelog generate</code>. There is nothing new to install, no second service to run, and the generator reuses the same Together AI client (<code>pkg/ai</code>) that powers SAST and triage. Dogfooding was the whole point: a tool for builders should be built with itself.</p>
+<h3>The audience rule</h3>
+<p>A changelog has two possible audiences: maintainers (who know the code) and users (who only see releases). This one is written for users. The generation prompt enforces a hard rule: internal refactors, CI chores, dependency bumps, and doc reorganization are omitted unless they change observable behavior (flags, commands, config, output formats, exit codes). Six commits can become two bullets if that is what the story needs.</p>
+<h3>Diffs, not just commit messages</h3>
+<p>Commit subjects undersell most changes (&#34;fix: word boundaries&#34; tells a user nothing). The generator collects each commit&#39;s message, body, touched files, and line counts, and attaches trimmed diffs to the most user-facing commits (feature work, anything touching <code>cmd/</code>, anything with breaking-sounding language). The model reads what actually changed and writes what it means. For context that never made it into a commit message, <code>--notes &#34;why we shipped this&#34;</code> passes maintainer intent straight into the prompt.</p>
+<h3>Draft, review, publish</h3>
+<p>The model never publishes. It writes a draft in a format designed for human editing: markdown with frontmatter, saved under <code>entries/</code>. The maintainer corrects wording, drops noise, and adds context the git history cannot show, then commits. Only reviewed entries reach the site. This mirrors how security tooling handles LLM output elsewhere in Broly (AI triage proposes verdicts; humans accept them), so the trust model is consistent across the product.</p>
+<h3>Guardrails on the model</h3>
+<ul>
+<li>The response is a JSON schema; anything unparseable fails loudly instead of guessing.</li>
+<li>Every commit reference the model returns is validated against the real commit window; invented SHAs are silently dropped and real ones get exact GitHub URLs.</li>
+<li>The prompt says &#34;never invent changes&#34; and caps the window at 150 commits so the model summarizes instead of listing.</li>
+</ul>
+<h3>The site is deliberately boring to deploy</h3>
+<p><code>site/</code> is three files: <code>index.html</code>, <code>style.css</code>, <code>app.js</code> (vanilla JS, no framework, no build step, no dependencies) plus the JSON the Go tool renders from entries. GitHub Actions runs <code>broly changelog build</code> and copies the directory to Pages. Nothing to npm install, nothing that can break CI with a transitive dependency, and it still looks sharp: dark terminal aesthetic, release timeline with category colors, filter chips, commit chips linking to GitHub, per-release diff stats, and a red glow on releases containing breaking changes. The build output (<code>changelog.json</code>, <code>feed.xml</code>) is gitignored and regenerated in CI, so the repo only ever stores reviewed source.</p>
+<p>Patterns borrowed from changelogs that do this well (Stripe, Twilio): breaking-change visibility up front, one-line summaries with links to detail, an RSS feed for subscribers, and reverse-chronological paging (4 releases per page, hash-addressable, so an RSS link like <code>#v1-0-28</code> lands on the right page).</p>
+<p>One deliberate style rule: ASCII punctuation only, in the README, the site, and generated entries. Broly is a terminal-first tool, and its docs render in terminals, editors, RSS readers, and browsers alike.</p>
+<hr>
+<h2>Layout</h2>
+<pre><code>changelog/
+  entries/    reviewed markdown, one file per release (frontmatter + sections)
+  site/       static site; app.js fetches changelog.json, about.html is
+              generated from this README at build time
+  README.md   this file
+</code></pre>
+<pre><code>pkg/changelog/
+  git.go       commit window collection, diffstats, repo remote resolution
+  generate.go  prompt assembly, model call, JSON validation
+  entry.go     entry types, markdown render/parse round-trip
+  site.go      entries -&gt; changelog.json + RSS feed
+cmd/broly/
+  changelog.go the generate/build subcommands
+.github/workflows/
+  pages.yml    CI: build site data, deploy to GitHub Pages
+</code></pre>
+<h2>Tools used to build this</h2>
+<ul>
+<li>Built with <a href="https://opencode.ai" rel="noopener">opencode</a>, an AI coding agent, using GLM via Together AI.</li>
+<li>Entry drafts are generated by <code>zai-org/GLM-5.2</code> through the same Together AI client Broly uses for SAST.</li>
+<li>Go, cobra, gopkg.in/yaml.v3; vanilla JS/CSS for the site.</li>
+</ul>
+<h2>Running locally</h2>
+<pre><code>export TOGETHER_API_KEY=your_key_here
+
+broly changelog generate --since v1.66.0          # draft to stdout
+broly changelog generate --since v1.66.0 --write  # save draft under entries/
+broly changelog build                             # render site data
+
+# preview
+cd changelog/site &amp;&amp; python3 -m http.server
+</code></pre>
+<p>Backfilling a historical release tag-to-tag:</p>
+<pre><code>broly changelog generate --since v1.0.20 --until v1.0.28 --version v1.0.28 --write
+</code></pre>
+<h2>Publishing checklist</h2>
+<ol>
+<li>Tag or cut the release.</li>
+<li><code>broly changelog generate --since &lt;last-tag&gt; --write</code>.</li>
+<li>Edit the draft in <code>entries/</code>: fix wording, add context, drop noise.</li>
+<li><code>broly changelog build</code> to preview locally.</li>
+<li>Commit <code>entries/</code> and push; CI deploys the site.</li>
+</ol>
+
+  </main>
+
+  <footer class="site-footer">
+    <p>This page is rendered from <code>changelog/README.md</code> by <code>broly changelog build</code>, so it can never drift from the repo.</p>
+  </footer>
+</body>
+</html>

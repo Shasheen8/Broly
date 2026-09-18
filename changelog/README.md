@@ -1,6 +1,8 @@
 # Broly Changelog
 
-Live site: https://shasheen8.github.io/Broly/ | RSS: https://shasheen8.github.io/Broly/feed.xml
+Live site: https://shasheen8.github.io/Broly/ | RSS: https://shasheen8.github.io/Broly/feed.xml | About: https://shasheen8.github.io/Broly/about.html
+
+This file is rendered into the site's About page by `broly changelog build`, so the repo README and the public page can never drift apart.
 
 An AI-generated changelog for [Broly](https://github.com/Shasheen8/Broly), a CLI-first code security scanner (secrets, SCA, SAST, workflow, IaC, containers, SBOM) with 200+ commits of release history. Broly is an active open-source project that was presented at **DEF CON 34 AppSec Village Arsenal** as "Broly: Rebuilding Code Security With Signal, Speed, and AI".
 
@@ -57,7 +59,8 @@ One deliberate style rule: ASCII punctuation only, in the README, the site, and 
 ```
 changelog/
   entries/    reviewed markdown, one file per release (frontmatter + sections)
-  site/       static site; app.js fetches changelog.json
+  site/       static site; app.js fetches changelog.json, about.html is
+              generated from this README at build time
   README.md   this file
 ```
 

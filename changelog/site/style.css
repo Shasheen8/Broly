@@ -368,6 +368,53 @@ main { max-width: 720px; margin: 0 auto; padding: 1.8rem 1.5rem 3rem; }
 }
 .state code { color: var(--text); }
 
+/* ---------- about page ---------- */
+
+.about {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 2.2rem 1.5rem 3rem;
+  color: var(--text);
+}
+
+.about h1 { font-size: 1.7rem; letter-spacing: -0.01em; margin: 0.4rem 0 1rem; }
+.about h2 {
+  font-size: 1.12rem;
+  margin: 2.1rem 0 0.7rem;
+  padding-bottom: 0.45rem;
+  border-bottom: 1px solid var(--border);
+}
+.about h3 { font-size: 0.95rem; margin: 1.4rem 0 0.5rem; color: var(--muted); }
+.about p { color: var(--muted); font-size: 0.93rem; max-width: 66ch; }
+.about li { color: var(--muted); font-size: 0.93rem; margin: 0.3rem 0; }
+.about ul, .about ol { padding-left: 1.4rem; }
+.about strong { color: var(--text); }
+.about a { color: var(--fixed); text-decoration: none; }
+.about a:hover { text-decoration: underline; }
+
+.about code {
+  font-family: var(--mono);
+  font-size: 0.82em;
+  padding: 0.1rem 0.35rem;
+  border-radius: 5px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+.about pre {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.9rem 1rem;
+  overflow-x: auto;
+  margin: 0.9rem 0;
+  line-height: 1.5;
+}
+.about pre code { background: none; border: none; padding: 0; font-size: 0.78rem; color: var(--muted); }
+
+.about hr { border: none; border-top: 1px solid var(--border); margin: 2.2rem 0; }
+
 /* ---------- footer ---------- */
 
 .site-footer {

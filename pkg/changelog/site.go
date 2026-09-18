@@ -68,8 +68,9 @@ func LoadEntries(dir string) ([]*Entry, error) {
 }
 
 // BuildSite writes changelog.json and feed.xml into outDir from the
-// entries in entriesDir.
-func BuildSite(entriesDir, outDir, baseURL string, repo RepoInfo) error {
+// entries in entriesDir. It also renders the README into about.html so
+// the site's About page and the repo README stay in sync from one source.
+func BuildSite(entriesDir, outDir, baseURL string, repo RepoInfo, readmePath string) error {
 	entries, err := LoadEntries(entriesDir)
 	if err != nil {
 		return err
@@ -104,7 +105,21 @@ func BuildSite(entriesDir, outDir, baseURL string, repo RepoInfo) error {
 	if err := os.WriteFile(filepath.Join(outDir, "feed.xml"), []byte(feed), 0o644); err != nil {
 		return fmt.Errorf("writing feed.xml: %w", err)
 	}
-	fmt.Printf("  built changelog.json (%d entries) and feed.xml in %s\n", len(entries), outDir)
+
+	about := 0
+	if readmePath != "" {
+		readme, err := os.ReadFile(readmePath)
+		if err != nil {
+			fmt.Printf("  note: skipping about page (%s not found)\n", readmePath)
+		} else {
+			html := renderAboutPage(string(readme), data, baseURL)
+			if err := os.WriteFile(filepath.Join(outDir, "about.html"), []byte(html), 0o644); err != nil {
+				return fmt.Errorf("writing about.html: %w", err)
+			}
+			about = 1
+		}
+	}
+	fmt.Printf("  built changelog.json (%d entries), feed.xml, and about.html (%d) in %s\n", len(entries), about, outDir)
 	return nil
 }
 
@@ -134,6 +149,60 @@ func renderFeed(d siteData, baseURL string) (string, error) {
 	}
 	b.WriteString("</channel></rss>\n")
 	return b.String(), nil
+}
+
+func renderAboutPage(readme string, d siteData, baseURL string) string {
+	name := d.Repo.Name
+	if i := strings.LastIndex(name, "/"); i >= 0 {
+		name = name[i+1:]
+	}
+	return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>` + htmlPageTitle(name) + ` Changelog: About</title>
+  <meta name="description" content="How this changelog is made: the tool, the review workflow, and the design decisions behind it.">
+  <link rel="icon" href="broly-logo.png" type="image/png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="glow" aria-hidden="true"></div>
+    <div class="header-inner">
+      <a class="brand" href="index.html" title="Back to the changelog">
+        <img src="broly-logo.png" alt="` + htmlPageTitle(name) + ` logo" width="44" height="44">
+        <span>
+          <strong>` + htmlPageTitle(name) + `</strong>
+          <em>Changelog</em>
+        </span>
+      </a>
+      <nav class="header-actions">
+        <a class="action" href="index.html">Changelog</a>
+        <a class="action" href="feed.xml" title="RSS feed">RSS</a>
+        <a class="action" href="` + d.Repo.URL + `" title="Source on GitHub">GitHub</a>
+      </nav>
+    </div>
+    <p class="tagline">Why this changelog exists, and how it is made.</p>
+  </header>
+
+  <main class="about">
+    ` + RenderMarkdown(readme) + `
+  </main>
+
+  <footer class="site-footer">
+    <p>This page is rendered from <code>changelog/README.md</code> by <code>broly changelog build</code>, so it can never drift from the repo.</p>
+  </footer>
+</body>
+</html>
+`
+}
+
+func htmlPageTitle(name string) string {
+	if name == "" {
+		return "Broly"
+	}
+	return name
 }
 
 func anchorID(version string) string {
