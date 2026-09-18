@@ -23,7 +23,7 @@ The workflow:
   1. broly changelog generate --since v1.66.0
        Prints a draft entry (frontmatter + markdown) to stdout.
   2. broly changelog generate --since v1.66.0 --write
-       Saves the draft to changelog/entries/<date>-<slug>.md. Edit it —
+       Saves the draft to changelog/entries/<date>-<slug>.md. Edit it:
        fix wording, add context the commits can't show, drop items.
   3. broly changelog build
        Renders changelog/site/changelog.json and feed.xml from every
@@ -63,7 +63,7 @@ the tool's end users.
 
 Without --write the draft prints to stdout, so it can be reviewed in the
 terminal or piped anywhere. With --write it is saved under the entries
-directory as editable markdown — the review step is part of the workflow:
+directory as editable markdown. The review step is part of the workflow:
 the model summarizes, you correct and enrich, the site publishes what
 you approved.
 
@@ -111,7 +111,7 @@ EXAMPLES
 				return err
 			}
 			if len(h.Commits) == 0 {
-				fmt.Println("  no commits in this range — nothing to generate")
+				fmt.Println("  no commits in this range, nothing to generate")
 				return nil
 			}
 			h.FillDiffs(repoDir)

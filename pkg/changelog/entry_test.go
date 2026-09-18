@@ -76,7 +76,8 @@ continued on the same paragraph.
 Second paragraph.
 
 ## New
-* **Star bullets** — Work too. ([abc1234](https://x/commit/abc1234))
+* **Star bullets**: Work too. ([abc1234](https://x/commit/abc1234))
+- **Legacy em dash** — still parses for hand-edited entries. ([1111111](https://x/commit/1111111))
 
 ## Fixed
 - No bold title, just detail with a bare sha (def5678)
@@ -95,11 +96,14 @@ Second paragraph.
 	if len(e.Sections) != 3 {
 		t.Fatalf("sections: %d", len(e.Sections))
 	}
-	if e.Sections[0].Name != "New" || len(e.Sections[0].Items) != 1 {
+	if e.Sections[0].Name != "New" || len(e.Sections[0].Items) != 2 {
 		t.Fatalf("New section: %+v", e.Sections[0])
 	}
 	if e.Sections[0].Items[0].Commits[0].SHA != "abc1234" {
 		t.Errorf("star bullet commit: %+v", e.Sections[0].Items[0].Commits)
+	}
+	if e.Sections[0].Items[1].Title != "Legacy em dash" {
+		t.Errorf("em dash tolerance: %+v", e.Sections[0].Items[1])
 	}
 	fixed := e.Sections[1]
 	if fixed.Items[0].Title != "" || !strings.Contains(fixed.Items[0].Detail, "bare sha") {

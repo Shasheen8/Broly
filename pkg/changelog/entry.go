@@ -95,7 +95,7 @@ func (e *Entry) RenderMarkdown() (string, error) {
 		for _, it := range s.Items {
 			b.WriteString("- **" + it.Title + "**")
 			if it.Detail != "" {
-				b.WriteString(" — " + it.Detail)
+				b.WriteString(": " + it.Detail)
 			}
 			if len(it.Commits) > 0 {
 				refs := make([]string, 0, len(it.Commits))

@@ -33,7 +33,7 @@ func SiteURL(repo RepoInfo) string {
 }
 
 // LoadEntries parses every entry in dir, sorted newest first. An empty
-// directory yields an empty slice, not an error — the site renders a
+// directory yields an empty slice, not an error; the site renders a
 // friendly empty state.
 func LoadEntries(dir string) ([]*Entry, error) {
 	files, err := os.ReadDir(dir)
@@ -121,7 +121,7 @@ func renderFeed(d siteData, baseURL string) (string, error) {
 	fmt.Fprintf(&b, "  <description>Release notes and changes for %s</description>\n", xmlEscape(name))
 	for _, e := range d.Entries {
 		fmt.Fprintf(&b, "  <item>\n")
-		fmt.Fprintf(&b, "    <title>%s — %s</title>\n", xmlEscape(e.Version), xmlEscape(e.Title))
+		fmt.Fprintf(&b, "    <title>%s: %s</title>\n", xmlEscape(e.Version), xmlEscape(e.Title))
 		fmt.Fprintf(&b, "    <link>%s#%s</link>\n", xmlEscape(baseURL), xmlEscape(anchorID(e.Version)))
 		fmt.Fprintf(&b, "    <guid>%s#%s</guid>\n", xmlEscape(baseURL), xmlEscape(anchorID(e.Version)))
 		if t, err := time.Parse("2006-01-02", e.Date); err == nil {

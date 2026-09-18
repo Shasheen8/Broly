@@ -48,13 +48,17 @@ Developers who use this tool but do not work on it. They care about new
 capabilities, changed behavior, fixed bugs, and anything that can break
 their workflows (flags, commands, config, output formats, exit codes).
 They do NOT care about internal refactors, CI chores, dependency bumps,
-or doc reorganization — unless those change behavior they can observe.
+or doc reorganization, unless those change behavior they can observe.
 
 TASK
 Summarize the commits below into a changelog entry. Group related commits
 into a single item where they tell one story. Skip commits that are pure
 maintenance with no user-visible effect. If everything in the window is
-noise, return few items — never invent changes.
+noise, return few items. Never invent changes.
+
+PUNCTUATION
+Use plain ASCII punctuation only. Never use em dashes in any output text;
+use colons, commas, or periods instead.
 
 FORMAT
 Respond with JSON only, no markdown fences, matching:

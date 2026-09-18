@@ -89,7 +89,7 @@ broly changelog generate --since v1.66.0 --write # save draft for review
 broly changelog build                            # render site data from entries
 ```
 
-Entries live in [`changelog/entries/`](changelog/entries) as editable markdown — the model drafts, you correct and enrich, the site publishes what you approved. Maintainer context that isn't in the commits can be passed with `--notes`.
+Entries live in [`changelog/entries/`](changelog/entries) as editable markdown: the model drafts, you correct and enrich, the site publishes what you approved. Maintainer context that isn't in the commits can be passed with `--notes`.
 
 ---
 
@@ -97,11 +97,11 @@ Entries live in [`changelog/entries/`](changelog/entries) as editable markdown �
 
 **AI Triage** (`--ai-triage`) adds a TRUE_POSITIVE / FALSE_POSITIVE verdict, confidence, reasoning, and a targeted code fix for SAST, SCA, IaC, and Workflow findings. Add `--explain` for a plain-language attack scenario per finding.
 
-**Adversarial Verification** (`--adversarial`) runs a second AI pass on critical SAST true positives — an agent traces data flow across files to confirm or falsify reachability. Returns `CONFIRMED`, `DISPUTED`, or `FALSIFIED`.
+**Adversarial Verification** (`--adversarial`) runs a second AI pass on critical SAST true positives; an agent traces data flow across files to confirm or falsify reachability. Returns `CONFIRMED`, `DISPUTED`, or `FALSIFIED`.
 
 **Exploit Chains** (`--exploit-chains`) links 2-4 cross-scanner true positives into multi-step attack narratives.
 
-**Agentic Triage** activates automatically for high-severity SAST findings when scanning a local directory — the AI can read related files and search the repo before deciding a verdict.
+**Agentic Triage** activates automatically for high-severity SAST findings when scanning a local directory; the AI can read related files and search the repo before deciding a verdict.
 
 ### Vulnerability Class Focus
 
@@ -147,7 +147,7 @@ Uploads SARIF to the GitHub Security tab and posts a summary PR comment.
 
 ### `broly-app` (local GitHub App)
 
-Webhook server for the full PR experience locally — clones, scans, triages, and posts check runs + PR comments. Uses the same pipeline as the CLI.
+Webhook server for the full PR experience locally: clones, scans, triages, and posts check runs + PR comments. Uses the same pipeline as the CLI.
 
 ```bash
 # terminal 1: smee proxy

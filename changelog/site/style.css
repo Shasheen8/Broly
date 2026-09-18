@@ -102,6 +102,29 @@ body {
   font-size: 0.92rem;
 }
 
+.badges {
+  position: relative;
+  max-width: 720px;
+  margin: 0.65rem auto 0;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
+  padding: 0.28rem 0.75rem;
+  border-radius: 999px;
+  font: 550 0.7rem var(--sans);
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+}
+
+.pill.defcon {
+  color: #fbbf24;
+  border: 1px solid color-mix(in srgb, #fbbf24 32%, var(--border));
+  background: color-mix(in srgb, #fbbf24 7%, var(--surface));
+}
+
 /* ---------- filters ---------- */
 
 main { max-width: 720px; margin: 0 auto; padding: 1.8rem 1.5rem 3rem; }
