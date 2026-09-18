@@ -3,7 +3,7 @@ name: changelog site
 on:
   push:
     branches: [main]
-    paths: ['changelog/**', '.github/workflows/pages.yml']
+    paths: ['changelog/**', 'pkg/changelog/**', 'cmd/broly/changelog.go', '.github/workflows/pages.yml']
   workflow_dispatch:
 
 permissions:
