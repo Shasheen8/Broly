@@ -3,7 +3,9 @@
   const filters = document.getElementById("filters");
   const state = document.getElementById("state");
   const repoLink = document.getElementById("repo-link");
+  const pagination = document.getElementById("pagination");
 
+  const PAGE_SIZE = 4;
   const SECTION_ORDER = ["New", "Improved", "Fixed", "Breaking"];
   const SECTION_CLASS = {
     New: "sec-new",
@@ -11,10 +13,17 @@
     Fixed: "sec-fixed",
     Breaking: "sec-breaking",
   };
+  const CHIP_COLOR = {
+    New: "var(--new)",
+    Improved: "var(--improved)",
+    Fixed: "var(--fixed)",
+    Breaking: "var(--breaking)",
+  };
 
   function el(tag, attrs, ...children) {
     const node = document.createElement(tag);
     for (const [k, v] of Object.entries(attrs || {})) {
+      if (v === null || v === undefined) continue;
       if (k === "class") node.className = v;
       else if (k.startsWith("on")) node.addEventListener(k.slice(2), v);
       else node.setAttribute(k, v);
@@ -40,6 +49,7 @@
 
   function showState(html) {
     timeline.replaceChildren();
+    pagination.replaceChildren();
     state.innerHTML = html;
     state.hidden = false;
   }
@@ -73,37 +83,48 @@
   const sectionNames = [...SECTION_ORDER.filter((n) => counts[n]), ...Object.keys(counts).filter((n) => n !== "All" && !SECTION_ORDER.includes(n))];
 
   let active = "All";
+  let page = 1;
+
+  function setHash(hash) {
+    history.replaceState(null, "", hash);
+  }
+
+  function visibleReleases() {
+    const out = [];
+    for (const e of entries) {
+      const sections = (e.sections || [])
+        .slice()
+        .sort((a, b) => {
+          const ai = SECTION_ORDER.indexOf(a.name);
+          const bi = SECTION_ORDER.indexOf(b.name);
+          return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+        })
+        .map((s) => ({ ...s, items: (s.items || []).filter(() => active === "All" || s.name === active) }))
+        .filter((s) => s.items.length);
+      if (sections.length) out.push({ entry: e, sections });
+    }
+    return out;
+  }
 
   function renderFilters() {
-    const chips = sectionNames.map((name) =>
+    const chip = (name, color) =>
       el("button", {
         class: "chip",
         "aria-pressed": String(name === active),
-        style: name === "Breaking" ? "--chip-color: var(--breaking)" : name === "New" ? "--chip-color: var(--new)" : name === "Fixed" ? "--chip-color: var(--fixed)" : name === "Improved" ? "--chip-color: var(--improved)" : "",
+        style: color ? "--chip-color: " + color : "",
         onclick: () => {
           active = name;
+          page = 1;
           renderFilters();
           renderTimeline();
         },
-      }, name, el("span", { class: "count" }, String(counts[name] || 0)))
-    );
-    filters.replaceChildren(
-      el("button", {
-        class: "chip",
-        "aria-pressed": String(active === "All"),
-        onclick: () => {
-          active = "All";
-          renderFilters();
-          renderTimeline();
-        },
-      }, "All", el("span", { class: "count" }, String(counts.All))),
-      ...chips
-    );
+      }, name, el("span", { class: "count" }, String(counts[name] || 0)));
+
+    filters.replaceChildren(chip("All"), ...sectionNames.map((n) => chip(n, CHIP_COLOR[n])));
   }
 
   function itemNode(item, sectionName) {
-    const body = el("div", { class: "item-body" },
-      el("p", { class: "item-title" }, item.title || ""));
+    const body = el("div", { class: "item-body" }, el("p", { class: "item-title" }, item.title || ""));
     if (item.detail) {
       body.append(el("p", { class: "item-detail" }, item.detail));
     }
@@ -120,68 +141,123 @@
       body);
   }
 
+  function releaseNode({ entry: e, sections }) {
+    const hasBreaking = sections.some((s) => s.name === "Breaking");
+    const card = el("article", { class: "release-card" });
+    card.append(el("div", { class: "release-head" },
+      el("a", { class: "version", id: anchorId(e.version), href: "#" + anchorId(e.version) }, e.version),
+      el("span", { class: "release-date" }, e.date + " · " + timeAgo(e.date)),
+      el("span", { class: "release-stats" },
+        el("span", { class: "add" }, "+" + (e.stats ? e.stats.insertions : 0).toLocaleString()), " ",
+        el("span", { class: "del" }, "−" + (e.stats ? e.stats.deletions : 0).toLocaleString()), " · ",
+        (e.stats ? e.stats.commits : 0) + " commits")));
+    card.append(el("h2", { class: "release-title" }, e.title || ""));
+    if (e.description) {
+      for (const p of e.description.split("\n\n")) {
+        if (p.trim()) card.append(el("p", { class: "release-desc" }, p.trim()));
+      }
+    }
+
+    const sectionsEl = el("div", { class: "sections" });
+    for (const s of sections) {
+      sectionsEl.append(el("section", { class: "section " + (SECTION_CLASS[s.name] || "") },
+        el("h3", { class: "section-head " + (SECTION_CLASS[s.name] || "") }, s.name),
+        s.items.map((item) => itemNode(item, s.name))));
+    }
+    card.append(sectionsEl);
+
+    return el("li", {
+      class: "release",
+      "data-breaking": String(hasBreaking),
+      "data-default-dot": sections.some((s) => s.name === "New") ? "new" : "",
+    }, card);
+  }
+
+  function pageWindow(total) {
+    if (total <= 7) {
+      return Array.from({ length: total }, (_, i) => i + 1);
+    }
+    const w = new Set([1, 2, page - 1, page, page + 1, total - 1, total]);
+    return [...w].filter((n) => n >= 1 && n <= total).sort((a, b) => a - b);
+  }
+
+  function renderPagination(total) {
+    if (total <= 1) {
+      pagination.replaceChildren();
+      return;
+    }
+    const go = (n) => () => {
+      page = n;
+      setHash("#page/" + n);
+      renderTimeline();
+      document.querySelector("main").scrollIntoView({ behavior: "smooth", block: "start" });
+    };
+    const btn = (n, opts) =>
+      el("button", {
+        class: "page-btn",
+        "aria-current": opts && opts.current ? "page" : null,
+        "aria-label": opts && opts.ariaLabel,
+        disabled: opts && opts.disabled ? "" : null,
+        onclick: opts && opts.disabled ? null : go(n),
+      }, opts && opts.label ? [opts.label] : [String(n)]);
+
+    const parts = [
+      el("button", {
+        class: "page-btn page-nav",
+        "aria-label": "Newer releases",
+        disabled: page === 1 ? "" : null,
+        onclick: page === 1 ? null : go(page - 1),
+      }, "← Newer"),
+    ];
+    let prev = 0;
+    for (const n of pageWindow(total)) {
+      if (prev && n - prev > 1) parts.push(el("span", { class: "page-dots" }, "…"));
+      parts.push(btn(n, { current: n === page, disabled: n === page }));
+      prev = n;
+    }
+    parts.push(el("button", {
+      class: "page-btn page-nav",
+      "aria-label": "Older releases",
+      disabled: page === total ? "" : null,
+      onclick: page === total ? null : go(page + 1),
+    }, "Older →"));
+
+    pagination.replaceChildren(...parts);
+  }
+
   function renderTimeline() {
-    const nodes = [];
-    for (const e of entries) {
-      const sections = (e.sections || []).slice().sort(
-        (a, b) => {
-          const ai = SECTION_ORDER.indexOf(a.name);
-          const bi = SECTION_ORDER.indexOf(b.name);
-          return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
-        }
-      );
-      const hasBreaking = sections.some((s) => s.name === "Breaking");
-      const visible = sections
-        .map((s) => ({ ...s, items: (s.items || []).filter(() => active === "All" || s.name === active) }))
-        .filter((s) => s.items.length);
+    const vr = visibleReleases();
+    const total = Math.max(1, Math.ceil(vr.length / PAGE_SIZE));
+    if (page > total) page = total;
+    if (page < 1) page = 1;
+    const slice = vr.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-      if (!visible.length) continue;
-
-      const card = el("article", { class: "release-card" });
-      const head = el("div", { class: "release-head" },
-        el("a", { class: "version", id: anchorId(e.version), href: "#" + anchorId(e.version) }, e.version),
-        el("span", { class: "release-date" }, e.date + " · " + timeAgo(e.date)),
-        el("span", { class: "release-stats" },
-          el("span", { class: "add" }, "+" + (e.stats ? e.stats.insertions : 0).toLocaleString()), " ",
-          el("span", { class: "del" }, "−" + (e.stats ? e.stats.deletions : 0).toLocaleString()), " · ",
-          (e.stats ? e.stats.commits : 0) + " commits"));
-      card.append(head);
-      card.append(el("h2", { class: "release-title" }, e.title || ""));
-      if (e.description) {
-        for (const p of e.description.split("\n\n")) {
-          if (p.trim()) card.append(el("p", { class: "release-desc" }, p.trim()));
-        }
-      }
-
-      const sectionsEl = el("div", { class: "sections" });
-      for (const s of visible) {
-        const sectionHead = el("h3", { class: "section-head " + (SECTION_CLASS[s.name] || "") }, s.name);
-        const section = el("section", { class: "section " + (SECTION_CLASS[s.name] || "") },
-          sectionHead,
-          s.items.map((item) => itemNode(item, s.name)));
-        sectionsEl.append(section);
-      }
-      card.append(sectionsEl);
-
-      nodes.push(el("li", {
-        class: "release",
-        "data-breaking": String(hasBreaking),
-        "data-default-dot": sections.some((s) => s.name === "New") ? "new" : "",
-      }, card));
-    }
-    timeline.replaceChildren(...nodes);
-    if (!nodes.length) {
+    timeline.replaceChildren(...slice.map(releaseNode));
+    if (!slice.length) {
       showState("No <strong>" + active + "</strong> changes yet.");
-    } else {
-      state.hidden = true;
+      return;
     }
+    state.hidden = true;
+    renderPagination(total);
   }
 
   renderFilters();
-  renderTimeline();
 
-  if (location.hash) {
-    const target = document.getElementById(location.hash.slice(1));
-    if (target) target.scrollIntoView({ block: "start" });
+  const hash = decodeURIComponent(location.hash.slice(1));
+  if (/^page\/\d+$/.test(hash)) {
+    page = parseInt(hash.split("/")[1], 10) || 1;
+    renderTimeline();
+  } else {
+    const idx = entries.findIndex((e) => anchorId(e.version) === hash);
+    if (idx >= 0) {
+      const vr = visibleReleases();
+      const vrIdx = vr.findIndex((v) => v.entry.version === entries[idx].version);
+      page = Math.floor(vrIdx / PAGE_SIZE) + 1;
+      renderTimeline();
+      const target = document.getElementById(hash);
+      if (target) target.scrollIntoView({ block: "start" });
+    } else {
+      renderTimeline();
+    }
   }
 })();

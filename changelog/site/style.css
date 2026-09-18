@@ -298,6 +298,39 @@ main { max-width: 720px; margin: 0 auto; padding: 1.8rem 1.5rem 3rem; }
 
 .release[data-default-dot="new"] { --dot-color: var(--new); }
 
+/* ---------- pagination ---------- */
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 1.8rem 0 0.4rem;
+}
+
+.page-btn {
+  min-width: 2.4rem;
+  padding: 0.34rem 0.6rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--muted);
+  font: 550 0.78rem var(--sans);
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: all .15s;
+}
+.page-btn:hover:not(:disabled) { color: var(--text); border-color: #3b4657; }
+.page-btn:disabled { opacity: 0.35; cursor: default; }
+.page-btn[aria-current="page"] {
+  color: var(--text);
+  border-color: #3b4657;
+  background: var(--surface-2);
+}
+.page-nav { padding: 0.34rem 0.75rem; font-family: var(--mono); font-size: 0.72rem; }
+.page-dots { color: #64748b; padding: 0 0.1rem; }
+
 /* ---------- states ---------- */
 
 .state {
