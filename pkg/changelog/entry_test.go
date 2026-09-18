@@ -54,6 +54,9 @@ func TestRenderParseRoundTrip(t *testing.T) {
 	if !strings.Contains(item.Detail, "Extracts declared HTTP routes") {
 		t.Errorf("detail: %q", item.Detail)
 	}
+	if strings.Contains(item.Detail, "(") || strings.Contains(item.Detail, ")") {
+		t.Errorf("detail should not keep chip parens: %q", item.Detail)
+	}
 	if len(item.Commits) != 1 || item.Commits[0].SHA != "be5f9b6" || item.Commits[0].URL == "" {
 		t.Errorf("commits: %+v", item.Commits)
 	}
@@ -112,8 +115,8 @@ Second paragraph.
 	if fixed.Items[0].Commits[0].SHA != "def5678" {
 		t.Errorf("bare sha: %+v", fixed.Items[0].Commits)
 	}
-	if !strings.HasPrefix(fixed.Items[1].Title, "Bare detail") {
-		t.Errorf("separatorless title: %+v", fixed.Items[1])
+	if !strings.Contains(fixed.Items[1].Detail, "has this text") || strings.Contains(fixed.Items[1].Detail, "()") {
+		t.Errorf("separatorless detail should drop chip parens: %q", fixed.Items[1].Detail)
 	}
 	if e.Sections[2].Name != "Weird Section" {
 		t.Errorf("custom section: %+v", e.Sections[2])

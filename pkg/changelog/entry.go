@@ -56,7 +56,7 @@ var (
 	linkShaRe    = regexp.MustCompile(`\[([0-9a-fA-F]{7,40})\]\((https?://[^\s)]+)\)`)
 	bareShaRe    = regexp.MustCompile(`\(([0-9a-fA-F]{7,40})\)`)
 	headingRe    = regexp.MustCompile(`^##\s+(.+?)\s*$`)
-	headingUnder = regexp.MustCompile(`^[-=]+\s*$`)
+	chipRemnant  = regexp.MustCompile(`\(\s*,?\s*\)`)
 )
 
 // RenderMarkdown writes the entry as frontmatter + body markdown, the same
@@ -211,8 +211,7 @@ func parseItemLine(line string) Item {
 		refs = append(refs, CommitRef{SHA: m[1]})
 		return ""
 	})
-	line = strings.TrimRight(line, " \t")
-	line = strings.TrimSuffix(line, "(")
+	line = chipRemnant.ReplaceAllString(line, "")
 	line = strings.TrimSpace(line)
 	it.Detail = line
 	it.Commits = refs
