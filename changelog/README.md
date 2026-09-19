@@ -48,9 +48,19 @@ The model never publishes. It writes a draft in a format designed for human edit
 
 ### The site is deliberately boring to deploy
 
-`site/` is three files: `index.html`, `style.css`, `app.js` (vanilla JS, no framework, no build step, no dependencies) plus the JSON the Go tool renders from entries. GitHub Actions runs `broly changelog build` and copies the directory to Pages. Nothing to npm install, nothing that can break CI with a transitive dependency, and it still looks sharp: dark terminal aesthetic, release timeline with category colors, filter chips, commit chips linking to GitHub, per-release diff stats, and a red glow on releases containing breaking changes. The build output (`changelog.json`, `feed.xml`) is gitignored and regenerated in CI, so the repo only ever stores reviewed source.
+`site/` is three hand-written files: `index.html`, `style.css`, and `app.js` (vanilla JS, no framework, no build step, no dependencies). GitHub Actions runs `broly changelog build` and copies the directory to Pages. What that buys:
 
-Patterns borrowed from changelogs that do this well (Stripe, Twilio): breaking-change visibility up front, one-line summaries with links to detail, an RSS feed for subscribers, and reverse-chronological paging (4 releases per page, hash-addressable, so an RSS link like `#v1-0-28` lands on the right page).
+- Nothing to npm install; no transitive dependency can break CI.
+- No build pipeline to keep green; a deploy is just a file copy.
+- It still looks sharp: dark terminal aesthetic, release timeline with category colors, filter chips, commit chips linking to GitHub, per-release diff stats, and a red glow on releases containing breaking changes.
+
+Generated output (`changelog.json`, `feed.xml`, `about.html`) is gitignored and rebuilt in CI, so the repo only ever stores reviewed source.
+
+Patterns borrowed from changelogs that do this well:
+
+- **Stripe**: breaking-change visibility up front, so users can scan for danger before reading anything else.
+- **Twilio**: an RSS feed worth subscribing to, and one-line summaries that link to detail.
+- **Both**: reverse-chronological paging (4 releases per page, hash-addressable, so an RSS link like `#v1-0-28` lands on the right page).
 
 One deliberate style rule: ASCII punctuation only, in the README, the site, and generated entries. Broly is a terminal-first tool, and its docs render in terminals, editors, RSS readers, and browsers alike.
 
