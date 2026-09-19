@@ -31,8 +31,8 @@ The workflow:
 
 The audience for entries is end users of the tool, not maintainers:
 new capabilities, fixed bugs, and anything that can break workflows.
-Commits are filtered and grouped by the model; maintainer context can
-be passed with --notes.`,
+Commits are filtered and grouped by the model, and maintainer context
+can be passed with --notes.`,
 	}
 
 	cmd.AddCommand(changelogGenerateCmd())
@@ -100,7 +100,7 @@ EXAMPLES
 				if sinceRef == "" {
 					sinceRef = changelog.LatestTag(repoDir)
 					if sinceRef == "" {
-						return fmt.Errorf("no tags found; use --since <rev> or --days N")
+						return fmt.Errorf("no tags found. Use --since <rev> or --days N")
 					}
 				}
 				fmt.Fprintf(os.Stderr, "  collecting commits %s..%s\n", sinceRef, untilLabel(untilRef))
@@ -168,7 +168,7 @@ EXAMPLES
 	}
 
 	cmd.Flags().StringVar(&sinceRef, "since", "", "Collect commits since this tag or revision (default: latest tag)")
-	cmd.Flags().StringVar(&untilRef, "until", "", "Collect commits up to this revision (default: HEAD; use for backfilling historical releases)")
+	cmd.Flags().StringVar(&untilRef, "until", "", "Collect commits up to this revision (default: HEAD, use for backfilling historical releases)")
 	cmd.Flags().IntVar(&days, "days", 0, "Collect commits from the last N days instead of since a tag")
 	cmd.Flags().StringVar(&notes, "notes", "", "Maintainer context for the model: why changes shipped, what they mean")
 	cmd.Flags().StringVar(&version, "version", "", "Release version for the entry (default: tag on HEAD, or 'Unreleased')")

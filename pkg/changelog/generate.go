@@ -57,19 +57,20 @@ maintenance with no user-visible effect. If everything in the window is
 noise, return few items. Never invent changes.
 
 PUNCTUATION
-Use plain ASCII punctuation only. Never use em dashes in any output text;
-use colons, commas, or periods instead.
+Use plain ASCII punctuation only. Never use em dashes. Never join two
+sentences with a semicolon. Write separate sentences with periods
+instead, and use colons or commas where they fit naturally.
 
 FORMAT
 Respond with JSON only, no markdown fences, matching:
 {
   "title": "short release headline, 3-6 words, no version number",
   "description": "2-4 sentence narrative explaining what this release is
-                  about and why it matters to users; plain prose, no markdown",
+                  about and why it matters to users. Plain prose, no markdown",
   "items": [
     {
       "section": "new" | "improved" | "fixed" | "breaking",
-      "title": "imperative, specific; e.g. 'Adds a routes subcommand'",
+      "title": "imperative and specific, e.g. 'Adds a routes subcommand'",
       "detail": "1-2 sentences: what changed and what it means for the user",
       "commits": ["short-sha", "short-sha"]
     }

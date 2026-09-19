@@ -97,11 +97,11 @@ Entries live in [`changelog/entries/`](changelog/entries) as editable markdown: 
 
 **AI Triage** (`--ai-triage`) adds a TRUE_POSITIVE / FALSE_POSITIVE verdict, confidence, reasoning, and a targeted code fix for SAST, SCA, IaC, and Workflow findings. Add `--explain` for a plain-language attack scenario per finding.
 
-**Adversarial Verification** (`--adversarial`) runs a second AI pass on critical SAST true positives; an agent traces data flow across files to confirm or falsify reachability. Returns `CONFIRMED`, `DISPUTED`, or `FALSIFIED`.
+**Adversarial Verification** (`--adversarial`) runs a second AI pass on critical SAST true positives. An agent traces data flow across files to confirm or falsify reachability. Returns `CONFIRMED`, `DISPUTED`, or `FALSIFIED`.
 
 **Exploit Chains** (`--exploit-chains`) links 2-4 cross-scanner true positives into multi-step attack narratives.
 
-**Agentic Triage** activates automatically for high-severity SAST findings when scanning a local directory; the AI can read related files and search the repo before deciding a verdict.
+**Agentic Triage** activates automatically for high-severity SAST findings when scanning a local directory. The AI can read related files and search the repo before deciding a verdict.
 
 ### Vulnerability Class Focus
 

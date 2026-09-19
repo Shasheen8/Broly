@@ -33,7 +33,7 @@ func SiteURL(repo RepoInfo) string {
 }
 
 // LoadEntries parses every entry in dir, sorted newest first. An empty
-// directory yields an empty slice, not an error; the site renders a
+// directory yields an empty slice, not an error. The site renders a
 // friendly empty state.
 func LoadEntries(dir string) ([]*Entry, error) {
 	files, err := os.ReadDir(dir)

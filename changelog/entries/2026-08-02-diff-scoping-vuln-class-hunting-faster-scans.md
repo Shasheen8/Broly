@@ -13,7 +13,7 @@ This release adds line-level diff scoping for PR scans, vulnerability class focu
 ## New
 - **Add vulnerability class focus flags for targeted SAST hunting**: New flags like --idor, --xss, --sqli, --rce, and --ssrf let you focus SAST scans on specific vulnerability classes, injecting per-class guidance into the AI triage prompt and filtering final findings to only those classes. ([12d2d15](https://github.com/Shasheen8/Broly/commit/12d2d15))
 - **Add line-level diff scoping for PR scans**: Scans on pull requests now scope SAST findings to only the changed lines in the diff, reducing noise from pre-existing issues and focusing review attention on new code. ([12d2d15](https://github.com/Shasheen8/Broly/commit/12d2d15))
-- **Add --auto-containers flag for standalone Dockerfile base image scanning**: Container scanning is no longer coupled to SCA; the new --auto-containers flag auto-discovers and scans Dockerfile base images independently of other scanner selections. ([13fcd62](https://github.com/Shasheen8/Broly/commit/13fcd62))
+- **Add --auto-containers flag for standalone Dockerfile base image scanning**: Container scanning is no longer coupled to SCA. The new --auto-containers flag auto-discovers and scans Dockerfile base images independently of other scanner selections. ([13fcd62](https://github.com/Shasheen8/Broly/commit/13fcd62))
 - **Add --short flag to version command**: The version command now accepts --short to print only the version string, which also fixes version detection logic in the update command. ([dd8421b](https://github.com/Shasheen8/Broly/commit/dd8421b))
 
 ## Improved
