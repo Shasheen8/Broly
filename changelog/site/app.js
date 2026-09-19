@@ -39,8 +39,10 @@
     if (days < 1) return "today";
     if (days === 1) return "yesterday";
     if (days < 30) return days + " days ago";
-    if (days < 365) return Math.round(days / 30) + " months ago";
-    return (days / 365).toFixed(1) + " years ago";
+    const months = Math.round(days / 30);
+    if (months < 12) return months + (months === 1 ? " month ago" : " months ago");
+    const years = (days / 365).toFixed(1);
+    return years + (years === "1.0" ? " year ago" : " years ago");
   }
 
   function anchorId(version) {
