@@ -257,20 +257,40 @@ func renderAboutPage(readme string, d siteData, baseURL string, cssHash string) 
     var links = Array.prototype.slice.call(document.querySelectorAll('.toc a'));
     var byId = {};
     links.forEach(function (l) { byId[l.getAttribute('href').slice(1)] = l; });
+    var heads = Array.prototype.slice.call(document.querySelectorAll('.about h2[id], .about h3[id]'))
+      .filter(function (h) { return byId[h.id]; });
     var current = null;
     function setActive(id) {
-      if (id === current) return;
+      if (!id || id === current) return;
       current = id;
       links.forEach(function (l) { l.classList.remove('active'); });
       if (byId[id]) byId[id].classList.add('active');
     }
-    var observer = new IntersectionObserver(function (entries) {
-      entries.forEach(function (e) {
-        if (e.isIntersecting) setActive(e.target.id);
+    function update() {
+      if (!heads.length) return;
+      var line = window.innerHeight * 0.2;
+      var active = heads[0].id;
+      for (var i = 0; i < heads.length; i++) {
+        if (heads[i].getBoundingClientRect().top <= line) active = heads[i].id;
+      }
+      var atBottom = window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 4;
+      if (atBottom) active = heads[heads.length - 1].id;
+      setActive(active);
+    }
+    var ticking = false;
+    window.addEventListener('scroll', function () {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(function () { update(); ticking = false; });
+    }, { passive: true });
+    window.addEventListener('resize', update);
+    window.addEventListener('load', update);
+    links.forEach(function (l) {
+      l.addEventListener('click', function () {
+        setActive(l.getAttribute('href').slice(1));
       });
-    }, { rootMargin: '-15% 0px -75% 0px' });
-    document.querySelectorAll('.about h2[id], .about h3[id]').forEach(function (h) { observer.observe(h); });
-    if (links.length) setActive(links[0].getAttribute('href').slice(1));
+    });
+    update();
   })();
   </script>
 </body>
