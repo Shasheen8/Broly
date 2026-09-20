@@ -1,11 +1,14 @@
 package changelog
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"html"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -113,13 +116,15 @@ func BuildSite(entriesDir, outDir, baseURL string, repo RepoInfo, readmePath str
 		if err != nil {
 			fmt.Printf("  note: skipping about page (%s not found)\n", readmePath)
 		} else {
-			html := renderAboutPage(string(readme), data, baseURL)
+			cssHash := fileHash(filepath.Join(outDir, "style.css"))
+			html := renderAboutPage(string(readme), data, baseURL, cssHash)
 			if err := os.WriteFile(filepath.Join(outDir, "about.html"), []byte(html), 0o644); err != nil {
 				return fmt.Errorf("writing about.html: %w", err)
 			}
 			about = 1
 		}
 	}
+	versionIndexAssets(outDir)
 	fmt.Printf("  built changelog.json (%d entries), feed.xml, and about.html (%d) in %s\n", len(entries), about, outDir)
 	return nil
 }
@@ -152,7 +157,44 @@ func renderFeed(d siteData, baseURL string) (string, error) {
 	return b.String(), nil
 }
 
-func renderAboutPage(readme string, d siteData, baseURL string) string {
+func fileHash(path string) string {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:4])
+}
+
+var (
+	cssLinkRe = regexp.MustCompile(`style\.css(\?v=[0-9a-f]+)?`)
+	jsLinkRe  = regexp.MustCompile(`app\.js(\?v=[0-9a-f]+)?`)
+)
+
+// versionIndexAssets rewrites the stylesheet and script links in index.html
+// to carry the current content hash, so every deploy breaks the browser
+// cache instead of serving a stale 10-minute-old asset.
+func versionIndexAssets(dir string) {
+	path := filepath.Join(dir, "index.html")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return
+	}
+	s := string(raw)
+	if h := fileHash(filepath.Join(dir, "style.css")); h != "" {
+		s = cssLinkRe.ReplaceAllString(s, "style.css?v="+h)
+	}
+	if h := fileHash(filepath.Join(dir, "app.js")); h != "" {
+		s = jsLinkRe.ReplaceAllString(s, "app.js?v="+h)
+	}
+	if s != string(raw) {
+		if err := os.WriteFile(path, []byte(s), 0o644); err == nil {
+			fmt.Printf("  versioned asset links in index.html\n")
+		}
+	}
+}
+
+func renderAboutPage(readme string, d siteData, baseURL string, cssHash string) string {
 	name := d.Repo.Name
 	if i := strings.LastIndex(name, "/"); i >= 0 {
 		name = name[i+1:]
@@ -174,7 +216,7 @@ func renderAboutPage(readme string, d siteData, baseURL string) string {
   <title>` + htmlPageTitle(name) + ` Changelog: About</title>
   <meta name="description" content="How this changelog is made: the tool, the review workflow, and the design decisions behind it.">
   <link rel="icon" href="broly-logo.png" type="image/png">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css` + cssQuery(cssHash) + `">
 </head>
 <body>
   <header class="site-header">
@@ -234,6 +276,13 @@ func renderAboutPage(readme string, d siteData, baseURL string) string {
 </body>
 </html>
 `
+}
+
+func cssQuery(hash string) string {
+	if hash == "" {
+		return ""
+	}
+	return "?v=" + hash
 }
 
 func htmlPageTitle(name string) string {
