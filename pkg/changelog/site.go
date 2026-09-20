@@ -3,6 +3,7 @@ package changelog
 import (
 	"encoding/json"
 	"fmt"
+	"html"
 	"os"
 	"path/filepath"
 	"sort"
@@ -156,6 +157,15 @@ func renderAboutPage(readme string, d siteData, baseURL string) string {
 	if i := strings.LastIndex(name, "/"); i >= 0 {
 		name = name[i+1:]
 	}
+	var toc strings.Builder
+	for _, h := range ExtractHeadings(readme) {
+		class := "toc-h2"
+		if h.Level == 3 {
+			class = "toc-h3"
+		}
+		fmt.Fprintf(&toc, "        <a class=\"%s\" href=\"#%s\">%s</a>\n", class, h.ID, html.EscapeString(h.Text))
+	}
+
 	return `<!doctype html>
 <html lang="en">
 <head>
@@ -186,13 +196,41 @@ func renderAboutPage(readme string, d siteData, baseURL string) string {
     <p class="tagline">Why this changelog exists, and how it is made.</p>
   </header>
 
-  <main class="about">
+  <div class="about-layout">
+    <aside class="toc" aria-label="Table of contents">
+      <p class="toc-title">On this page</p>
+` + toc.String() + `    </aside>
+
+    <main class="about">
     ` + RenderMarkdown(readme) + `
-  </main>
+    </main>
+  </div>
 
   <footer class="site-footer">
     <p>This page is rendered from <code>changelog/README.md</code> by <code>broly changelog build</code>, so it can never drift from the repo.</p>
   </footer>
+
+  <script>
+  (function () {
+    var links = Array.prototype.slice.call(document.querySelectorAll('.toc a'));
+    var byId = {};
+    links.forEach(function (l) { byId[l.getAttribute('href').slice(1)] = l; });
+    var current = null;
+    function setActive(id) {
+      if (id === current) return;
+      current = id;
+      links.forEach(function (l) { l.classList.remove('active'); });
+      if (byId[id]) byId[id].classList.add('active');
+    }
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) setActive(e.target.id);
+      });
+    }, { rootMargin: '-15% 0px -75% 0px' });
+    document.querySelectorAll('.about h2[id], .about h3[id]').forEach(function (h) { observer.observe(h); });
+    if (links.length) setActive(links[0].getAttribute('href').slice(1));
+  })();
+  </script>
 </body>
 </html>
 `

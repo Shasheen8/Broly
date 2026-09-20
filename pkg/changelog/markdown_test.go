@@ -13,7 +13,7 @@ func TestRenderMarkdownBasics(t *testing.T) {
 		"<strong>bold</strong>",
 		"<code>code</code>",
 		`<a href="https://example.com/a?b=1" rel="noopener">link</a>`,
-		"<h2>Section</h2>",
+		"<h2 id=\"section\">Section</h2>",
 		"<ul>", "<li>item one</li>", "</ul>",
 		"<ol>", "<li>first</li>", "</ol>",
 		"<hr>",
@@ -39,5 +39,30 @@ func TestRenderMarkdownCodeFenceOnly(t *testing.T) {
 	got := RenderMarkdown("```\nunclosed fence\n")
 	if !strings.Contains(got, "</code></pre>") {
 		t.Errorf("unclosed fence should still close: %s", got)
+	}
+}
+
+func TestHeadingIDsAndExtraction(t *testing.T) {
+	md := "# Page\n\n## Why it is built\n\n### The tool, a subcommand\n\n## Layout\n\n```\n## not a heading\n```\n"
+	got := RenderMarkdown(md)
+	if !strings.Contains(got, `<h2 id="why-it-is-built">`) {
+		t.Errorf("h2 id missing: %s", got)
+	}
+	if !strings.Contains(got, `<h3 id="the-tool-a-subcommand">`) {
+		t.Errorf("h3 id missing: %s", got)
+	}
+
+	hs := ExtractHeadings(md)
+	if len(hs) != 3 {
+		t.Fatalf("want 3 headings, got %d: %+v", len(hs), hs)
+	}
+	if hs[0].Level != 2 || hs[0].ID != "why-it-is-built" || hs[0].Text != "Why it is built" {
+		t.Errorf("first heading: %+v", hs[0])
+	}
+	if hs[1].Level != 3 {
+		t.Errorf("second heading level: %+v", hs[1])
+	}
+	if hs[2].ID != "layout" {
+		t.Errorf("third heading: %+v", hs[2])
 	}
 }

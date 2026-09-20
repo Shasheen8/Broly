@@ -6,6 +6,55 @@ import (
 	"strings"
 )
 
+// Heading is a table-of-contents entry extracted from markdown.
+type Heading struct {
+	Level int    // 2 or 3
+	Text  string
+	ID    string
+}
+
+// ExtractHeadings returns the h2/h3 headings of a markdown document in
+// order, with the same anchor IDs RenderMarkdown emits.
+func ExtractHeadings(md string) []Heading {
+	var out []Heading
+	inCode := false
+	for _, line := range strings.Split(strings.ReplaceAll(md, "\r\n", "\n"), "\n") {
+		if strings.HasPrefix(line, "```") {
+			inCode = !inCode
+			continue
+		}
+		if inCode {
+			continue
+		}
+		trimmed := strings.TrimSpace(line)
+		switch {
+		case strings.HasPrefix(trimmed, "### "):
+			out = append(out, Heading{Level: 3, Text: trimmed[4:], ID: headingSlug(trimmed[4:])})
+		case strings.HasPrefix(trimmed, "## "):
+			out = append(out, Heading{Level: 2, Text: trimmed[3:], ID: headingSlug(trimmed[3:])})
+		}
+	}
+	return out
+}
+
+func headingSlug(s string) string {
+	var b strings.Builder
+	prevDash := true
+	for _, r := range strings.ToLower(s) {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
+			b.WriteRune(r)
+			prevDash = false
+		default:
+			if !prevDash {
+				b.WriteRune('-')
+				prevDash = true
+			}
+		}
+	}
+	return strings.Trim(b.String(), "-")
+}
+
 // RenderMarkdown converts the constrained markdown subset used by the
 // changelog README into HTML: headings, paragraphs, fenced code blocks,
 // bullet and numbered lists, horizontal rules, bold, inline code, and links.
@@ -55,11 +104,11 @@ func RenderMarkdown(md string) string {
 		case strings.HasPrefix(trimmed, "### "):
 			flushPara()
 			closeList()
-			out.WriteString("<h3>" + inline(trimmed[4:]) + "</h3>\n")
+			out.WriteString("<h3 id=\"" + headingSlug(trimmed[4:]) + "\">" + inline(trimmed[4:]) + "</h3>\n")
 		case strings.HasPrefix(trimmed, "## "):
 			flushPara()
 			closeList()
-			out.WriteString("<h2>" + inline(trimmed[3:]) + "</h2>\n")
+			out.WriteString("<h2 id=\"" + headingSlug(trimmed[3:]) + "\">" + inline(trimmed[3:]) + "</h2>\n")
 		case strings.HasPrefix(trimmed, "# "):
 			flushPara()
 			closeList()

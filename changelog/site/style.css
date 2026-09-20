@@ -370,12 +370,49 @@ main { max-width: 720px; margin: 0 auto; padding: 1.8rem 1.5rem 3rem; }
 
 /* ---------- about page ---------- */
 
-.about {
-  max-width: 760px;
+.about-layout {
+  max-width: 1080px;
   margin: 0 auto;
   padding: 2.2rem 1.5rem 3rem;
-  color: var(--text);
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 3.5rem;
+  align-items: start;
 }
+
+.toc {
+  position: sticky;
+  top: 1.4rem;
+  font-size: 0.8rem;
+  border-left: 1px solid var(--border);
+  padding-left: 0;
+}
+
+.toc-title {
+  font: 650 0.66rem var(--sans);
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: #64748b;
+  margin: 0 0 0.75rem;
+  padding-left: 0.85rem;
+}
+
+.toc a {
+  display: block;
+  padding: 0.3rem 0.85rem;
+  border-left: 2px solid transparent;
+  margin-left: -1px;
+  color: var(--muted);
+  text-decoration: none;
+  line-height: 1.35;
+  transition: color .15s, border-color .15s;
+}
+.toc a:hover { color: var(--text); }
+.toc a.active { color: var(--text); border-left-color: var(--fixed); }
+.toc a.toc-h3 { padding-left: 1.7rem; font-size: 0.74rem; color: #75839c; }
+.toc a.toc-h3.active { color: var(--text); }
+
+.about h1, .about h2, .about h3 { scroll-margin-top: 1.2rem; }
 
 .about h1 { font-size: 1.7rem; letter-spacing: -0.01em; margin: 0.4rem 0 1rem; }
 .about h2 {
@@ -414,6 +451,11 @@ main { max-width: 720px; margin: 0 auto; padding: 1.8rem 1.5rem 3rem; }
 .about pre code { background: none; border: none; padding: 0; font-size: 0.78rem; color: var(--muted); }
 
 .about hr { border: none; border-top: 1px solid var(--border); margin: 2.2rem 0; }
+
+@media (max-width: 900px) {
+  .about-layout { grid-template-columns: 1fr; gap: 0; padding-top: 1.4rem; }
+  .toc { display: none; }
+}
 
 /* ---------- footer ---------- */
 
