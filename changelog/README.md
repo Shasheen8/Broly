@@ -4,9 +4,9 @@
 - RSS feed: [https://shasheen8.github.io/Broly/feed.xml](https://shasheen8.github.io/Broly/feed.xml)
 - About page: [https://shasheen8.github.io/Broly/about.html](https://shasheen8.github.io/Broly/about.html)
 
-An AI-generated changelog for [Broly](https://github.com/Shasheen8/Broly), a CLI-first code security scanner (secrets, SCA, SAST, workflow, IaC, containers, SBOM) with 200+ commits of release history. Broly is an active open-source project that was presented at **DEF CON 34 AppSec Village Arsenal** as "Broly: Rebuilding Code Security With Signal, Speed, and AI".
+A changelog for [Broly](https://github.com/Shasheen8/Broly), a CLI-first code security scanner (secrets, SCA, SAST, workflow, IaC, containers, SBOM) with 200+ commits of release history. Broly is an active open-source project that was presented at **DEF CON 34 AppSec Village Arsenal** as "Broly: Rebuilding Code Security With Signal, Speed, and AI".
 
-Every entry is drafted from git history by the `broly changelog` subcommand, reviewed word by word by a human, and only reviewed entries reach the site. This file is rendered into the site's About page by `broly changelog build`, so the repo README and the public page can never drift apart.
+Every entry is drafted from git history by the `broly changelog` subcommand, then edited and approved by a human before it reaches the site. This file is rendered into the site's About page by `broly changelog build`, so the repo README and the public page can never drift apart.
 
 This directory holds both halves of the changelog system:
 
