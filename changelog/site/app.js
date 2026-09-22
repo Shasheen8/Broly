@@ -143,8 +143,17 @@
       body);
   }
 
+  function dotCategory(sections) {
+    if (sections.some((s) => s.name === "Breaking")) return "breaking";
+    if (sections.some((s) => s.name === "New")) return "new";
+    if (sections.some((s) => s.name === "Improved")) return "improved";
+    if (sections.some((s) => s.name === "Fixed")) return "fixed";
+    return "";
+  }
+
   function releaseNode({ entry: e, sections }) {
     const hasBreaking = sections.some((s) => s.name === "Breaking");
+    const dot = active !== "All" ? active.toLowerCase() : dotCategory(sections);
     const card = el("article", { class: "release-card" });
     card.append(el("div", { class: "release-head" },
       el("a", { class: "version", id: anchorId(e.version), href: "#" + anchorId(e.version) }, e.version),
@@ -171,7 +180,7 @@
     return el("li", {
       class: "release",
       "data-breaking": String(hasBreaking),
-      "data-default-dot": sections.some((s) => s.name === "New") ? "new" : "",
+      "data-dot": dot,
     }, card);
   }
 

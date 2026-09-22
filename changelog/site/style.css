@@ -319,7 +319,10 @@ main { max-width: 720px; margin: 0 auto; padding: 1.8rem 1.5rem 3rem; }
 .sec-fixed { --sec-color: var(--fixed); }
 .sec-breaking { --sec-color: var(--breaking); }
 
-.release[data-default-dot="new"] { --dot-color: var(--new); }
+.release[data-dot="new"] { --dot-color: var(--new); }
+.release[data-dot="improved"] { --dot-color: var(--improved); }
+.release[data-dot="fixed"] { --dot-color: var(--fixed); }
+.release[data-dot="breaking"] { --dot-color: var(--breaking); }
 
 /* ---------- pagination ---------- */
 
