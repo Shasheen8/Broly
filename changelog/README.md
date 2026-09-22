@@ -1,17 +1,11 @@
-# Broly Changelog
+# About this changelog
 
 - Live site: [https://shasheen8.github.io/Broly/](https://shasheen8.github.io/Broly/)
-- RSS feed: [https://shasheen8.github.io/Broly/feed.xml](https://shasheen8.github.io/Broly/feed.xml)
-- About page: [https://shasheen8.github.io/Broly/about.html](https://shasheen8.github.io/Broly/about.html)
+- Usage guide (install, scanners, demo video): [https://shasheen8.github.io/Broly/usage.html](https://shasheen8.github.io/Broly/usage.html)
 
-A changelog for [Broly](https://github.com/Shasheen8/Broly), a CLI-first code security scanner (secrets, SCA, SAST, workflow, IaC, containers, SBOM) with 200+ commits of release history. Broly is an active open-source project that was presented at **DEF CON 34 AppSec Village Arsenal** as "Broly: Rebuilding Code Security With Signal, Speed, and AI".
+Broly is a CLI-first code security scanner (secrets, SCA, SAST, workflow, IaC, containers, SBOM) with 200+ commits of release history, presented at **DEF CON 34 AppSec Village Arsenal** as "Broly: Rebuilding Code Security With Signal, Speed, and AI". Every entry here is drafted from git history by the `broly changelog` subcommand, then edited and approved by a human before it reaches the site. This page is rendered from this README by `broly changelog build`, so the repo and the public page can never drift apart.
 
-Every entry is drafted from git history by the `broly changelog` subcommand, then edited and approved by a human before it reaches the site. This file is rendered into the site's About page by `broly changelog build`, so the repo README and the public page can never drift apart.
-
-This directory holds both halves of the changelog system:
-
-1. A developer-facing tool: the `broly changelog` subcommand, part of the CLI itself.
-2. A public-facing static site: `site/`, deployed to GitHub Pages on every push.
+## How it works
 
 ```
 broly changelog generate --since v1.66.0 --write   # AI drafts an entry
@@ -20,30 +14,28 @@ broly changelog build                              # entries -> changelog.json +
         (push to main, then CI builds and deploys the site)
 ```
 
----
-
 ## Why it is built this way
 
 ### The tool is a subcommand, not a separate repo
 
-Broly is a CLI tool, so its changelog generator is a CLI command. A maintainer who already runs `broly scan` in this repo writes release notes with `broly changelog generate`. There is nothing new to install, no second service to run, and the generator reuses the same Together AI client (`pkg/ai`) that powers SAST and triage. Dogfooding was the whole point: a tool for builders should be built with itself.
+Broly is a CLI tool, so its changelog generator is a CLI command. A maintainer who already runs `broly scan` writes release notes with `broly changelog generate`, with nothing new to install, and the generator reuses the same Together AI client (`pkg/ai`) that powers SAST and triage. Dogfooding is the point: a tool for builders should be built with itself.
 
 ### The audience rule
 
-A changelog has two possible audiences: maintainers (who know the code) and users (who only see releases). This one is written for users. The generation prompt enforces a hard rule: internal refactors, CI chores, dependency bumps, and doc reorganization are omitted unless they change observable behavior (flags, commands, config, output formats, exit codes). Six commits can become two bullets if that is what the story needs.
+Entries are written for users, not maintainers. The prompt enforces a hard rule: internal refactors, CI chores, dependency bumps, and doc reorganization are omitted unless they change observable behavior (flags, commands, config, output formats, exit codes). Six commits can become two bullets if that is what the story needs.
 
 ### Diffs, not just commit messages
 
-Commit subjects undersell most changes ("fix: word boundaries" tells a user nothing). The generator collects each commit's message, body, touched files, and line counts, and attaches trimmed diffs to the most user-facing commits (feature work, anything touching `cmd/`, anything with breaking-sounding language). The model reads what actually changed and writes what it means. For context that never made it into a commit message, `--notes "why we shipped this"` passes maintainer intent straight into the prompt.
+Commit subjects undersell most changes ("fix: word boundaries" tells a user nothing). The generator collects each commit's message, body, touched files, and line counts, and attaches trimmed diffs to the most user-facing commits. For context that never made it into a commit message, `--notes` passes maintainer intent straight into the prompt.
 
 ### Draft, review, publish
 
-The model never publishes. It writes a draft in a format designed for human editing: markdown with frontmatter, saved under `entries/`. The maintainer corrects wording, drops noise, and adds context the git history cannot show, then commits. Only reviewed entries reach the site. This mirrors how security tooling handles LLM output elsewhere in Broly (AI triage proposes verdicts, humans accept them), so the trust model is consistent across the product.
+The model never publishes. It writes a draft in markdown with frontmatter, saved under `entries/`. The maintainer corrects wording, drops noise, and adds context the git history cannot show, then commits. Only reviewed entries reach the site, mirroring how Broly treats AI triage verdicts.
 
 ### Guardrails on the model
 
 - The response is a JSON schema. Anything unparseable fails loudly instead of guessing.
-- Every commit reference the model returns is validated against the real commit window. Invented SHAs are silently dropped, and real ones get exact GitHub URLs.
+- Every commit reference is validated against the real commit window. Invented SHAs are silently dropped, and real ones get exact GitHub URLs.
 - The prompt says "never invent changes" and caps the window at 150 commits so the model summarizes instead of listing.
 
 ### The site is deliberately boring to deploy
@@ -54,7 +46,7 @@ The model never publishes. It writes a draft in a format designed for human edit
 - No build pipeline to keep green. A deploy is just a file copy.
 - It still looks sharp: dark terminal aesthetic, release timeline with category colors, filter chips, commit chips linking to GitHub, per-release diff stats, and a red glow on releases containing breaking changes.
 
-Generated output (`changelog.json`, `feed.xml`, `about.html`) is gitignored and rebuilt in CI, so the repo only ever stores reviewed source.
+Generated output (`changelog.json`, `feed.xml`, `about.html`, `usage.html`) is gitignored and rebuilt in CI, so the repo only ever stores reviewed source.
 
 Patterns borrowed from changelogs that do this well:
 
@@ -64,9 +56,9 @@ Patterns borrowed from changelogs that do this well:
 
 One deliberate style rule: ASCII punctuation only, in the README, the site, and generated entries. Broly is a terminal-first tool, and its docs render in terminals, editors, RSS readers, and browsers alike.
 
----
+## Working on it
 
-## Layout
+### Repo layout
 
 ```
 changelog/
@@ -83,20 +75,20 @@ pkg/changelog/
   git.go       commit window collection, diffstats, repo remote resolution
   generate.go  prompt assembly, model call, JSON validation
   entry.go     entry types, markdown render/parse round-trip
-  site.go      entries -> changelog.json + RSS feed
+  site.go      entries -> changelog.json + RSS feed + doc pages
 cmd/broly/
   changelog.go the generate/build subcommands
 .github/workflows/
   pages.yml    CI: build site data, deploy to GitHub Pages
 ```
 
-## Tools used to build this
+### Tools used to build this
 
 - Built with [opencode](https://opencode.ai), an AI coding agent, using GLM via Together AI.
 - Entry drafts are generated by `zai-org/GLM-5.2` through the same Together AI client Broly uses for SAST.
 - Go, cobra, and gopkg.in/yaml.v3. Vanilla JS/CSS for the site.
 
-## Running locally
+### Running locally
 
 ```bash
 export TOGETHER_API_KEY=your_key_here
@@ -115,7 +107,7 @@ Backfilling a historical release tag-to-tag:
 broly changelog generate --since v1.0.20 --until v1.0.28 --version v1.0.28 --write
 ```
 
-## Publishing checklist
+### Publishing checklist
 
 1. Tag or cut the release.
 2. `broly changelog generate --since <last-tag> --write`.
