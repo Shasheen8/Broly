@@ -1,6 +1,10 @@
 # Using Broly
 
-Broly is a CLI-first code security scanner: secrets, SCA, SAST, workflow, IaC, containers, SBOM, and supply chain auditing in one Go binary, powered by Together AI for SAST and triage. This page covers installation, every scanner and flag, and ends with a short demo.
+Broly is a CLI-first code security scanner: secrets, SCA, SAST, workflow, IaC, containers, SBOM, and supply chain auditing in one Go binary, powered by Together AI for SAST and triage. Watch it run first, then install it and see every flag.
+
+## Broly in action
+
+<!-- video: Broly.mp4 -->
 
 ## Install
 
@@ -101,7 +105,3 @@ TOOL AUTO-INSTALL
 
 Built in Go for speed. Designed for local developer runs and CI.
 ```
-
-## Broly in action
-
-<!-- video: Broly.mp4 -->
