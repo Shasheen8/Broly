@@ -193,6 +193,7 @@ func changelogBuildCmd() *cobra.Command {
 		siteDir   string
 		baseURL   string
 		readme    string
+		usage     string
 	)
 
 	cmd := &cobra.Command{
@@ -201,8 +202,9 @@ func changelogBuildCmd() *cobra.Command {
 		Long: `Parse every markdown entry in the entries directory and render
 changelog.json and feed.xml for the static changelog site.
 
-Also renders the README into about.html, so the site's About page and
-the repo README stay in sync from one source.
+Also renders the README into about.html and the usage guide into
+usage.html, so the doc pages and their markdown sources stay in sync
+from one place.
 
 Run this after adding or editing an entry, then commit everything:
 GitHub Pages (see .github/workflows/pages.yml) re-runs this build on
@@ -220,7 +222,7 @@ push and deploys the site directory.`,
 			if baseURL == "" {
 				baseURL = changelog.SiteURL(repo)
 			}
-			return changelog.BuildSite(entries, siteDir, baseURL, repo, readme)
+			return changelog.BuildSite(entries, siteDir, baseURL, repo, readme, usage)
 		},
 	}
 
@@ -228,5 +230,6 @@ push and deploys the site directory.`,
 	cmd.Flags().StringVar(&siteDir, "site", "changelog/site", "Directory the site data is written to")
 	cmd.Flags().StringVar(&baseURL, "base-url", "", "Public URL of the site (default: derived from origin remote)")
 	cmd.Flags().StringVar(&readme, "readme", "changelog/README.md", "README rendered into about.html (empty to skip)")
+	cmd.Flags().StringVar(&usage, "usage", "changelog/USAGE.md", "Usage guide rendered into usage.html (empty to skip)")
 	return cmd
 }

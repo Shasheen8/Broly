@@ -1,6 +1,8 @@
 package changelog
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -32,6 +34,26 @@ func TestRenderMarkdownEscapesHTML(t *testing.T) {
 	}
 	if !strings.Contains(got, "&lt;script&gt;") {
 		t.Errorf("script should be escaped: %s", got)
+	}
+}
+
+func TestRenderMarkdownVideoSlot(t *testing.T) {
+	got := RenderMarkdown("## Demo\n\n<!-- video: Broly.mp4 -->\n")
+	if !strings.Contains(got, `<p class="video-slot" data-video="Broly.mp4"></p>`) {
+		t.Errorf("video slot not emitted: %s", got)
+	}
+}
+
+func TestFillVideoSlots(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "demo.mp4"), []byte("x"), 0o644)
+	page := `<p class="video-slot" data-video="demo.mp4"></p><p class="video-slot" data-video="missing.mp4"></p>`
+	got := fillVideoSlots(page, dir)
+	if !strings.Contains(got, `<video controls preload="metadata" src="demo.mp4">`) {
+		t.Errorf("existing video not filled: %s", got)
+	}
+	if !strings.Contains(got, "video-missing") || !strings.Contains(got, "missing.mp4") {
+		t.Errorf("missing video should render a note: %s", got)
 	}
 }
 

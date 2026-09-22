@@ -55,10 +55,22 @@ func headingSlug(s string) string {
 	return strings.Trim(b.String(), "-")
 }
 
+var (
+	videoSlotRe = regexp.MustCompile(`^<!-- video: (.+?) -->$`)
+)
+
+func videoSlot(line string) (string, bool) {
+	if m := videoSlotRe.FindStringSubmatch(line); m != nil {
+		return m[1], true
+	}
+	return "", false
+}
+
 // RenderMarkdown converts the constrained markdown subset used by the
 // changelog README into HTML: headings, paragraphs, fenced code blocks,
-// bullet and numbered lists, horizontal rules, bold, inline code, and links.
-// Input is HTML-escaped before any tags are injected.
+// bullet and numbered lists, horizontal rules, bold, inline code, links,
+// and video embed slots (`<!-- video: name -->` becomes a slot paragraph
+// the page assembler replaces with a real player).
 func RenderMarkdown(md string) string {
 	lines := strings.Split(strings.ReplaceAll(md, "\r\n", "\n"), "\n")
 	var out strings.Builder
@@ -97,6 +109,12 @@ func RenderMarkdown(md string) string {
 		}
 
 		trimmed := strings.TrimSpace(line)
+		if name, ok := videoSlot(trimmed); ok {
+			flushPara()
+			closeList()
+			out.WriteString("<p class=\"video-slot\" data-video=\"" + html.EscapeString(name) + "\"></p>\n")
+			continue
+		}
 		switch {
 		case trimmed == "":
 			flushPara()

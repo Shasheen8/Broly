@@ -117,7 +117,7 @@ ENVIRONMENT VARIABLES
 
 EXIT CODES
   0   No findings (clean scan)
-  1   Findings detected (or required baseline missing) — signals CI to fail
+  1   Findings detected (or required baseline missing): signals CI to fail
   2   Operational error (bad flags, scan failure, missing tool)
 
 TOOL AUTO-INSTALL

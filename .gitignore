@@ -52,6 +52,7 @@ scan-results/
 changelog/site/changelog.json
 changelog/site/feed.xml
 changelog/site/about.html
+changelog/site/usage.html
 
 # Plan and internal docs (not for repo)
 PLAN.md

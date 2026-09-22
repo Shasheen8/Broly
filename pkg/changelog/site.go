@@ -72,9 +72,10 @@ func LoadEntries(dir string) ([]*Entry, error) {
 }
 
 // BuildSite writes changelog.json and feed.xml into outDir from the
-// entries in entriesDir. It also renders the README into about.html so
-// the site's About page and the repo README stay in sync from one source.
-func BuildSite(entriesDir, outDir, baseURL string, repo RepoInfo, readmePath string) error {
+// entries in entriesDir. It also renders the README into about.html and
+// the usage guide into usage.html, so the doc pages and their markdown
+// sources stay in sync from one place.
+func BuildSite(entriesDir, outDir, baseURL string, repo RepoInfo, readmePath, usagePath string) error {
 	entries, err := LoadEntries(entriesDir)
 	if err != nil {
 		return err
@@ -110,22 +111,42 @@ func BuildSite(entriesDir, outDir, baseURL string, repo RepoInfo, readmePath str
 		return fmt.Errorf("writing feed.xml: %w", err)
 	}
 
-	about := 0
-	if readmePath != "" {
-		readme, err := os.ReadFile(readmePath)
-		if err != nil {
-			fmt.Printf("  note: skipping about page (%s not found)\n", readmePath)
-		} else {
-			cssHash := fileHash(filepath.Join(outDir, "style.css"))
-			html := renderAboutPage(string(readme), data, baseURL, cssHash)
-			if err := os.WriteFile(filepath.Join(outDir, "about.html"), []byte(html), 0o644); err != nil {
-				return fmt.Errorf("writing about.html: %w", err)
-			}
-			about = 1
+	cssHash := fileHash(filepath.Join(outDir, "style.css"))
+	pages := 0
+	for _, p := range []docPage{
+		{
+			Title:   "About",
+			Tagline: "Why this changelog exists, and how it is made.",
+			Nav:     "about",
+			Source:  "changelog/README.md",
+			Path:    readmePath,
+			File:    "about.html",
+		},
+		{
+			Title:   "Usage",
+			Tagline: "Install Broly, see every scanner and flag, and watch it run.",
+			Nav:     "usage",
+			Source:  "changelog/USAGE.md",
+			Path:    usagePath,
+			File:    "usage.html",
+		},
+	} {
+		if p.Path == "" {
+			continue
 		}
+		src, err := os.ReadFile(p.Path)
+		if err != nil {
+			fmt.Printf("  note: skipping %s (%s not found)\n", p.File, p.Path)
+			continue
+		}
+		html := renderDocPage(p, string(src), outDir, cssHash, data)
+		if err := os.WriteFile(filepath.Join(outDir, p.File), []byte(html), 0o644); err != nil {
+			return fmt.Errorf("writing %s: %w", p.File, err)
+		}
+		pages++
 	}
 	versionIndexAssets(outDir)
-	fmt.Printf("  built changelog.json (%d entries), feed.xml, and about.html (%d) in %s\n", len(entries), about, outDir)
+	fmt.Printf("  built changelog.json (%d entries), feed.xml, and %d doc pages in %s\n", len(entries), pages, outDir)
 	return nil
 }
 
@@ -194,11 +215,37 @@ func versionIndexAssets(dir string) {
 	}
 }
 
-func renderAboutPage(readme string, d siteData, baseURL string, cssHash string) string {
+var videoSlotHTMLRe = regexp.MustCompile(`<p class="video-slot" data-video="([^"]+)"></p>`)
+
+// fillVideoSlots replaces video-slot paragraphs with a native player when
+// the file exists next to the site, or a note when it does not.
+func fillVideoSlots(pageHTML, outDir string) string {
+	return videoSlotHTMLRe.ReplaceAllStringFunc(pageHTML, func(m string) string {
+		name := videoSlotHTMLRe.FindStringSubmatch(m)[1]
+		if _, err := os.Stat(filepath.Join(outDir, name)); err != nil {
+			return "<p class=\"video-missing\">Video " + html.EscapeString(name) + " is not in the site directory.</p>"
+		}
+		return "<figure class=\"video-wrap\"><video controls preload=\"metadata\" src=\"" + html.EscapeString(name) + "\"></video></figure>"
+	})
+}
+
+type docPage struct {
+	Title   string // "About" or "Usage"
+	Tagline string
+	Nav     string // "usage" or "about" marks the active link
+	Source  string // markdown file the page is rendered from
+	Path    string // where the source markdown lives ("" skips the page)
+	File    string // output filename
+}
+
+// renderDocPage wraps rendered markdown in the shared doc-page shell:
+// brand header, TOC sidebar with scroll-spy, and footer.
+func renderDocPage(p docPage, readme, outDir, cssHash string, d siteData) string {
 	name := d.Repo.Name
 	if i := strings.LastIndex(name, "/"); i >= 0 {
 		name = name[i+1:]
 	}
+
 	var toc strings.Builder
 	for _, h := range ExtractHeadings(readme) {
 		class := "toc-h2"
@@ -208,13 +255,23 @@ func renderAboutPage(readme string, d siteData, baseURL string, cssHash string) 
 		fmt.Fprintf(&toc, "        <a class=\"%s\" href=\"#%s\">%s</a>\n", class, h.ID, html.EscapeString(h.Text))
 	}
 
+	usageClass := ""
+	aboutClass := ""
+	if p.Nav == "usage" {
+		usageClass = " aria-current=\"page\""
+	} else if p.Nav == "about" {
+		aboutClass = " aria-current=\"page\""
+	}
+
+	content := fillVideoSlots(RenderMarkdown(readme), outDir)
+
 	return `<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>` + htmlPageTitle(name) + ` Changelog: About</title>
-  <meta name="description" content="How this changelog is made: the tool, the review workflow, and the design decisions behind it.">
+  <title>` + htmlPageTitle(name) + ` Changelog: ` + p.Title + `</title>
+  <meta name="description" content="` + html.EscapeString(p.Tagline) + `">
   <link rel="icon" href="broly-logo.png" type="image/png">
   <link rel="stylesheet" href="style.css` + cssQuery(cssHash) + `">
 </head>
@@ -230,12 +287,13 @@ func renderAboutPage(readme string, d siteData, baseURL string, cssHash string) 
         </span>
       </a>
       <nav class="header-actions">
-        <a class="action" href="index.html">Changelog</a>
+        <a class="action"` + usageClass + ` href="usage.html" title="Install and use Broly">Usage</a>
+        <a class="action"` + aboutClass + ` href="about.html" title="How this changelog is made">About</a>
         <a class="action" href="feed.xml" title="RSS feed">RSS</a>
         <a class="action" href="` + d.Repo.URL + `" title="Source on GitHub">GitHub</a>
       </nav>
     </div>
-    <p class="tagline">Why this changelog exists, and how it is made.</p>
+    <p class="tagline">` + html.EscapeString(p.Tagline) + `</p>
   </header>
 
   <div class="about-layout">
@@ -244,12 +302,12 @@ func renderAboutPage(readme string, d siteData, baseURL string, cssHash string) 
 ` + toc.String() + `    </aside>
 
     <main class="about">
-    ` + RenderMarkdown(readme) + `
+    ` + content + `
     </main>
   </div>
 
   <footer class="site-footer">
-    <p>This page is rendered from <code>changelog/README.md</code> by <code>broly changelog build</code>, so it can never drift from the repo.</p>
+    <p>This page is rendered from <code>` + p.Source + `</code> by <code>broly changelog build</code>, so it can never drift from the repo.</p>
   </footer>
 
   <script>

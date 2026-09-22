@@ -452,6 +452,26 @@ main { max-width: 720px; margin: 0 auto; padding: 1.8rem 1.5rem 3rem; }
 
 .about hr { border: none; border-top: 1px solid var(--border); margin: 2.2rem 0; }
 
+.video-wrap {
+  margin: 1.3rem 0 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  background: var(--surface-2);
+  overflow: hidden;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+}
+.video-wrap video { display: block; width: 100%; height: auto; }
+
+.video-missing {
+  color: var(--breaking);
+  border: 1px dashed color-mix(in srgb, var(--breaking) 35%, var(--border));
+  border-radius: 10px;
+  padding: 0.9rem 1rem;
+  font-size: 0.85rem;
+}
+
+.action[aria-current="page"] { color: var(--text); border-color: #3b4657; background: var(--surface-2); }
+
 @media (max-width: 900px) {
   .about-layout { grid-template-columns: 1fr; gap: 0; padding-top: 1.4rem; }
   .toc { display: none; }

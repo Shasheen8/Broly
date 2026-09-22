@@ -71,9 +71,11 @@ One deliberate style rule: ASCII punctuation only, in the README, the site, and 
 ```
 changelog/
   entries/    reviewed markdown, one file per release (frontmatter + sections)
-  site/       static site: app.js fetches changelog.json, about.html is
-              generated from this README at build time
+  site/       static site: app.js fetches changelog.json, while about.html
+              and usage.html are generated from this README and
+              USAGE.md at build time, demo video alongside
   README.md   this file
+  USAGE.md    usage guide rendered into usage.html
 ```
 
 ```
